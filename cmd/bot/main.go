@@ -1,38 +1,31 @@
 package main
 
 import (
-	"LazyCatBot/internal/discord"
-	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
+	"LazyCatBot/internal/worker"
 	"fmt"
 	"log"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 
 	"github.com/bwmarrin/discordgo"
+	"github.com/joho/godotenv"
 )
 
-var globalStore storage.RaidStorage
+var leaderboardStore *storage.LeaderboardStorage
 
 func main() {
-	raids, err := sirus.GetActualRaids()
+	leaderboardStore = storage.NewLeaderboardStorage()
+
+	go worker.StartLeaderboardSync(leaderboardStore)
+	err := godotenv.Load()
 	if err != nil {
-		log.Printf("Ошибка получения рейдов: %v", err)
+		log.Fatal("Ошибка загрузки .env файла")
 	}
+	token := os.Getenv("DISCORD_TOKEN")
 
-	globalStore = storage.RaidStorage{
-		ActiveRaids: raids,
-	}
-
-	store := storage.RaidStorage{
-		ActiveRaids: raids,
-	}
-	fmt.Printf("Содержимое store.ActiveRaids: %#v\n", store.ActiveRaids)
-	fmt.Printf("Загружено актуальных рейдов: %d\n", len(store.ActiveRaids))
-
-	dg, err := discordgo.New("Bot " + os.Getenv("DISCORD_TOKEN"))
+	dg, err := discordgo.New("Bot " + token)
 
 	if err != nil {
 		fmt.Println("Ошибка создания сессии:", err)
@@ -41,7 +34,7 @@ func main() {
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
 
-	dg.AddHandler(messageCreate)
+	// dg.AddHandler(messageCreate)
 
 	err = dg.Open()
 
@@ -59,17 +52,17 @@ func main() {
 	<-sc
 }
 
-func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	if m.Author.ID == s.State.User.ID {
-		return
-	}
+// func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+//     if m.Author.ID == s.State.User.ID {
+//         return
+//     }
 
-	if strings.ToLower(m.Content) == "/топ" {
-		table := discord.FormatTotalTopGuild("Coda", globalStore.ActiveRaids)
+//     if strings.ToLower(m.Content) == "/топ" {
+//         table := discord.FormatTotalTopGuild("Coda", globalStore.ActiveRaids)
 
-		_, err := s.ChannelMessageSend(m.ChannelID, table)
-		if err != nil {
-			fmt.Println("Ошибка отправки сообщения:", err)
-		}
-	}
-}
+//         _, err := s.ChannelMessageSend(m.ChannelID, table)
+//         if err != nil {
+//             fmt.Println("Ошибка отправки сообщения:", err)
+//         }
+//     }
+// }

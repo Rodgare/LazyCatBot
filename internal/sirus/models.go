@@ -1,12 +1,14 @@
 package sirus
 
-type RaidInfo struct {
-	MapID      int    `json:"map_id"`
-	MapName    string `json:"map_name"`
-	Difficulty int    `json:"difficulty"`
-	Actual     bool   `json:"actual"`
+type LeaderboardPlayer struct {
+	Name string `json:"name"`
+	Rank int    `json:"rank"`
+	Dps  int    `json:"dps"`
 }
 
-type CharacterResponse struct {
-	Pve map[string]RaidInfo `json:"pve"`
+type Leaderboard struct {
+	Data []LeaderboardPlayer `json:"data"`
+	Meta struct {
+		LastPage int `json:"last_page"`
+	} `json:"meta"`
 }
