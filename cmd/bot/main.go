@@ -1,6 +1,7 @@
 package main
 
 import (
+	"LazyCatBot/internal/discord"
 	"LazyCatBot/internal/storage"
 	"LazyCatBot/internal/worker"
 	"fmt"
@@ -13,17 +14,17 @@ import (
 	"github.com/joho/godotenv"
 )
 
-var leaderboardStore *storage.LeaderboardStorage
-
 func main() {
-	leaderboardStore = storage.NewLeaderboardStorage()
-
-	go worker.StartLeaderboardSync(leaderboardStore)
-	err := godotenv.Load()
-	if err != nil {
+	if err := godotenv.Load("../../.env"); err != nil {
 		log.Fatal("Ошибка загрузки .env файла")
 	}
 	token := os.Getenv("DISCORD_TOKEN")
+	if token == "" {
+		log.Fatal("DISCORD_TOKEN не установлен")
+	}
+
+	leaderboardStore := storage.NewLeaderboardStorage()
+	go worker.StartLeaderboardSync(leaderboardStore)
 
 	dg, err := discordgo.New("Bot " + token)
 
@@ -34,8 +35,10 @@ func main() {
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
 
-	// dg.AddHandler(messageCreate)
-
+	h := &discord.BotHandler{
+		Store: leaderboardStore,
+	}
+	dg.AddHandler(h.MessageCreate)
 	err = dg.Open()
 
 	if err != nil {
@@ -51,18 +54,3 @@ func main() {
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
 }
-
-// func messageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-//     if m.Author.ID == s.State.User.ID {
-//         return
-//     }
-
-//     if strings.ToLower(m.Content) == "/топ" {
-//         table := discord.FormatTotalTopGuild("Coda", globalStore.ActiveRaids)
-
-//         _, err := s.ChannelMessageSend(m.ChannelID, table)
-//         if err != nil {
-//             fmt.Println("Ошибка отправки сообщения:", err)
-//         }
-//     }
-// }
