@@ -59,6 +59,7 @@ func FetchFullLeaderboard(raidID, bossID int, spec string) ([]LeaderboardPlayer,
 		nextPage, err := GetPage(raidID, bossID, spec, p)
 		if err != nil {
 			fmt.Printf("Ошибка при загрузке страницы %d: %v\n", p, err)
+			time.Sleep(2 * time.Second)
 			continue
 		}
 		allPlayers = append(allPlayers, nextPage.Data...)
