@@ -23,18 +23,22 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 	for {
 		fmt.Println("[Worker] Начало цикла обновления данных...")
 
-		for raidID, bosses := range RaidsToFetch {
-			for _, bossID := range bosses {
+		for raidOrder, bosses := range RaidsToFetch {
+			for _, bossOrder := range bosses {
 				for _, spec := range SpecsToFetch {
-					fmt.Printf("[Worker] парсинг raidID %v, bossID %v, spec %v...\n", raidID, bossID, spec)
-					players, err := sirus.FetchFullLeaderboard(raidID, bossID, spec)
+					fmt.Printf("[Worker] Parsing (R:%v, B:%v, S:%v)...\n", raidOrder, bossOrder, spec)
+					players, err := sirus.FetchFullLeaderboard(raidOrder, bossOrder, spec)
 					if err != nil {
-						log.Printf("[Worker] Ошибка (R:%d B:%d S:%s): %v", raidID, bossID, spec, err)
+						log.Printf("[Worker] Error (R:%d B:%d S:%s): %v", raidOrder, bossOrder, spec, err)
 						time.Sleep(2 * time.Second)
 						continue
 					}
-
-					store.Update(raidID, bossID, spec, players)
+					if len(players) == 0 {
+						fmt.Printf("[Worker] Empty players data R:%d B:%d S:%s\n", raidOrder, bossOrder, spec)
+						continue
+					}
+					firstPlayer := players[0]
+					store.Update(firstPlayer.MapID, firstPlayer.Difficulty, firstPlayer.EncounterID, spec, players)
 
 					time.Sleep(2 * time.Second)
 				}
