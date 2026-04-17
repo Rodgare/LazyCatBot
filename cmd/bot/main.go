@@ -15,11 +15,13 @@ import (
 )
 
 func main() {
-	if err := godotenv.Load("../../.env"); err != nil {
+	if err := godotenv.Load(); err != nil {
 		log.Fatal("Ошибка загрузки .env файла")
 	}
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
+		log.Fatal("DISCORD_TOKEN не установлен")
+	}
 		log.Fatal("DISCORD_TOKEN не установлен")
 	}
 
@@ -32,15 +34,24 @@ func main() {
 		fmt.Println("Ошибка создания сессии:", err)
 		return
 	}
+		fmt.Println("Ошибка создания сессии:", err)
+		return
+	}
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
 
 	h := &discord.BotHandler{
 		Store: leaderboardStore,
 	}
+		Store: leaderboardStore,
+	}
 	dg.AddHandler(h.MessageCreate)
 	err = dg.Open()
 
+	if err != nil {
+		fmt.Println("Ошибка открытия соединения:", err)
+		return
+	}
 	if err != nil {
 		fmt.Println("Ошибка открытия соединения:", err)
 		return

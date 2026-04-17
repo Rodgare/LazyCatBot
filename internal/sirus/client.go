@@ -69,8 +69,10 @@ func FetchFullLeaderboard(raidID, bossID int, spec string) ([]LeaderboardPlayer,
 }
 
 func GetSirusDates() (string, string) {
-	now := time.Now()
+	return calculateSirusDates(time.Now())
+}
 
+func calculateSirusDates(now time.Time) (string, string) {
 	daysSinceThursday := int(now.Weekday()) - int(time.Thursday)
 	if daysSinceThursday < 0 {
 		daysSinceThursday += 7

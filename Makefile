@@ -14,3 +14,9 @@ clean:
 
 build-linux:
 	set GOOS=linux&& set GOARCH=amd64&& go build -o bot_linux $(MAIN_PATH)
+
+test:
+	go test ./...
+
+testv:
+	go test -v ./...
