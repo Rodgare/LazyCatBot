@@ -26,7 +26,10 @@ func main() {
 	}
 
 	leaderboardStore := storage.NewLeaderboardStorage()
+	bossKillsStore := storage.NewBossKillsStorage()
+
 	go worker.StartLeaderboardSync(leaderboardStore)
+	go worker.KillMonitor(bossKillsStore)
 
 	dg, err := discordgo.New("Bot " + token)
 

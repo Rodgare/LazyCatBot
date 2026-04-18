@@ -8,14 +8,27 @@ import (
 	"time"
 )
 
+// raid order: boss/encounter order
 var RaidsToFetch = map[int][]int{
 	13: {0},
 	15: {0, 1, 2, 3, 4},
 	16: {0},
 	17: {0, 1},
 }
-var SpecsToFetch = []string{"1:0", "1:1", "1:2", "2:0", "2:1", "2:2", "3:0", "3:1", "3:2", "4:0", "4:1", "4:2",
-	"5:0", "5:1", "5:2", "6:0", "6:1", "6:2", "7:0", "7:1", "7:2", "8:0", "8:1", "8:2", "9:0", "9:1", "9:2", "11:0", "11:1", "11:2"}
+
+// class order: spec order
+var ClassesToFetch = map[int][]int{
+	1:  {0, 1, 2},
+	2:  {0, 1, 2},
+	3:  {0, 1, 2},
+	4:  {0, 1, 2},
+	5:  {0, 1, 2},
+	6:  {0, 1, 2},
+	7:  {0, 1, 2},
+	8:  {0, 1, 2},
+	9:  {0, 1, 2},
+	11: {0, 1, 2},
+}
 
 func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 	fmt.Println("[Worker] Запуск системы синхронизации...")
@@ -25,22 +38,27 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 
 		for raidOrder, bosses := range RaidsToFetch {
 			for _, bossOrder := range bosses {
-				for _, spec := range SpecsToFetch {
-					fmt.Printf("[Worker] Parsing (R:%v, B:%v, S:%v)...\n", raidOrder, bossOrder, spec)
-					players, err := sirus.FetchFullLeaderboard(raidOrder, bossOrder, spec)
-					if err != nil {
-						log.Printf("[Worker] Error (R:%d B:%d S:%s): %v", raidOrder, bossOrder, spec, err)
-						time.Sleep(2 * time.Second)
-						continue
-					}
-					if len(players) == 0 {
-						fmt.Printf("[Worker] Empty players data R:%d B:%d S:%s\n", raidOrder, bossOrder, spec)
-						continue
-					}
-					firstPlayer := players[0]
-					store.Update(firstPlayer.MapID, firstPlayer.Difficulty, firstPlayer.EncounterID, spec, players)
+				for class, specs := range ClassesToFetch {
+					for _, spec := range specs {
+						fmt.Printf("[Worker] Parsing (R:%v, B:%v, C:%v, S:%v)...\n", raidOrder, bossOrder, class, spec)
 
-					time.Sleep(2 * time.Second)
+						classSpec := fmt.Sprintf("%d:%d", class, spec)
+						players, err := sirus.FetchFullLeaderboard(raidOrder, bossOrder, classSpec)
+						if err != nil {
+							log.Printf("[Worker] Error (R:%d B:%d C:%d S:%d): %v", raidOrder, bossOrder, class, spec, err)
+							time.Sleep(2 * time.Second)
+							continue
+						}
+						if len(players) == 0 {
+							fmt.Printf("[Worker] Empty players data R:%d B:%d C:%d S:%d\n", raidOrder, bossOrder, class, spec)
+							continue
+						}
+
+						store.UpdateLeaderboardStorage(raidOrder, bossOrder, class, spec, players)
+
+						time.Sleep(2 * time.Second)
+					}
+
 				}
 			}
 		}

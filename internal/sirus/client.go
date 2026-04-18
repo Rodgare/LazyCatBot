@@ -8,38 +8,16 @@ import (
 )
 
 func GetPage(raidID, bossID int, spec string, page int) (*Leaderboard, error) {
-    weekFrom, weekTo := GetSirusDates()
-    url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=dps&aggregation=max&week_from=%s&week_to=%s&i=%d&boss=%d&specs=%s&page=%d",
-        weekFrom, weekTo, raidID, bossID, spec, page)
+	weekFrom, weekTo := GetSirusDates()
+	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=dps&aggregation=max&week_from=%s&week_to=%s&i=%d&boss=%d&specs=%s&page=%d",
+		weekFrom, weekTo, raidID, bossID, spec, page)
 
-    httpClient := &http.Client{
-        Timeout: 10 * time.Second,
-    }
+	var res Leaderboard
+	if err := makeRequest(url, &res); err != nil {
+		return nil, err
+	}
 
-    req, err := http.NewRequest("GET", url, nil)
-    if err != nil {
-        return nil, err
-    }
-
-    req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LazyCatBot/1.0")
-    req.Header.Set("Accept", "application/json")
-
-    resp, err := httpClient.Do(req)
-    if err != nil {
-        return nil, err
-    }
-    defer resp.Body.Close()
-
-    if resp.StatusCode != http.StatusOK {
-        return nil, fmt.Errorf("API вернуло статус: %d", resp.StatusCode)
-    }
-
-    var res Leaderboard
-    if err := json.NewDecoder(resp.Body).Decode(&res); err != nil {
-        return nil, err
-    }
-
-    return &res, nil
+	return &res, nil
 }
 
 func FetchFullLeaderboard(raidID, bossID int, spec string) ([]LeaderboardPlayer, error) {
@@ -68,6 +46,28 @@ func FetchFullLeaderboard(raidID, bossID int, spec string) ([]LeaderboardPlayer,
 	return allPlayers, nil
 }
 
+func FetchLatestBossKills() (*LatestBossKills, error) {
+	url := "https://sirus.su/api/base/22/progression/pve/latest-boss-kills"
+	var res LatestBossKills
+
+	if err := makeRequest(url, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+}
+
+func FetchBossFightDetails(fightID int) (*BossFight, error) {
+	url := fmt.Sprintf("https://sirus.su/api/base/22/details/bossfight/%v", fightID)
+	var fight BossFight
+
+	if err := makeRequest(url, &fight); err != nil {
+		return nil, err
+	}
+
+	return &fight, nil
+}
+
 func GetSirusDates() (string, string) {
 	return calculateSirusDates(time.Now())
 }
@@ -85,4 +85,30 @@ func calculateSirusDates(now time.Time) (string, string) {
 	weekFrom := weekFromDate.Format("2006-01-02")
 
 	return weekFrom, weekTo
+}
+
+func makeRequest(url string, target any) error {
+	httpClient := &http.Client{
+		Timeout: 10 * time.Second,
+	}
+
+	req, err := http.NewRequest("GET", url, nil)
+	if err != nil {
+		return err
+	}
+
+	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LazyCatBot/1.0")
+	req.Header.Set("Accept", "application/json")
+
+	resp, err := httpClient.Do(req)
+	if err != nil {
+		return err
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("API вернуло статус: %d", resp.StatusCode)
+	}
+
+	return json.NewDecoder(resp.Body).Decode(target)
 }
