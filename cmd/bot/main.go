@@ -16,30 +16,24 @@ import (
 
 func main() {
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Ошибка загрузки .env файла")
+		log.Fatal("Error load .env file")
 	}
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
-		log.Fatal("DISCORD_TOKEN не установлен")
+		log.Fatal("DISCORD_TOKEN doesn`t set")
 	}
-		log.Fatal("DISCORD_TOKEN не установлен")
+
+	dg, err := discordgo.New("Bot " + token)
+	if err != nil {
+		fmt.Println("DiscordGo session create error:", err)
+		return
 	}
 
 	leaderboardStore := storage.NewLeaderboardStorage()
 	bossKillsStore := storage.NewBossKillsStorage()
 
 	go worker.StartLeaderboardSync(leaderboardStore)
-	go worker.KillMonitor(bossKillsStore)
-
-	dg, err := discordgo.New("Bot " + token)
-
-	if err != nil {
-		fmt.Println("Ошибка создания сессии:", err)
-		return
-	}
-		fmt.Println("Ошибка создания сессии:", err)
-		return
-	}
+	go worker.KillMonitor(leaderboardStore, bossKillsStore, dg)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
 
@@ -52,17 +46,17 @@ func main() {
 	err = dg.Open()
 
 	if err != nil {
-		fmt.Println("Ошибка открытия соединения:", err)
+		fmt.Println("Connection error:", err)
 		return
 	}
 	if err != nil {
-		fmt.Println("Ошибка открытия соединения:", err)
+		fmt.Println("Connection error:", err)
 		return
 	}
 
 	defer dg.Close()
 
-	fmt.Println("Бот запущен. Ctrl+C для выхода.")
+	fmt.Println("Bot is running. Ctrl+C exit")
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)

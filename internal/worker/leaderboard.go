@@ -64,6 +64,6 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 		}
 
 		fmt.Println("[Worker] Все данные обновлены. Спим 60 минут...")
-		time.Sleep(60 * time.Minute)
+		time.Sleep(240 * time.Minute)
 	}
 }

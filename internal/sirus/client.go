@@ -3,6 +3,7 @@ package sirus
 import (
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"time"
 )
@@ -27,20 +28,19 @@ func FetchFullLeaderboard(raidID, bossID int, spec string) ([]LeaderboardPlayer,
 	if err != nil {
 		return nil, err
 	}
-
+	time.Sleep(5 * time.Second)
 	allPlayers = append(allPlayers, firstPage.Data...)
 	totalPages := firstPage.Meta.LastPage
 
 	for p := 2; p <= totalPages; p++ {
-		time.Sleep(300 * time.Millisecond)
-
 		nextPage, err := GetPage(raidID, bossID, spec, p)
 		if err != nil {
 			fmt.Printf("Ошибка при загрузке страницы %d: %v\n", p, err)
-			time.Sleep(2 * time.Second)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 		allPlayers = append(allPlayers, nextPage.Data...)
+		time.Sleep(5 * time.Second)
 	}
 
 	return allPlayers, nil
@@ -89,7 +89,7 @@ func calculateSirusDates(now time.Time) (string, string) {
 
 func makeRequest(url string, target any) error {
 	httpClient := &http.Client{
-		Timeout: 10 * time.Second,
+		Timeout: 30 * time.Second,
 	}
 
 	req, err := http.NewRequest("GET", url, nil)
@@ -100,15 +100,25 @@ func makeRequest(url string, target any) error {
 	req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LazyCatBot/1.0")
 	req.Header.Set("Accept", "application/json")
 
-	resp, err := httpClient.Do(req)
-	if err != nil {
-		return err
+	var lastErr error
+	for try := 1; try <= 3; try++ {
+		resp, err := httpClient.Do(req)
+		if err != nil {
+			lastErr = err
+			log.Printf("Попытка %d не удалась (ошибка сети): %v", try, err)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		if resp.StatusCode != http.StatusOK {
+			lastErr = fmt.Errorf("API вернуло статус: %d", resp.StatusCode)
+			resp.Body.Close()
+			log.Printf("Попытка %d не удалась (статус %d)", try, resp.StatusCode)
+			time.Sleep(2 * time.Second)
+			continue
+		}
+		defer resp.Body.Close()
+		return json.NewDecoder(resp.Body).Decode(target)
 	}
-	defer resp.Body.Close()
 
-	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("API вернуло статус: %d", resp.StatusCode)
-	}
-
-	return json.NewDecoder(resp.Body).Decode(target)
+	return fmt.Errorf("все попытки запроса провалены: %w", lastErr)
 }

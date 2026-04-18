@@ -18,12 +18,12 @@ func (h *BotHandler) MessageCreate(s *discordgo.Session, m *discordgo.MessageCre
 	}
 
 	if strings.ToLower(m.Content) == "/топ" {
-		
+
 		response := "Таблица из стореджа"
-		
+
 		_, err := s.ChannelMessageSend(m.ChannelID, response)
 		if err != nil {
-			fmt.Println("Ошибка отправки сообщения:", err)
+			fmt.Println("Send message error:", err)
 		}
 	}
 }
