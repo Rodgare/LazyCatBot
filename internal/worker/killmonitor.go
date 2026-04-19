@@ -5,16 +5,15 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"log"
-	"slices"
+	"os"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
 
-var GuildsIDsToWatch = []int{913}
-
 func KillMonitor(
 	lbStore *storage.LeaderboardStorage,
+	subStore *storage.SubscribeStorage,
 	dg *discordgo.Session,
 ) {
 	var lastID int
@@ -37,14 +36,32 @@ func KillMonitor(
 			time.Sleep(2 * time.Minute)
 			continue
 		}
-
+		debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
 		newKills := getNewKills(kills, lastID)
-		guildKills := getGuildKills(newKills, GuildsIDsToWatch)
-		killsDetails := getKillsDetails(guildKills)
-		killsReports := getKillsReports(killsDetails, lbStore)
 
-		for _, report := range killsReports {
-			discord.SendKillReport(dg, "700024788164411435", report)
+		for _, kill := range newKills {
+			channels, _ := subStore.GetSubscribers(kill.GuildId)
+
+			if debugChannel != "" {
+				channels = append(channels, debugChannel)
+			}
+
+			if len(channels) == 0 {
+				continue
+			}
+
+			fight, err := sirus.FetchBossFightDetails(kill.KillID)
+			time.Sleep(2 * time.Second)
+			if err != nil {
+				time.Sleep(2 * time.Second)
+				continue
+			}
+
+			report := createReport(fight, lbStore)
+
+			for _, ch := range channels {
+				discord.SendKillReport(dg, ch, report)
+			}
 		}
 
 		if len(kills.Data) > 0 {
@@ -55,57 +72,22 @@ func KillMonitor(
 	}
 }
 
-func getKillsReports(kills []sirus.BossFight, lbStore *storage.LeaderboardStorage) []discord.BossKillReport {
-	var bossKillReports []discord.BossKillReport
-
-	for _, kill := range kills {
-		report := discord.BossKillReport{
-			BossName: kill.Data.BossName,
-		}
-
-		for _, player := range kill.Data.Players {
-			playerReport := discord.PlayerReport{
-				Name:     player.Name,
-				Dps:      player.Dps,
-				SpecRank: lbStore.GetSpecRank(kill.Order, kill.Encounter, player.ClassID, player.Spec, player.Dps),
-			}
-
-			report.Players = append(report.Players, playerReport)
-		}
-
-		bossKillReports = append(bossKillReports, report)
+func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) discord.BossKillReport {
+	report := discord.BossKillReport{
+		BossName: fight.Data.BossName,
 	}
 
-	return bossKillReports
-}
-
-func getKillsDetails(kills []sirus.BossKill) []sirus.BossFight {
-	var fights []sirus.BossFight
-
-	for _, kill := range kills {
-		fight, err := sirus.FetchBossFightDetails(kill.KillID)
-		if err != nil {
-			log.Printf("[KillMonitor] FetchBossFightDetails error %v", err)
-			time.Sleep(2 * time.Second)
-			continue
+	for _, player := range fight.Data.Players {
+		playerReport := discord.PlayerReport{
+			Name: player.Name,
+			Dps:  player.Dps,
+			SpecRank: lbStore.GetSpecRank(fight.Order, fight.Encounter, player.ClassID,
+				player.Spec, player.Dps),
 		}
-		fights = append(fights, *fight)
-		time.Sleep(2 * time.Second)
+		report.Players = append(report.Players, playerReport)
 	}
 
-	return fights
-}
-
-func getGuildKills(kills []sirus.BossKill, guildIDs []int) []sirus.BossKill {
-	var guildKills []sirus.BossKill
-
-	for _, kill := range kills {
-		if slices.Contains(guildIDs, kill.GuildId) {
-			guildKills = append(guildKills, kill)
-		}
-	}
-
-	return guildKills
+	return report
 }
 
 func getNewKills(kills *sirus.LatestBossKills, lastID int) []sirus.BossKill {

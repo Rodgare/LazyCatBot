@@ -39,7 +39,10 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 					continue
 				}
 
-				store.UpdateLeaderboardStorage(raid, boss, players)
+				err = store.UpdateLeaderboardStorage(raid, boss, players)
+				if err != nil {
+					log.Printf("[Worker] Ошибка сохранения в базу (R:%d B:%d): %v", raid, boss, err)
+				}
 
 				time.Sleep(2 * time.Second)
 			}

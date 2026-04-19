@@ -42,12 +42,13 @@ func main() {
 	subStore.InitDB()
 
 	go worker.StartLeaderboardSync(lbStore)
-	go worker.KillMonitor(lbStore, dg)
+	go worker.KillMonitor(lbStore, subStore, dg)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
 
 	h := &discord.BotHandler{
-		Store: lbStore,
+		LbStore:  lbStore,
+		SubStore: subStore,
 	}
 		Store: leaderboardStore,
 	}

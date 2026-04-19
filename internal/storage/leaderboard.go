@@ -3,6 +3,7 @@ package storage
 import (
 	"LazyCatBot/internal/sirus"
 	"database/sql"
+	"fmt"
 
 	_ "modernc.org/sqlite"
 )
@@ -25,7 +26,7 @@ func (s *LeaderboardStorage) InitDB() error {
         player_name TEXT,
         rank INTEGER,
         dps INTEGER,
-        PRIMARY KEY (raid_id, boss_id, class_id, spec_id, player_name)
+        PRIMARY KEY (raid_id, boss_id, class_id, spec_id, rank, player_name)
     );
     CREATE INDEX IF NOT EXISTS idx_rank_lookup ON leaderboard (raid_id, boss_id, class_id, spec_id, dps DESC);
     `
@@ -47,7 +48,7 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, 
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, rank, dps) 
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, rank, dps) 
 		VALUES (?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
@@ -62,7 +63,11 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, 
 		}
 	}
 
-	return tx.Commit()
+	err = tx.Commit()
+	if err == nil {
+		fmt.Printf("[DB] Успешно сохранено %d игроков для босса %d (рейд %d)\n", len(players), encounter, raidOrder)
+	}
+	return err
 }
 
 func (s *LeaderboardStorage) GetSpecRank(raid, boss, class, spec, dps int) int {

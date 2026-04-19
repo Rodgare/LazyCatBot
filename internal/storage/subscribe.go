@@ -29,15 +29,15 @@ func (s *SubscribeStorage) InitDB() error {
 	return err
 }
 
-func (s *SubscribeStorage) Subscribe(guildID int, channelID, discordID string) error {
+func (s *SubscribeStorage) Subscribe(guild int, channelID, discordID string) error {
 	query := `INSERT OR REPLACE INTO subscribe (guild_id, channel_id, discord_id) VALUES (?, ?, ?)`
-	_, err := s.db.Exec(query, guildID, channelID, discordID)
+	_, err := s.db.Exec(query, guild, channelID, discordID)
 	return err
 }
 
-func (s *SubscribeStorage) GetSubscribers(guildID int) ([]string, error) {
+func (s *SubscribeStorage) GetSubscribers(guild int) ([]string, error) {
 	query := `SELECT channel_id FROM subscribe WHERE guild_id = ?`
-	rows, err := s.db.Query(query, guildID)
+	rows, err := s.db.Query(query, guild)
 	if err != nil {
 		return nil, err
 	}
@@ -53,4 +53,24 @@ func (s *SubscribeStorage) GetSubscribers(guildID int) ([]string, error) {
 	}
 
 	return channels, nil
+}
+
+func (s *SubscribeStorage) GetTrackedGuilds() ([]int, error) {
+	query := `SELECT DISTINCT guild_id FROM subscribe`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var guilds []int
+	for rows.Next() {
+		var guild int
+		if err := rows.Scan(&guild); err != nil {
+			return nil, err
+		}
+		guilds = append(guilds, guild)
+	}
+
+	return guilds, nil
 }
