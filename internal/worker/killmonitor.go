@@ -15,7 +15,6 @@ var GuildsIDsToWatch = []int{913}
 
 func KillMonitor(
 	lbStore *storage.LeaderboardStorage,
-	bossKillsStore *storage.BossKillsStorage,
 	dg *discordgo.Session,
 ) {
 	var lastID int
@@ -47,8 +46,6 @@ func KillMonitor(
 		for _, report := range killsReports {
 			discord.SendKillReport(dg, "700024788164411435", report)
 		}
-
-		bossKillsStore.UpdateBossKillsStorage(newKills)
 
 		if len(kills.Data) > 0 {
 			lastID = kills.Data[0].KillID

@@ -8,10 +8,10 @@ import (
 	"time"
 )
 
-func GetPage(raidID, bossID int, spec string, page int) (*Leaderboard, error) {
+func GetPage(raidID, bossID int, page int) (*Leaderboard, error) {
 	weekFrom, weekTo := GetSirusDates()
-	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=dps&aggregation=max&week_from=%s&week_to=%s&i=%d&boss=%d&specs=%s&page=%d",
-		weekFrom, weekTo, raidID, bossID, spec, page)
+	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=dps&aggregation=max&week_from=%s&week_to=%s&i=%d&boss=%d&page=%d",
+		weekFrom, weekTo, raidID, bossID, page)
 
 	var res Leaderboard
 	if err := makeRequest(url, &res); err != nil {
@@ -21,10 +21,10 @@ func GetPage(raidID, bossID int, spec string, page int) (*Leaderboard, error) {
 	return &res, nil
 }
 
-func FetchFullLeaderboard(raidID, bossID int, spec string) ([]LeaderboardPlayer, error) {
+func FetchFullLeaderboard(raidID, bossID int) ([]LeaderboardPlayer, error) {
 	var allPlayers []LeaderboardPlayer
 
-	firstPage, err := GetPage(raidID, bossID, spec, 1)
+	firstPage, err := GetPage(raidID, bossID, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -33,7 +33,7 @@ func FetchFullLeaderboard(raidID, bossID int, spec string) ([]LeaderboardPlayer,
 	totalPages := firstPage.Meta.LastPage
 
 	for p := 2; p <= totalPages; p++ {
-		nextPage, err := GetPage(raidID, bossID, spec, p)
+		nextPage, err := GetPage(raidID, bossID, p)
 		if err != nil {
 			fmt.Printf("Ошибка при загрузке страницы %d: %v\n", p, err)
 			time.Sleep(5 * time.Second)

@@ -8,9 +8,11 @@ type Leaderboard struct {
 }
 
 type LeaderboardPlayer struct {
-	Name string `json:"name"`
-	Rank int    `json:"rank"`
-	Dps  int    `json:"dps"`
+	Name    string `json:"name"`
+	Rank    int    `json:"rank"`
+	Dps     int    `json:"dps"`
+	ClassID int    `json:"class_id"`
+	SpecID  int    `json:"spec"`
 }
 
 type LatestBossKills struct {

@@ -4,6 +4,7 @@ import (
 	"LazyCatBot/internal/discord"
 	"LazyCatBot/internal/storage"
 	"LazyCatBot/internal/worker"
+	"database/sql"
 	"fmt"
 	"log"
 	"os"
@@ -29,16 +30,24 @@ func main() {
 		return
 	}
 
-	leaderboardStore := storage.NewLeaderboardStorage()
-	bossKillsStore := storage.NewBossKillsStorage()
+	db, err := sql.Open("sqlite", "bot.db")
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer db.Close()
 
-	go worker.StartLeaderboardSync(leaderboardStore)
-	go worker.KillMonitor(leaderboardStore, bossKillsStore, dg)
+	lbStore := storage.NewLeaderboardStorage(db)
+	subStore := storage.NewSubscribeStorage(db)
+	lbStore.InitDB()
+	subStore.InitDB()
+
+	go worker.StartLeaderboardSync(lbStore)
+	go worker.KillMonitor(lbStore, dg)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages
 
 	h := &discord.BotHandler{
-		Store: leaderboardStore,
+		Store: lbStore,
 	}
 		Store: leaderboardStore,
 	}
