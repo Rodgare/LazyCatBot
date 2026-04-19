@@ -69,7 +69,8 @@ func FetchBossFightDetails(fightID int) (*BossFight, error) {
 }
 
 func GetSirusDates() (string, string) {
-	return calculateSirusDates(time.Now())
+	loc := time.FixedZone("MSK", 3*3600)
+	return calculateSirusDates(time.Now().In(loc))
 }
 
 func calculateSirusDates(now time.Time) (string, string) {

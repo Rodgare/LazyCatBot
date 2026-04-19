@@ -73,16 +73,30 @@ func KillMonitor(
 }
 
 func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) discord.BossKillReport {
-	report := discord.BossKillReport{
-		BossName: fight.Data.BossName,
+	totalDps := 0
+	for _, p := range fight.Data.Players {
+		totalDps += p.Dps
 	}
 
-	for _, player := range fight.Data.Players {
+	report := discord.BossKillReport{
+		BossName: fight.Data.BossName,
+		Duration: fight.Data.FightLength,
+		Attempts: fight.Data.Attempts,
+		TotalDps: totalDps,
+	}
+
+	for _, p := range fight.Data.Players {
+		// Получаем название спека из нашего хелпера
+		specName := sirus.GetSpecName(p.ClassID, p.Spec)
+
 		playerReport := discord.PlayerReport{
-			Name: player.Name,
-			Dps:  player.Dps,
-			SpecRank: lbStore.GetSpecRank(fight.Order, fight.Encounter, player.ClassID,
-				player.Spec, player.Dps),
+			Name:     p.Name,
+			Dps:      p.Dps,
+			Hps:      p.Hps,
+			Ilvl:     p.Ilvl,
+			SpecName: specName,
+			SpecRank: lbStore.GetSpecRank(fight.Order, fight.Encounter, p.ClassID,
+				p.Spec, p.Dps),
 		}
 		report.Players = append(report.Players, playerReport)
 	}
