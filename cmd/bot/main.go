@@ -44,7 +44,7 @@ func main() {
 	go worker.StartLeaderboardSync(lbStore)
 	go worker.KillMonitor(lbStore, subStore, dg)
 
-	dg.Identify.Intents = discordgo.IntentsGuildMessages
+	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
 	h := &discord.BotHandler{
 		LbStore:  lbStore,
@@ -53,6 +53,7 @@ func main() {
 		Store: leaderboardStore,
 	}
 	dg.AddHandler(h.MessageCreate)
+	dg.AddHandler(h.GuildCreate)
 	err = dg.Open()
 
 	if err != nil {

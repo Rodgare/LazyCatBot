@@ -41,12 +41,40 @@ func (h *BotHandler) MessageCreate(s *discordgo.Session, m *discordgo.MessageCre
 	}
 
 	if strings.ToLower(m.Content) == "/топ" {
-
 		response := "Таблица из стореджа"
-
 		_, err := s.ChannelMessageSend(m.ChannelID, response)
 		if err != nil {
 			fmt.Println("Send message error:", err)
 		}
 	}
+}
+
+func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
+	var channelID string
+	if g.SystemChannelID != "" {
+		channelID = g.SystemChannelID
+	} else {
+		for _, ch := range g.Channels {
+			if ch.Type == discordgo.ChannelTypeGuildText {
+				channelID = ch.ID
+				break
+			}
+		}
+	}
+
+	if channelID == "" {
+		return
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title: "🐈 Привет! Я LazyCatBot",
+		Description: "Я помогу вам отслеживать прогресс убийства боссов вашей гильдии на Sirus.su!\n\n" +
+			"**Как меня настроить:**\n" +
+			"1. Перейдите в канал, куда я должен присылать отчеты.\n" +
+			"2. Напишите команду: `/set [ID вашей гильдии на Сирусе]`\n\n" +
+			"*(ID гильдии можно найти в ссылке на вашу гильдию в базе Sirus)*",
+		Color: 0xf1c40f,
+	}
+
+	s.ChannelMessageSendEmbed(channelID, embed)
 }
