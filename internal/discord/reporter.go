@@ -36,7 +36,7 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 	embed := &discordgo.MessageEmbed{
 		Title: fmt.Sprintf("%s", report.GuildName),
 		URL:   fmt.Sprintf("https://sirus.su/base/guilds/x3/%d", report.GuildID),
-		Description: fmt.Sprintf("[**%s — %s**](https://sirus.su/base/pve-progression/boss-kill/x3/%s)",
+		Description: fmt.Sprintf("[**%s — %s**](https://sirus.su/base/pve-progression/boss-kill/x3/%d)",
 			report.MapName,
 			report.BossName,
 			report.KillID),
