@@ -86,6 +86,7 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) d
 	}
 
 	for _, p := range fight.Data.Players {
+		log.Printf("[DEBUG] player=%s class_id=%d spec=%d", p.Name, p.ClassID, p.Spec)
 		specName := sirus.GetSpecName(p.ClassID, p.Spec)
 		playerReport := discord.PlayerReport{
 			Name:     p.Name,
