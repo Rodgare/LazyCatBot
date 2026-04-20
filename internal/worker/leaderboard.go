@@ -22,9 +22,9 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 		}
 
 		for _, raid := range actualRaids {
-			if !raid.Actual {
-				continue
-			}
+			// if !raid.Actual {
+			// 	continue
+			// }
 
 			fmt.Printf("[Worker] === Processing actual raid: %s (ID: %d) ===\n", raid.MapName, raid.Order)
 
