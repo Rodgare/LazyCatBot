@@ -8,7 +8,7 @@ import (
 )
 
 func SendKillReport(s *discordgo.Session, channelID string, report BossKillReport) {
-	ddBlock, healBlock := BuildReportText(report)
+	ddBlocks, healBlocks := BuildReportText(report)
 
 	// Основное описание
 	description := fmt.Sprintf(
@@ -20,7 +20,7 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 		Title:       "⚔️  Boss Kill: " + report.BossName,
 		Description: description,
 		Color:       0xf1c40f,
-		Fields:      buildFields(ddBlock, healBlock),
+		Fields:      buildFields(ddBlocks, healBlocks),
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: "LazyCatBot PVE Progression • Sirus.su",
 		},
@@ -37,21 +37,29 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 	}
 }
 
-func buildFields(ddBlock, healBlock string) []*discordgo.MessageEmbedField {
+func buildFields(ddBlocks []string, healBlocks []string) []*discordgo.MessageEmbedField {
 	var fields []*discordgo.MessageEmbedField
 
-	if ddBlock != "" {
+	for i, block := range ddBlocks {
+		name := "⚔️  Damage Dealers"
+		if i > 0 {
+			name = "⚔️  Damage Dealers (cont.)"
+		}
 		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   "⚔️  Damage Dealers",
-			Value:  ddBlock,
+			Name:   name,
+			Value:  block,
 			Inline: false,
 		})
 	}
 
-	if healBlock != "" {
+	for i, block := range healBlocks {
+		name := "💚  Healers"
+		if i > 0 {
+			name = "💚  Healers (cont.)"
+		}
 		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   "💚  Healers",
-			Value:  healBlock,
+			Name:   name,
+			Value:  block,
 			Inline: false,
 		})
 	}

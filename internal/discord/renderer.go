@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"slices"
 	"strings"
+	"unicode/utf8"
 )
 
 // classANSI — ANSI-цвета для Discord ```ansi``` блока.
@@ -25,8 +26,8 @@ var classANSI = map[int]string{
 const ansiReset = "\033[0m"
 
 // BuildReportText строит текстовый отчёт для Discord embed.
-// Возвращает заголовок раздела и ANSI-раскрашенный code-блок.
-func BuildReportText(report BossKillReport) (ddBlock string, healBlock string) {
+// Возвращает массивы ANSI-раскрашенных code-блоков.
+func BuildReportText(report BossKillReport) (ddBlocks []string, healBlocks []string) {
 	var dds, healers []PlayerReport
 	for _, p := range report.Players {
 		if p.Role == 1 {
@@ -39,16 +40,17 @@ func BuildReportText(report BossKillReport) (ddBlock string, healBlock string) {
 	slices.SortFunc(dds, func(a, b PlayerReport) int { return b.Dps - a.Dps })
 	slices.SortFunc(healers, func(a, b PlayerReport) int { return b.Hps - a.Hps })
 
-	ddBlock = buildAnsiBlock(dds, true)
-	healBlock = buildAnsiBlock(healers, false)
+	ddBlocks = buildAnsiBlocks(dds, true)
+	healBlocks = buildAnsiBlocks(healers, false)
 	return
 }
 
-func buildAnsiBlock(players []PlayerReport, isDD bool) string {
+func buildAnsiBlocks(players []PlayerReport, isDD bool) []string {
 	if len(players) == 0 {
-		return ""
+		return nil
 	}
 
+	var blocks []string
 	var sb strings.Builder
 	sb.WriteString("```ansi\n")
 
@@ -73,12 +75,26 @@ func buildAnsiBlock(players []PlayerReport, isDD bool) string {
 		perf := fmt.Sprintf("\033[37m%6s %s%s", formatNum(val), valLabel, ansiReset)
 		srank := fmt.Sprintf("\033[33m#%-3d%s", p.SpecRank, ansiReset)
 
-		sb.WriteString(fmt.Sprintf("%s %s  %s  %s  %s  %s\n",
-			rank, name, spec, ilvl, perf, srank))
+		line := fmt.Sprintf("%s %s  %s  %s  %s  %s\n",
+			rank, name, spec, ilvl, perf, srank)
+
+		// 1024 char limit. 1000 logic for safety. +3 for closing "```"
+		if utf8.RuneCountInString(sb.String()) + utf8.RuneCountInString(line) + 3 > 1000 {
+			sb.WriteString("```")
+			blocks = append(blocks, sb.String())
+			sb.Reset()
+			sb.WriteString("```ansi\n")
+		}
+
+		sb.WriteString(line)
 	}
 
-	sb.WriteString("```")
-	return sb.String()
+	if sb.Len() > 8 { // more than just "```ansi\n"
+		sb.WriteString("```")
+		blocks = append(blocks, sb.String())
+	}
+
+	return blocks
 }
 
 func truncate(s string, max int) string {
