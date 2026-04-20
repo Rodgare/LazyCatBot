@@ -67,6 +67,41 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 			},
 		})
 
+	case "list":
+		guilds, err := h.SubStore.GetGuildsByChannel(channelID)
+		if err != nil {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "❌ Ошибка при получении списка гильдий.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			return
+		}
+
+		if len(guilds) == 0 {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "В этом канале не отслеживается ни одна гильдия.",
+				},
+			})
+			return
+		}
+
+		content := "📊 **Отслеживаемые гильдии в этом канале:**\n"
+		for _, id := range guilds {
+			content += fmt.Sprintf("— Гильдия ID `%d`\n", id)
+		}
+
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: content,
+			},
+		})
+
 	case "help":
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -77,6 +112,7 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 						Description: "Я помогаю отслеживать прогресс гильдий на Sirus.su!\n\n" +
 							"**/set [id]** — Подписаться на отчеты гильдии в этом канале.\n" +
 							"**/unset [id]** — Отписаться от отчетов.\n" +
+							"**/list** — Список отслеживаемых гильдий.\n" +
 							"**/help** — Показать это сообщение.",
 						Color: 0xf1c40f,
 					},

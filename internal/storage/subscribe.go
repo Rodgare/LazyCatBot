@@ -61,6 +61,26 @@ func (s *SubscribeStorage) GetSubscribers(guild int) ([]string, error) {
 	return channels, nil
 }
 
+func (s *SubscribeStorage) GetGuildsByChannel(channelID string) ([]int, error) {
+	query := `SELECT guild_id FROM subscribe WHERE channel_id = ?`
+	rows, err := s.db.Query(query, channelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var guilds []int
+	for rows.Next() {
+		var guild int
+		if err := rows.Scan(&guild); err != nil {
+			return nil, err
+		}
+		guilds = append(guilds, guild)
+	}
+
+	return guilds, nil
+}
+
 func (s *SubscribeStorage) GetTrackedGuilds() ([]int, error) {
 	query := `SELECT DISTINCT guild_id FROM subscribe`
 	rows, err := s.db.Query(query)

@@ -89,6 +89,10 @@ func main() {
 			Name:        "help",
 			Description: "Показать справку по боту",
 		},
+		{
+			Name:        "list",
+			Description: "Показать список отслеживаемых гильдий в текущем канале",
+		},
 	}
 
 	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)
