@@ -12,12 +12,12 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 
 	// Основное описание
 	description := fmt.Sprintf(
-		"⏱️ **Duration:** %s  ·  🔄 **Attempts:** %d  ·  💥 **Raid DPS:** %s",
+		"⏱️ **Длительность боя:** %s  ·  🔄 **Попытки:** %d  ·  💥 **Raid DPS:** %s",
 		report.Duration, report.Attempts, formatNum(report.TotalDps),
 	)
 
 	embed := &discordgo.MessageEmbed{
-		Title:       "⚔️  Boss Kill: " + report.BossName,
+		Title:       "⚔️  Boss: " + report.BossName,
 		Description: description,
 		Color:       0xf1c40f,
 		Fields:      buildFields(ddBlocks, healBlocks),
@@ -41,9 +41,9 @@ func buildFields(ddBlocks []string, healBlocks []string) []*discordgo.MessageEmb
 	var fields []*discordgo.MessageEmbedField
 
 	for i, block := range ddBlocks {
-		name := "⚔️  Damage Dealers"
+		name := "⚔️  ДД"
 		if i > 0 {
-			name = "⚔️  Damage Dealers (cont.)"
+			name = "\u200b"
 		}
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   name,
@@ -53,9 +53,9 @@ func buildFields(ddBlocks []string, healBlocks []string) []*discordgo.MessageEmb
 	}
 
 	for i, block := range healBlocks {
-		name := "💚  Healers"
+		name := "💚  Хилы"
 		if i > 0 {
-			name = "💚  Healers (cont.)"
+			name = "\u200b"
 		}
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   name,
