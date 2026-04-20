@@ -34,7 +34,12 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 	ddBlocks, healBlocks := BuildReportText(report)
 
 	embed := &discordgo.MessageEmbed{
-		Title:  "⚔️  Boss: " + report.BossName,
+		Title: fmt.Sprintf("%s", report.GuildName),
+		URL:   fmt.Sprintf("https://sirus.su/base/guilds/x3/%d", report.GuildID),
+		Description: fmt.Sprintf("[**%s — %s**](https://sirus.su/base/pve-progression/boss-kill/x3/%s)",
+			report.MapName,
+			report.BossName,
+			report.KillID),
 		Color:  0xf1c40f,
 		Fields: buildFields(report, ddBlocks, healBlocks),
 		Footer: &discordgo.MessageEmbedFooter{

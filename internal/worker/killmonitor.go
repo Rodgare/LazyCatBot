@@ -64,7 +64,7 @@ func KillMonitor(
 			}
 
 			log.Printf("[KillMonitor] Successfully fetched details for [%s], creating report...", fight.Data.BossName)
-			report := createReport(fight, lbStore)
+			report := createReport(fight, lbStore, kill.KillID)
 
 			for _, ch := range channels {
 				discord.SendKillReport(dg, ch, report)
@@ -80,7 +80,7 @@ func KillMonitor(
 	}
 }
 
-func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) discord.BossKillReport {
+func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, killID int) discord.BossKillReport {
 	totalDps := 0
 	totalHps := 0
 	for _, p := range fight.Data.Players {
@@ -89,12 +89,16 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) d
 	}
 
 	report := discord.BossKillReport{
-		BossName: fight.Data.BossName,
-		Duration: fight.Data.FightLength,
-		Attempts: fight.Data.Attempts,
-		KilledAt: fight.Data.KilledAt,
-		TotalDps: totalDps,
-		TotalHps: totalHps,
+		MapName:   fight.Data.MapName,
+		BossName:  fight.Data.BossName,
+		KillID:    killID,
+		Duration:  fight.Data.FightLength,
+		Attempts:  fight.Data.Attempts,
+		KilledAt:  fight.Data.KilledAt,
+		GuildID:   fight.Data.Guild.ID,
+		GuildName: fight.Data.Guild.Name,
+		TotalDps:  totalDps,
+		TotalHps:  totalHps,
 	}
 
 	for _, p := range fight.Data.Players {

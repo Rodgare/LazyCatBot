@@ -12,11 +12,15 @@ type PlayerReport struct {
 }
 
 type BossKillReport struct {
-	BossName string
-	Duration string
-	Attempts int
-	TotalDps int
-	TotalHps int
-	KilledAt string
-	Players  []PlayerReport
+	MapName   string
+	BossName  string
+	KillID    int
+	Duration  string
+	Attempts  int
+	TotalDps  int
+	TotalHps  int
+	KilledAt  string
+	GuildID   int
+	GuildName string
+	Players   []PlayerReport
 }

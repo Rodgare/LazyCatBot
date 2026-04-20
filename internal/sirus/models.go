@@ -41,9 +41,12 @@ type BossFight struct {
 				RealmID int    `json:"realm_id"`
 			} `json:"item"`
 		} `json:"loots"`
-		Attempts    int    `json:"attempts"`
-		Difficulty  int    `json:"difficulty"`
-		Guild       any    `json:"guild"`
+		Attempts   int `json:"attempts"`
+		Difficulty int `json:"difficulty"`
+		Guild      struct {
+			ID   int    `json:"id"`
+			Name string `json:"name"`
+		} `json:"guild"`
 		KilledAt    string `json:"killed_at"`
 		FightLength string `json:"fight_length"`
 		Players     []struct {
