@@ -87,12 +87,13 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) d
 
 	for _, p := range fight.Data.Players {
 		specName := sirus.GetSpecName(p.ClassID, p.Spec)
-
 		playerReport := discord.PlayerReport{
 			Name:     p.Name,
 			Dps:      p.Dps,
 			Hps:      p.Hps,
 			Ilvl:     p.Ilvl,
+			ClassID:  p.ClassID,
+			Role:     sirus.GetRole(p.ClassID, p.Spec),
 			SpecName: specName,
 			SpecRank: lbStore.GetSpecRank(fight.Order, fight.Encounter, p.ClassID,
 				p.Spec, p.Dps),

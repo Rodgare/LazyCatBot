@@ -31,3 +31,23 @@ func GetSpecName(classID, specID int) string {
 func GetZodiacName(fullName string) string {
 	return fullName
 }
+
+// GetRole возвращает роль игрока: 0 - DD/Tank, 1 - Healer
+func GetRole(classID, specID int) int {
+	healers := map[int][]int{
+		2:  {0},    // Paladin (Holy)
+		5:  {0, 1}, // Priest (Disc, Holy)
+		7:  {2},    // Shaman (Resto)
+		10: {1},    // Monk (MW)
+		11: {2},    // Druid (Resto)
+	}
+
+	if specs, ok := healers[classID]; ok {
+		for _, s := range specs {
+			if s == specID {
+				return 1
+			}
+		}
+	}
+	return 0
+}

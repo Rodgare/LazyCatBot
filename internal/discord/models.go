@@ -7,6 +7,8 @@ type PlayerReport struct {
 	Ilvl     int
 	SpecName string
 	SpecRank int
+	Role     int
+	ClassID  int
 }
 
 type BossKillReport struct {
