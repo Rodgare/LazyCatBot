@@ -82,8 +82,10 @@ func KillMonitor(
 
 func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) discord.BossKillReport {
 	totalDps := 0
+	totalHps := 0
 	for _, p := range fight.Data.Players {
 		totalDps += p.Dps
+		totalHps += p.Hps
 	}
 
 	report := discord.BossKillReport{
@@ -91,6 +93,7 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) d
 		Duration: fight.Data.FightLength,
 		Attempts: fight.Data.Attempts,
 		TotalDps: totalDps,
+		TotalHps: totalHps,
 	}
 
 	for _, p := range fight.Data.Players {

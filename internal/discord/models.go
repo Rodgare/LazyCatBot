@@ -16,5 +16,6 @@ type BossKillReport struct {
 	Duration string
 	Attempts int
 	TotalDps int
+	TotalHps int
 	Players  []PlayerReport
 }

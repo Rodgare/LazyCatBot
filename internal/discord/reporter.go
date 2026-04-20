@@ -10,17 +10,10 @@ import (
 func SendKillReport(s *discordgo.Session, channelID string, report BossKillReport) {
 	ddBlocks, healBlocks := BuildReportText(report)
 
-	// Основное описание
-	description := fmt.Sprintf(
-		"⏱️ **Длительность боя:** %s  ·  🔄 **Попытки:** %d  ·  💥 **Raid DPS:** %s",
-		report.Duration, report.Attempts, formatNum(report.TotalDps),
-	)
-
 	embed := &discordgo.MessageEmbed{
 		Title:       "⚔️  Boss: " + report.BossName,
-		Description: description,
 		Color:       0xf1c40f,
-		Fields:      buildFields(ddBlocks, healBlocks),
+		Fields:      buildFields(report, ddBlocks, healBlocks),
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: "LazyCatBot PVE Progression • Sirus.su",
 		},
@@ -37,13 +30,31 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 	}
 }
 
-func buildFields(ddBlocks []string, healBlocks []string) []*discordgo.MessageEmbedField {
+func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) []*discordgo.MessageEmbedField {
 	var fields []*discordgo.MessageEmbedField
 
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Попытки",
+		Value:  fmt.Sprintf("%d", report.Attempts),
+		Inline: true,
+	})
+
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Время боя",
+		Value:  report.Duration,
+		Inline: true,
+	})
+
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Общий DPS",
+		Value:  FormatNum(report.TotalDps),
+		Inline: false,
+	})
+
 	for i, block := range ddBlocks {
-		name := "⚔️  ДД"
+		name := "#\u2800Ник\u2800Дпс\u2800(Рейтинг по спеку)"
 		if i > 0 {
-			name = "\u200b"
+			name = "\u2800"
 		}
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   name,
@@ -52,10 +63,16 @@ func buildFields(ddBlocks []string, healBlocks []string) []*discordgo.MessageEmb
 		})
 	}
 
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Общий HPS",
+		Value:  FormatNum(report.TotalHps),
+		Inline: false,
+	})
+
 	for i, block := range healBlocks {
-		name := "💚  Хилы"
+		name := "#\u2800Ник\u2800Хпс\u2800(Рейтинг по спеку)"
 		if i > 0 {
-			name = "\u200b"
+			name = "\u2800"
 		}
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   name,
