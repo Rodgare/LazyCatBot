@@ -7,6 +7,29 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+var ansiColors = map[string]string{
+	// Базовые (яркие)
+	"red":    "\033[31m",
+	"green":  "\033[32m",
+	"yellow": "\033[33m",
+	"blue":   "\033[34m",
+	"purple": "\033[35m",
+	"cyan":   "\033[36m",
+	"white":  "\033[37m",
+
+	// Жирные (более насыщенные версии для акцентов)
+	"red_bold":    "\033[1;31m",
+	"green_bold":  "\033[1;32m",
+	"yellow_bold": "\033[1;33m",
+	"blue_bold":   "\033[1;34m",
+	"purple_bold": "\033[1;35m",
+	"cyan_bold":   "\033[1;36m",
+	"white_bold":  "\033[1;37m",
+
+	// Сброс цвета (обязательно в конце строки)
+	"reset": "\033[0m",
+}
+
 func SendKillReport(s *discordgo.Session, channelID string, report BossKillReport) {
 	ddBlocks, healBlocks := BuildReportText(report)
 
@@ -58,8 +81,11 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 	})
 
 	fields = append(fields, &discordgo.MessageEmbedField{
-		Name:   "Общий DPS",
-		Value:  fmt.Sprintf("```diff\n-%s\n```", FormatNum(report.TotalDps)),
+		Name: "Общий DPS",
+		Value: fmt.Sprintf("```ansi\n%s%s%s\n```",
+			ansiColors["red_bold"],
+			FormatNum(report.TotalDps),
+			ansiColors["reset"]),
 		Inline: false,
 	})
 
@@ -76,8 +102,11 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 	}
 
 	fields = append(fields, &discordgo.MessageEmbedField{
-		Name:   "Общий HPS",
-		Value:  fmt.Sprintf("```diff\n+%s\n```", FormatNum(report.TotalHps)),
+		Name: "Общий HPS",
+		Value: fmt.Sprintf("```ansi\n%s%s%s\n```",
+			ansiColors["green_bold"],
+			FormatNum(report.TotalHps),
+			ansiColors["reset"]),
 		Inline: true,
 	})
 
