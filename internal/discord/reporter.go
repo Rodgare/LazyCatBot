@@ -35,20 +35,32 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name:   "Попытки",
-		Value:  fmt.Sprintf("```diff\n%d\n```", report.Attempts),
+		Value:  fmt.Sprintf("%d", report.Attempts),
+		Inline: true,
+	})
+
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Когда убили",
+		Value:  fmt.Sprintf("%s", report.KilledAt),
 		Inline: true,
 	})
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name:   "Время боя",
-		Value:  fmt.Sprintf("```diff\n%s\n```", report.Duration),
+		Value:  fmt.Sprintf("%s", report.Duration),
 		Inline: true,
 	})
 
 	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "\u200B",
+		Value:  "\u200B",
+		Inline: false,
+	})
+
+	fields = append(fields, &discordgo.MessageEmbedField{
 		Name:   "Общий DPS",
-		Value:  fmt.Sprintf("```diff\n%s\n```", FormatNum(report.TotalDps)),
-		Inline: true,
+		Value:  fmt.Sprintf("```diff\n-%s\n```", FormatNum(report.TotalDps)),
+		Inline: false,
 	})
 
 	for i, block := range ddBlocks {
@@ -65,7 +77,7 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name:   "Общий HPS",
-		Value:  fmt.Sprintf("```diff\n%s\n```", FormatNum(report.TotalHps)),
+		Value:  fmt.Sprintf("```diff\n+%s\n```", FormatNum(report.TotalHps)),
 		Inline: true,
 	})
 

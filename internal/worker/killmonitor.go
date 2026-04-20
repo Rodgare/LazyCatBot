@@ -92,6 +92,7 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) d
 		BossName: fight.Data.BossName,
 		Duration: fight.Data.FightLength,
 		Attempts: fight.Data.Attempts,
+		KilledAt: fight.Data.KilledAt,
 		TotalDps: totalDps,
 		TotalHps: totalHps,
 	}
