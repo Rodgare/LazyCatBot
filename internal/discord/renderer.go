@@ -103,15 +103,10 @@ func buildBlocks(players []PlayerReport, isDD bool, total int) []string {
 			val = p.Hps
 		}
 
-		var percent float64
-		if total > 0 {
-			percent = (float64(val) / float64(total)) * 100
-		}
-
 		// Формат: Ранг Ник (Дпс/Хпс) (Процент) Рейтинг
 		// Используем \u2800 для пустого места (Braille Pattern Blank)
-		line := fmt.Sprintf("**%d**\u2800\u2800%s**%s** %s (%.2f%%) `#%d`\n",
-			i+1, emoji, p.Name, FormatNum(val), percent, p.SpecRank)
+		line := fmt.Sprintf("**%d**\u2800\u2800%s**%s** %s `#%d`\n",
+			i+1, emoji, p.Name, FormatNum(val), p.SpecRank)
 
 		// Discord limit 1024 characters per field value. Safely cut at 1000.
 		if utf8.RuneCountInString(sb.String())+utf8.RuneCountInString(line) > 1000 {
