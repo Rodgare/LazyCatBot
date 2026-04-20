@@ -13,7 +13,6 @@ type BotHandler struct {
 }
 
 func (h *BotHandler) MessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
-	// Здесь можно оставить логику для обычных текстовых сообщений, если нужно
 }
 
 func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {

@@ -8,47 +8,51 @@ import (
 	"time"
 )
 
-// raid order: boss/encounter order
-var RaidsToFetch = map[int][]int{
-	13: {0},
-	15: {0, 1, 2, 3, 4},
-	16: {0},
-	17: {0, 1},
-}
-
 func StartLeaderboardSync(store *storage.LeaderboardStorage) {
-	fmt.Println("[Worker] Запуск системы синхронизации...")
+	fmt.Println("[Worker] Starting sync system...")
 
 	for {
-		fmt.Println("[Worker] Начало цикла обновления данных...")
+		fmt.Println("[Worker] Starting data update cycle...")
 
-		for raid, bosses := range RaidsToFetch {
-			for _, boss := range bosses {
-				fmt.Printf("[Worker] Parsing (R:%v, B:%v)...\n", raid, boss)
+		actualRaids, err := sirus.FetchActualRaids()
+		if err != nil {
+			log.Printf("[Worker] Error fetching actual raids: %v", err)
+			time.Sleep(1 * time.Minute)
+			continue
+		}
 
-				players, err := sirus.FetchFullLeaderboard(raid, boss)
+		for _, raid := range actualRaids {
+			if !raid.Actual {
+				continue
+			}
 
+			fmt.Printf("[Worker] === Processing actual raid: %s (ID: %d) ===\n", raid.MapName, raid.Order)
+
+			for bossID, encounter := range raid.Encounters {
+				fmt.Printf("[Worker] Parsing boss %s (R:%d, B:%d)...\n", encounter.Name, raid.Order, bossID)
+
+				players, err := sirus.FetchFullLeaderboard(raid.Order, bossID)
 				if err != nil {
-					log.Printf("[Worker] Error (R:%d B:%d): %v", raid, boss, err)
-					time.Sleep(2 * time.Second)
+					log.Printf("[Worker] Error (Raid:%d Boss:%d): %v", raid.Order, bossID, err)
+					time.Sleep(5 * time.Second)
 					continue
 				}
 
 				if len(players) == 0 {
-					fmt.Printf("[Worker] Empty players data R:%d B:%d\n", raid, boss)
+					fmt.Printf("[Worker] No player data for Raid:%d Boss:%d\n", raid.Order, bossID)
 					continue
 				}
 
-				err = store.UpdateLeaderboardStorage(raid, boss, players)
+				err = store.UpdateLeaderboardStorage(raid.Order, bossID, players)
 				if err != nil {
-					log.Printf("[Worker] Ошибка сохранения в базу (R:%d B:%d): %v", raid, boss, err)
+					log.Printf("[Worker] Error saving to database: %v", err)
 				}
 
-				time.Sleep(2 * time.Second)
+				time.Sleep(5 * time.Second)
 			}
 		}
 
-		fmt.Println("[Worker] Все данные обновлены. Спим 12 часов...")
+		fmt.Println("[Worker] All actual data updated. Sleeping 12 hours...")
 		time.Sleep(12 * time.Hour)
 	}
 }

@@ -35,7 +35,7 @@ func FetchFullLeaderboard(raidID, bossID int) ([]LeaderboardPlayer, error) {
 	for p := 2; p <= totalPages; p++ {
 		nextPage, err := GetPage(raidID, bossID, p)
 		if err != nil {
-			fmt.Printf("Ошибка при загрузке страницы %d: %v\n", p, err)
+			fmt.Printf("Error loading page %d: %v\n", p, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
@@ -44,6 +44,17 @@ func FetchFullLeaderboard(raidID, bossID int) ([]LeaderboardPlayer, error) {
 	}
 
 	return allPlayers, nil
+}
+
+func FetchActualRaids() (ActualRaids, error) {
+	url := "https://sirus.su/api/base/22/progression/pve/realm-progress"
+	var res ActualRaids
+
+	if err := makeRequest(url, &res); err != nil {
+		return nil, err
+	}
+
+	return res, nil
 }
 
 func FetchLatestBossKills() (*LatestBossKills, error) {
@@ -106,14 +117,14 @@ func makeRequest(url string, target any) error {
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			lastErr = err
-			log.Printf("Попытка %d не удалась (ошибка сети): %v", try, err)
+			log.Printf("Attempt %d failed (network error): %v", try, err)
 			time.Sleep(2 * time.Second)
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			lastErr = fmt.Errorf("API вернуло статус: %d", resp.StatusCode)
+			lastErr = fmt.Errorf("API returned status: %d", resp.StatusCode)
 			resp.Body.Close()
-			log.Printf("Попытка %d не удалась (статус %d)", try, resp.StatusCode)
+			log.Printf("Attempt %d failed (status %d)", try, resp.StatusCode)
 			time.Sleep(2 * time.Second)
 			continue
 		}
@@ -121,5 +132,5 @@ func makeRequest(url string, target any) error {
 		return json.NewDecoder(resp.Body).Decode(target)
 	}
 
-	return fmt.Errorf("все попытки запроса провалены: %w", lastErr)
+	return fmt.Errorf("all request attempts failed: %w", lastErr)
 }

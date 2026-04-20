@@ -25,7 +25,7 @@ func KillMonitor(
 			}
 			break
 		}
-		log.Printf("[KillMonitor] Не удалось получить стартовый ID: %v. Пробую снова через 10 сек...", err)
+		log.Printf("[KillMonitor] Failed to get initial ID: %v. Retrying in 10s...", err)
 		time.Sleep(10 * time.Second)
 	}
 
@@ -86,7 +86,6 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage) d
 	}
 
 	for _, p := range fight.Data.Players {
-		// Получаем название спека из нашего хелпера
 		specName := sirus.GetSpecName(p.ClassID, p.Spec)
 
 		playerReport := discord.PlayerReport{

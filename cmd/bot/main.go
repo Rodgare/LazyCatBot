@@ -50,7 +50,6 @@ func main() {
 		LbStore:  lbStore,
 		SubStore: subStore,
 	}
-	// Регистрируем обработчик взаимодействий (Slash Commands)
 	dg.AddHandler(h.InteractionCreate)
 	dg.AddHandler(h.GuildCreate)
 
@@ -61,7 +60,6 @@ func main() {
 	}
 	defer dg.Close()
 
-	// Регистрация самих команд в API Дискорда
 	commands := []*discordgo.ApplicationCommand{
 		{
 			Name:        "set",
@@ -95,7 +93,7 @@ func main() {
 
 	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)
 	if err != nil {
-		log.Printf("Ошибка регистрации команд: %v", err)
+		log.Printf("Error registering commands: %v", err)
 	}
 
 	fmt.Println("Bot is running. Slash Commands registered. Ctrl+C exit")
