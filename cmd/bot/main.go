@@ -50,24 +50,55 @@ func main() {
 		LbStore:  lbStore,
 		SubStore: subStore,
 	}
-		Store: leaderboardStore,
-	}
-	dg.AddHandler(h.MessageCreate)
+	// Регистрируем обработчик взаимодействий (Slash Commands)
+	dg.AddHandler(h.InteractionCreate)
 	dg.AddHandler(h.GuildCreate)
+
 	err = dg.Open()
-
 	if err != nil {
 		fmt.Println("Connection error:", err)
 		return
 	}
-	if err != nil {
-		fmt.Println("Connection error:", err)
-		return
-	}
-
 	defer dg.Close()
 
-	fmt.Println("Bot is running. Ctrl+C exit")
+	// Регистрация самих команд в API Дискорда
+	commands := []*discordgo.ApplicationCommand{
+		{
+			Name:        "set",
+			Description: "Подписаться на отчеты гильдии в этом канале",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "id",
+					Description: "ID гильдии на Сирусе",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "unset",
+			Description: "Отписаться от отчетов гильдии в этом канале",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "id",
+					Description: "ID гильдии на Сирусе",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "help",
+			Description: "Показать справку по боту",
+		},
+	}
+
+	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)
+	if err != nil {
+		log.Printf("Ошибка регистрации команд: %v", err)
+	}
+
+	fmt.Println("Bot is running. Slash Commands registered. Ctrl+C exit")
 
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)

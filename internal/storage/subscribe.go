@@ -35,6 +35,12 @@ func (s *SubscribeStorage) Subscribe(guild int, channelID, discordID string) err
 	return err
 }
 
+func (s *SubscribeStorage) Unsubscribe(guild int, channelID, discordID string) error {
+	query := `DELETE FROM subscribe WHERE guild_id = ? AND channel_id = ? AND discord_id = ?`
+	_, err := s.db.Exec(query, guild, channelID, discordID)
+	return err
+}
+
 func (s *SubscribeStorage) GetSubscribers(guild int) ([]string, error) {
 	query := `SELECT channel_id FROM subscribe WHERE guild_id = ?`
 	rows, err := s.db.Query(query, guild)
