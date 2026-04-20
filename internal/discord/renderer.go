@@ -1,36 +1,32 @@
 package discord
 
 import (
-	"bytes"
 	"fmt"
-	"os"
 	"slices"
-
-	"github.com/fogleman/gg"
+	"strings"
 )
 
-var classColors = map[int]string{
-	1:  "#C79C6E", // Warrior
-	2:  "#F58CBA", // Paladin
-	3:  "#ABD473", // Hunter
-	4:  "#FFF569", // Rogue
-	5:  "#FFFFFF", // Priest
-	6:  "#C41F3B", // DK
-	7:  "#0070DE", // Shaman
-	8:  "#69CCF0", // Mage
-	9:  "#9482C9", // Warlock
-	11: "#FF7D0A", // Druid
+// classANSI — ANSI-цвета для Discord ```ansi``` блока.
+// Discord поддерживает стандартные ANSI 30-37 и яркие 90-97.
+// Подбираем ближайший к реальному цвету класса WoW.
+var classANSI = map[int]string{
+	1:  "\033[33m",  // Warrior    — #C79C6E → жёлтый
+	2:  "\033[95m",  // Paladin    — #F58CBA → ярко-пурпурный
+	3:  "\033[32m",  // Hunter     — #ABD473 → зелёный
+	4:  "\033[93m",  // Rogue      — #FFF569 → ярко-жёлтый
+	5:  "\033[97m",  // Priest     — #FFFFFF → белый
+	6:  "\033[31m",  // DK         — #C41F3B → красный
+	7:  "\033[34m",  // Shaman     — #0070DE → синий
+	8:  "\033[96m",  // Mage       — #69CCF0 → голубой
+	9:  "\033[35m",  // Warlock    — #9482C9 → пурпурный
+	11: "\033[91m",  // Druid      — #FF7D0A → ярко-красный (оранжевого нет в ANSI)
 }
 
-func RenderReportImage(report BossKillReport) ([]byte, error) {
-	const (
-		width     = 800
-		rowHeight = 35
-		headerH   = 50
-		margin    = 20
-	)
+const ansiReset = "\033[0m"
 
-	// Разделяем игроков на роли
+// BuildReportText строит текстовый отчёт для Discord embed.
+// Возвращает заголовок раздела и ANSI-раскрашенный code-блок.
+func BuildReportText(report BossKillReport) (ddBlock string, healBlock string) {
 	var dds, healers []PlayerReport
 	for _, p := range report.Players {
 		if p.Role == 1 {
@@ -40,108 +36,66 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 		}
 	}
 
-	// Сортируем: ДД по ДПС, Хилов по ХПС
 	slices.SortFunc(dds, func(a, b PlayerReport) int { return b.Dps - a.Dps })
 	slices.SortFunc(healers, func(a, b PlayerReport) int { return b.Hps - a.Hps })
 
-	// Считаем общую высоту: заголовок рейда + секция ДД + секция Хилов
-	totalRows := len(dds) + len(healers)
-	height := headerH + (totalRows+2)*rowHeight + margin*2 // +2 для заголовков ролей
-
-	dc := gg.NewContext(width, int(height))
-
-	// Фон
-	dc.SetHexColor("#2c2f33") // Темно-серый Discord
-	dc.Clear()
-
-	// Попытка загрузить шрифт (Windows path)
-	fontPath := "C:\\Windows\\Fonts\\arial.ttf"
-	if _, err := os.Stat(fontPath); err == nil {
-		if err := dc.LoadFontFace(fontPath, 18); err != nil {
-			fmt.Printf("Error loading font: %v\n", err)
-		}
-	}
-
-	y := float64(margin)
-
-	// Заголовок Босса
-	dc.SetRGB(1, 1, 1)
-	dc.DrawStringAnchored(fmt.Sprintf("⚔️ %s", report.BossName), width/2, y+20, 0.5, 0.5)
-	y += headerH
-
-	// Секция ДД
-	if len(dds) > 0 {
-		y = drawRoleHeader(dc, "DAMAGE DEALERS", y, width)
-		for i, p := range dds {
-			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, true)
-		}
-	}
-
-	// Секция Хилов
-	if len(healers) > 0 {
-		y += 10
-		y = drawRoleHeader(dc, "HEALERS", y, width)
-		for i, p := range healers {
-			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, false)
-		}
-	}
-
-	buf := new(bytes.Buffer)
-	err := dc.EncodePNG(buf)
-	return buf.Bytes(), err
+	ddBlock = buildAnsiBlock(dds, true)
+	healBlock = buildAnsiBlock(healers, false)
+	return
 }
 
-func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 {
-	dc.SetRGBA(0, 0, 0, 0.3)
-	dc.DrawRectangle(0, y, float64(width), 30)
-	dc.Fill()
+func buildAnsiBlock(players []PlayerReport, isDD bool) string {
+	if len(players) == 0 {
+		return ""
+	}
 
-	dc.SetRGB(0.7, 0.7, 0.7)
-	dc.DrawString(title, 20, y+20)
-	return y + 35
+	var sb strings.Builder
+	sb.WriteString("```ansi\n")
+
+	for i, p := range players {
+		ansi := classANSI[p.ClassID]
+		if ansi == "" {
+			ansi = "\033[37m"
+		}
+
+		val := p.Dps
+		valLabel := "DPS"
+		if !isDD {
+			val = p.Hps
+			valLabel = "HPS"
+		}
+
+		// Форматируем строку: ранг, имя (цвет класса), спек, iLvl, DPS/HPS, ранг по спеку
+		rank := fmt.Sprintf("\033[90m%2d.\033[0m", i+1)
+		name := ansi + truncate(p.Name, 12) + ansiReset
+		spec := "\033[90m" + truncate(p.SpecName, 12) + ansiReset
+		ilvl := fmt.Sprintf("\033[37m%3divl%s", p.Ilvl, ansiReset)
+		perf := fmt.Sprintf("\033[97m%6s %s%s", formatNum(val), valLabel, ansiReset)
+		srank := fmt.Sprintf("\033[93m#%-3d%s", p.SpecRank, ansiReset)
+
+		sb.WriteString(fmt.Sprintf("%s %s  %s  %s  %s  %s\n",
+			rank, name, spec, ilvl, perf, srank))
+	}
+
+	sb.WriteString("```")
+	return sb.String()
 }
 
-func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width int, rowHeight float64, isDD bool) float64 {
-	// Подложка (чередующийся фон)
-	if rank%2 == 0 {
-		dc.SetRGBA(1, 1, 1, 0.05)
-		dc.DrawRectangle(0, y, float64(width), rowHeight)
-		dc.Fill()
+func truncate(s string, max int) string {
+	runes := []rune(s)
+	if len(runes) <= max {
+		// Дополняем пробелами для выравнивания
+		return s + strings.Repeat(" ", max-len(runes))
 	}
+	return string(runes[:max-1]) + "…"
+}
 
-	// №
-	dc.SetRGB(0.5, 0.5, 0.5)
-	dc.DrawString(fmt.Sprintf("%d", rank), 20, y+25)
-
-	// Имя (цвет класса)
-	colorHex, ok := classColors[p.ClassID]
-	if !ok {
-		colorHex = "#FFFFFF"
+func formatNum(n int) string {
+	if n >= 1_000_000 {
+		return fmt.Sprintf("%.1fM", float64(n)/1_000_000)
 	}
-	dc.SetHexColor(colorHex)
-	dc.DrawString(p.Name, 60, y+25)
-
-	// Спек
-	dc.SetRGB(0.6, 0.6, 0.6)
-	dc.DrawString(p.SpecName, 220, y+25)
-
-	// iLvl
-	dc.SetRGB(0.8, 0.8, 0.8)
-	dc.DrawString(fmt.Sprintf("%d", p.Ilvl), 380, y+25)
-
-	// DPS/HPS
-	val := p.Dps
-	label := "DPS"
-	if !isDD {
-		val = p.Hps
-		label = "HPS"
+	if n >= 1_000 {
+		return fmt.Sprintf("%.1fk", float64(n)/1_000)
 	}
-	dc.SetRGB(1, 1, 1)
-	dc.DrawString(fmt.Sprintf("%d %s", val, label), 500, y+25)
-
-	// Spec Rank
-	dc.SetRGB(1, 0.8, 0)
-	dc.DrawString(fmt.Sprintf("#%d", p.SpecRank), 700, y+25)
-
-	return y + rowHeight
+	return fmt.Sprintf("%d", n)
 }

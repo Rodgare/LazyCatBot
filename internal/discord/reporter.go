@@ -1,7 +1,6 @@
 package discord
 
 import (
-	"bytes"
 	"fmt"
 	"time"
 
@@ -9,23 +8,19 @@ import (
 )
 
 func SendKillReport(s *discordgo.Session, channelID string, report BossKillReport) {
-	// Генерируем изображение
-	imgBytes, err := RenderReportImage(report)
-	if err != nil {
-		fmt.Println("Error rendering report image:", err)
-		return
-	}
+	ddBlock, healBlock := BuildReportText(report)
 
-	description := fmt.Sprintf("⏱️ **Duration:** %s  |  🔄 **Attempts:** %d\n💥 **Raid DPS:** %d",
-		report.Duration, report.Attempts, report.TotalDps)
+	// Основное описание
+	description := fmt.Sprintf(
+		"⏱️ **Duration:** %s  ·  🔄 **Attempts:** %d  ·  💥 **Raid DPS:** %s",
+		report.Duration, report.Attempts, formatNum(report.TotalDps),
+	)
 
 	embed := &discordgo.MessageEmbed{
-		Title:       "⚔️Boss Kill: " + report.BossName,
+		Title:       "⚔️  Boss Kill: " + report.BossName,
 		Description: description,
 		Color:       0xf1c40f,
-		Image: &discordgo.MessageEmbedImage{
-			URL: "attachment://report.png",
-		},
+		Fields:      buildFields(ddBlock, healBlock),
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: "LazyCatBot PVE Progression • Sirus.su",
 		},
@@ -34,17 +29,32 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 
 	params := &discordgo.MessageSend{
 		Embeds: []*discordgo.MessageEmbed{embed},
-		Files: []*discordgo.File{
-			{
-				Name:        "report.png",
-				ContentType: "image/png",
-				Reader:      bytes.NewReader(imgBytes),
-			},
-		},
 	}
 
-	_, err = s.ChannelMessageSendComplex(channelID, params)
+	_, err := s.ChannelMessageSendComplex(channelID, params)
 	if err != nil {
 		fmt.Println("Error sending report:", err)
 	}
+}
+
+func buildFields(ddBlock, healBlock string) []*discordgo.MessageEmbedField {
+	var fields []*discordgo.MessageEmbedField
+
+	if ddBlock != "" {
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "⚔️  Damage Dealers",
+			Value:  ddBlock,
+			Inline: false,
+		})
+	}
+
+	if healBlock != "" {
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "💚  Healers",
+			Value:  healBlock,
+			Inline: false,
+		})
+	}
+
+	return fields
 }
