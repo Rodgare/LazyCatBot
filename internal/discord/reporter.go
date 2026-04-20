@@ -11,9 +11,9 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 	ddBlocks, healBlocks := BuildReportText(report)
 
 	embed := &discordgo.MessageEmbed{
-		Title:       "⚔️  Boss: " + report.BossName,
-		Color:       0xf1c40f,
-		Fields:      buildFields(report, ddBlocks, healBlocks),
+		Title:  "⚔️  Boss: " + report.BossName,
+		Color:  0xf1c40f,
+		Fields: buildFields(report, ddBlocks, healBlocks),
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: "LazyCatBot PVE Progression • Sirus.su",
 		},
@@ -47,8 +47,8 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name:   "Общий DPS",
-		Value:  FormatNum(report.TotalDps),
-		Inline: false,
+		Value:  fmt.Sprintf("```diff\n- %s\n```", FormatNum(report.TotalDps)),
+		Inline: true,
 	})
 
 	for i, block := range ddBlocks {
@@ -65,7 +65,7 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name:   "Общий HPS",
-		Value:  FormatNum(report.TotalHps),
+		Value:  fmt.Sprintf("```diff\n- %s\n```", FormatNum(report.TotalHps)),
 		Inline: false,
 	})
 
