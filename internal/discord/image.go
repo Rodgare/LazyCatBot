@@ -68,15 +68,15 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 	// Отказоустойчивая загрузка шрифта (в первую очередь ищем локальный файл в репозитории)
 	fontLoaded := false
 	fontPaths := []string{
-		"internal/discord/assets/fonts/Roboto-Regular.ttf",              // Локальный шрифт из репозитория!
-		"C:\\Windows\\Fonts\\arialbd.ttf",                               // Windows Arial Bold
-		"C:\\Windows\\Fonts\\arial.ttf",                                 // Windows Arial
-		"C:\\Windows\\Fonts\\seguiemj.ttf",                              // Windows Segoe UI
-		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",          // Linux Ubuntu/Debian
-		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",               // Linux Ubuntu/Debian
-		"/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",           // Linux FreeFont
-		"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",  // Linux CentOS/RHEL
-		"/usr/share/fonts/dejavu/DejaVuSans.ttf",                        // Alpine Linux
+		"internal/discord/assets/fonts/Roboto-Regular.ttf",             // Локальный шрифт из репозитория!
+		"C:\\Windows\\Fonts\\arialbd.ttf",                              // Windows Arial Bold
+		"C:\\Windows\\Fonts\\arial.ttf",                                // Windows Arial
+		"C:\\Windows\\Fonts\\seguiemj.ttf",                             // Windows Segoe UI
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",         // Linux Ubuntu/Debian
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",              // Linux Ubuntu/Debian
+		"/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",          // Linux FreeFont
+		"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", // Linux CentOS/RHEL
+		"/usr/share/fonts/dejavu/DejaVuSans.ttf",                       // Alpine Linux
 	}
 
 	for _, path := range fontPaths {
@@ -165,11 +165,11 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 			bounds := img.Bounds()
 			imgW := bounds.Dx()
 			imgH := bounds.Dy()
-			
+
 			// Если картинка слишком большая, можно было бы сделать ресайз,
 			// но gg не поддерживает ресайз напрямую. Будем считать, что иконки небольшие (~30x30).
 			imgY := int(y) + int(rowHeight)/2 - imgH/2
-			
+
 			dc.DrawImage(img, 220, imgY)
 			specTextX += float64(imgW + 10) // Смещаем текст правее иконки
 		} else {
