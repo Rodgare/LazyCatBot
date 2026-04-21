@@ -172,6 +172,8 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 			
 			dc.DrawImage(img, 220, imgY)
 			specTextX += float64(imgW + 10) // Смещаем текст правее иконки
+		} else {
+			fmt.Printf("Error loading image %s: %v\n", imgFile, err)
 		}
 	}
 
