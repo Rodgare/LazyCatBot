@@ -2,6 +2,7 @@ package discord
 
 import (
 	"fmt"
+	"math/rand"
 	"strings"
 	"time"
 
@@ -45,7 +46,7 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 		Color:  0xf1c40f,
 		Fields: buildFields(report, ddBlocks, healBlocks),
 		Footer: &discordgo.MessageEmbedFooter{
-			Text: "Связь с разработчиком: <@195175537356963840>",
+			Text: generateJoke(),
 		},
 		Timestamp: time.Now().Format(time.RFC3339),
 	}
@@ -90,7 +91,7 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name: "Общий DPS",
 		Value: fmt.Sprintf("```ansi\n%s%s%s%s\n```",
-			strings.Repeat(" ", 12),
+			strings.Repeat(" ", 24),
 			ansiColors["red_bold"],
 			FormatNum(report.TotalDps),
 			ansiColors["reset"]),
@@ -118,7 +119,7 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name: "Общий HPS",
 		Value: fmt.Sprintf("```ansi\n%s%s%s%s\n```",
-			strings.Repeat(" ", 12),
+			strings.Repeat(" ", 24),
 			ansiColors["green_bold"],
 			FormatNum(report.TotalHps),
 			ansiColors["reset"]),
@@ -144,4 +145,22 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 	})
 
 	return fields
+}
+
+func generateJoke() string {
+	jokes := []string{
+		"LazyCatBot — Мяу, рейд пройден! 🐾",
+		"LazyCatBot — Кот посмотрел логи и одобрил 🐈",
+		"LazyCatBot — Мур-мур, прогресс засчитан 🐾",
+		"LazyCatBot — Рейды ради консервов 🐟",
+		"LazyCatBot — Сплю на клавиатуре, пока боссы падают 🐱💤",
+		"LazyCatBot — Кот одобряет этот лут 💍",
+		"LazyCatBot — Босс повержен, я заслужил сметанку 🥛",
+		"LazyCatBot — Этот рейд был легче, чем пакет с кормом 📦",
+		"LazyCatBot — Мяу-аналитика завершена. Идите спать.",
+		"LazyCatBot — Мог бы протащить всех, но мне лень 🐾",
+		"LazyCatBot — 1% боссу остался? Зовите, когда будет 0% 🐈",
+	}
+
+	return jokes[rand.Intn(len(jokes))]
 }

@@ -7,10 +7,7 @@ import (
 	"unicode/utf8"
 )
 
-// SpecEmojis содержит маппинг ID класса -> Имя спека -> Discord эмодзи.
-// Вам нужно будет заменить "ID" на реальные ID эмодзи с вашего сервера.
-// Чтобы узнать ID эмодзи, напишите в чат дискорда: \:имя_эмодзи: (с обратным слешем).
-var SpecEmojis = map[int]map[string]string{
+var SpecEmojiSpecs = map[int]map[string]string{
 	1: { // Warrior
 		"Arms": "<:WarA:1495884556509778070>",
 		"Fury": "<:WarF:1495884541443834067>",
@@ -63,7 +60,6 @@ var SpecEmojis = map[int]map[string]string{
 	},
 }
 
-// BuildReportText строит текстовый отчёт для Discord embed.
 func BuildReportText(report BossKillReport) (ddBlocks []string, healBlocks []string) {
 	var dds, healers []PlayerReport
 	for _, p := range report.Players {
@@ -91,10 +87,10 @@ func buildBlocks(players []PlayerReport, isDD bool, total int) []string {
 	var sb strings.Builder
 
 	for i, p := range players {
-		emoji := "❔"
-		if specs, ok := SpecEmojis[p.ClassID]; ok {
+		emojiSpec := "❔"
+		if specs, ok := SpecEmojiSpecs[p.ClassID]; ok {
 			if str, ok2 := specs[p.SpecName]; ok2 && str != "" {
-				emoji = str
+				emojiSpec = str
 			}
 		}
 
@@ -103,8 +99,8 @@ func buildBlocks(players []PlayerReport, isDD bool, total int) []string {
 			val = p.Hps
 		}
 
-		line := fmt.Sprintf("**%d**\u2800\u2800%s\u2800%s `%s [Топ: спек #%d]`\n",
-			i+1, emoji, p.Name, FormatNum(val), p.SpecRank)
+		line := fmt.Sprintf("**%d**\u2800\u2800%s\u2800%s `%s [Рейтинг: спек #%d]`\n",
+			i+1, emojiSpec, p.Name, FormatNum(val), p.SpecRank)
 
 		// Discord limit 1024 characters per field value. Safely cut at 1000.
 		if utf8.RuneCountInString(sb.String())+utf8.RuneCountInString(line) > 1000 {
