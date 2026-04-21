@@ -45,7 +45,7 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 		Color:  0xf1c40f,
 		Fields: buildFields(report, ddBlocks, healBlocks),
 		Footer: &discordgo.MessageEmbedFooter{
-			Text: "LazyCatBot PVE Progression • Sirus.su",
+			Text: "Связь с разработчиком: <@195175537356963840>",
 		},
 		Timestamp: time.Now().Format(time.RFC3339),
 	}
@@ -121,7 +121,7 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 			ansiColors["green_bold"],
 			FormatNum(report.TotalHps),
 			ansiColors["reset"]),
-		Inline: true,
+		Inline: false,
 	})
 
 	for i, block := range healBlocks {
