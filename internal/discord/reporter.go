@@ -117,7 +117,8 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name: "Общий HPS",
-		Value: fmt.Sprintf("```ansi\n%s%s%s\n```",
+		Value: fmt.Sprintf("```ansi\n%s%s%s%s\n```",
+			strings.Repeat(" ", 12),
 			ansiColors["green_bold"],
 			FormatNum(report.TotalHps),
 			ansiColors["reset"]),
