@@ -76,7 +76,7 @@ func KillMonitor(
 			lastID = kills.Data[0].KillID
 		}
 
-		time.Sleep(2 * time.Minute)
+		time.Sleep(30 * time.Second)
 	}
 }
 
