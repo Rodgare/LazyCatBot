@@ -39,10 +39,8 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 			IconURL: fmt.Sprintf("https://sirus.su/api/base/22/guild/%d/emblem.webp", report.GuildID),
 			URL:     fmt.Sprintf("https://sirus.su/base/guilds/x3/%d", report.GuildID),
 		},
-		Description: fmt.Sprintf("[**%s — %s**](https://sirus.su/base/pve-progression/boss-kill/x3/%d)",
-			report.MapName,
-			report.BossName,
-			report.KillID),
+		Title:  fmt.Sprintf("%s — %s", report.MapName, report.BossName),
+		URL:    fmt.Sprintf("https://sirus.su/base/pve-progression/boss-kill/x3/%d", report.KillID),
 		Color:  0xf1c40f,
 		Fields: buildFields(report, ddBlocks, healBlocks),
 		Footer: &discordgo.MessageEmbedFooter{
