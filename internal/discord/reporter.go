@@ -98,7 +98,7 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 	})
 
 	for i, block := range ddBlocks {
-		name := "#\u2800Ник\u2800Дпс\u2800(Рейтинг по спеку)"
+		name := "ДД"
 		if i > 0 {
 			name = "\u2800"
 		}
@@ -126,7 +126,7 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 	})
 
 	for i, block := range healBlocks {
-		name := "#\u2800Ник\u2800Хпс\u2800(Рейтинг по спеку)"
+		name := "Хилы"
 		if i > 0 {
 			name = "\u2800"
 		}
