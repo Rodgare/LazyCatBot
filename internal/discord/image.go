@@ -65,8 +65,10 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 	dc.SetHexColor("#2b2d31")
 	dc.Clear()
 
-	// Пытаемся найти шрифт с кириллицей (Windows и Linux пути)
+	// Отказоустойчивая загрузка шрифта (в первую очередь ищем локальный файл в репозитории)
+	fontLoaded := false
 	fontPaths := []string{
+		"internal/discord/assets/fonts/Roboto-Regular.ttf",              // Локальный шрифт из репозитория!
 		"C:\\Windows\\Fonts\\arialbd.ttf",                               // Windows Arial Bold
 		"C:\\Windows\\Fonts\\arial.ttf",                                 // Windows Arial
 		"C:\\Windows\\Fonts\\seguiemj.ttf",                              // Windows Segoe UI
@@ -80,9 +82,14 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 	for _, path := range fontPaths {
 		if _, err := os.Stat(path); err == nil {
 			if err := dc.LoadFontFace(path, 16); err == nil {
+				fontLoaded = true
 				break
 			}
 		}
+	}
+
+	if !fontLoaded {
+		fmt.Println("WARNING: No suitable font found for Cyrillic support!")
 	}
 
 	y := float64(margin)
