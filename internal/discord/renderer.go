@@ -91,7 +91,7 @@ func buildBlocks(players []PlayerReport, isDD bool, total int) []string {
 	var sb strings.Builder
 
 	for i, p := range players {
-		emoji := "❔" // Дефолт, если неизвестно
+		emoji := "❔"
 		if specs, ok := SpecEmojis[p.ClassID]; ok {
 			if str, ok2 := specs[p.SpecName]; ok2 && str != "" {
 				emoji = str
@@ -103,8 +103,6 @@ func buildBlocks(players []PlayerReport, isDD bool, total int) []string {
 			val = p.Hps
 		}
 
-		// Формат: Ранг Ник (Дпс/Хпс) Рейтинг
-		// Используем \u2800 для пустого места (Braille Pattern Blank)
 		line := fmt.Sprintf("**%d**\u2800\u2800%s%s `%s [Топ: спек #%d]`\n",
 			i+1, emoji, p.Name, FormatNum(val), p.SpecRank)
 

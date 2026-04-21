@@ -2,6 +2,7 @@ package discord
 
 import (
 	"fmt"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -88,7 +89,8 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name: "Общий DPS",
-		Value: fmt.Sprintf("```ansi\n%s%s%s\n```",
+		Value: fmt.Sprintf("```ansi\n%s%s%s%s\n```",
+			strings.Repeat(" ", 12),
 			ansiColors["red_bold"],
 			FormatNum(report.TotalDps),
 			ansiColors["reset"]),
@@ -106,6 +108,12 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 			Inline: false,
 		})
 	}
+
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "\u200B",
+		Value:  "\u200B",
+		Inline: false,
+	})
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name: "Общий HPS",
