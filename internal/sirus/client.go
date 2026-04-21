@@ -57,8 +57,8 @@ func FetchActualRaids() (ActualRaids, error) {
 	return res, nil
 }
 
-func FetchLatestBossKills() (*LatestBossKills, error) {
-	url := "https://sirus.su/api/base/22/progression/pve/latest-boss-kills"
+func FetchLatestBossKills(page int) (*LatestBossKills, error) {
+	url := fmt.Sprintf("https://sirus.su/api/base/22/progression/pve/latest-boss-kills?page=%d", page)
 	var res LatestBossKills
 
 	if err := makeRequest(url, &res); err != nil {

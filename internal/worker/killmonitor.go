@@ -18,7 +18,7 @@ func KillMonitor(
 ) {
 	var lastID int
 	for {
-		kills, err := sirus.FetchLatestBossKills()
+		kills, err := sirus.FetchLatestBossKills(1)
 		if err == nil && kills != nil {
 			if len(kills.Data) > 0 {
 				lastID = kills.Data[0].KillID
@@ -30,19 +30,50 @@ func KillMonitor(
 	}
 
 	for {
-		kills, err := sirus.FetchLatestBossKills()
-		if err != nil {
-			log.Printf("[KillMonitor] FetchLatestBossKills error %v", err)
-			time.Sleep(2 * time.Minute)
-			continue
-		}
-		debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
-		newKills := getNewKills(kills, lastID)
-		if len(newKills) > 0 {
-			log.Printf("[KillMonitor] Poll found %d new kills (lastID: %d)", len(newKills), lastID)
+		var newKills []sirus.BossKill
+		page := 1
+		maxPages := 10
+
+		for page <= maxPages {
+			kills, err := sirus.FetchLatestBossKills(page)
+			if err != nil {
+				log.Printf("[KillMonitor] FetchLatestBossKills page %d error %v", page, err)
+				break
+			}
+
+			if len(kills.Data) == 0 {
+				break
+			}
+
+			pageNewKills := getNewKills(kills, lastID)
+			newKills = append(newKills, pageNewKills...)
+
+			oldestOnPage := kills.Data[len(kills.Data)-1].KillID
+			if oldestOnPage <= lastID {
+				break
+			}
+
+			page++
+			time.Sleep(2 * time.Second)
 		}
 
+		if len(newKills) == 0 {
+			time.Sleep(30 * time.Second)
+			continue
+		}
+
+		maxNewID := lastID
 		for _, kill := range newKills {
+			if kill.KillID > maxNewID {
+				maxNewID = kill.KillID
+			}
+		}
+
+		debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
+		log.Printf("[KillMonitor] Poll found %d new kills (lastID: %d -> %d)", len(newKills), lastID, maxNewID)
+
+		for i := len(newKills) - 1; i >= 0; i-- {
+			kill := newKills[i]
 			channels, _ := subStore.GetSubscribers(kill.GuildId)
 
 			if debugChannel != "" {
@@ -72,10 +103,7 @@ func KillMonitor(
 			}
 		}
 
-		if len(kills.Data) > 0 {
-			lastID = kills.Data[0].KillID
-		}
-
+		lastID = maxNewID
 		time.Sleep(30 * time.Second)
 	}
 }
