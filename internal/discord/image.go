@@ -23,6 +23,19 @@ var classColors = map[int]string{
 	12: "#A330C9", // DH
 }
 
+var specIcons = map[int]map[string]string{
+	1:  {"Arms": "WarA.png", "Fury": "WarF.png", "Prot": "WarP.png"},
+	2:  {"Holy": "PaladinH.png", "Prot": "PaladinP.png", "Retri": "PaladinR.png"},
+	3:  {"BM": "HunterBM.png", "MM": "HunterMM.png", "Surv": "HunterS.png"},
+	4:  {"Assa": "RogueA.png", "Combat": "RogueC.png", "Sub": "RogueS.png"},
+	5:  {"Disc": "PriestD.png", "Holy": "PriestH.png", "Shadow": "PriestS.png"},
+	6:  {"Blood": "DKB.png", "Frost": "DKF.png", "Unholy": "DKU.png"},
+	7:  {"Ele": "ShamanEl.png", "Enh": "ShamanEnch.png", "Resto": "ShamanR.png"},
+	8:  {"Arcane": "MageA.png", "Fire": "MageF.png", "Frost": "MageFr.png"},
+	9:  {"Affli": "LockA.png", "Demo": "LockDemon.png", "Destro": "LockDestr.png"},
+	11: {"Bal": "DruidB.png", "Feral": "DruidF.png", "Resto": "DruidR.png", "Grd": "DruidF.png"},
+}
+
 func RenderReportImage(report BossKillReport) ([]byte, error) {
 	const (
 		width     = 800
@@ -52,12 +65,24 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 	dc.SetHexColor("#2b2d31")
 	dc.Clear()
 
-	fontPath := "C:\\Windows\\Fonts\\arialbd.ttf"
-	if _, err := os.Stat(fontPath); err == nil {
-		dc.LoadFontFace(fontPath, 16)
-	} else {
-		// Fallback
-		dc.LoadFontFace("C:\\Windows\\Fonts\\arial.ttf", 16)
+	// Пытаемся найти шрифт с кириллицей (Windows и Linux пути)
+	fontPaths := []string{
+		"C:\\Windows\\Fonts\\arialbd.ttf",                               // Windows Arial Bold
+		"C:\\Windows\\Fonts\\arial.ttf",                                 // Windows Arial
+		"C:\\Windows\\Fonts\\seguiemj.ttf",                              // Windows Segoe UI
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",          // Linux Ubuntu/Debian
+		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",               // Linux Ubuntu/Debian
+		"/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",           // Linux FreeFont
+		"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",  // Linux CentOS/RHEL
+		"/usr/share/fonts/dejavu/DejaVuSans.ttf",                        // Alpine Linux
+	}
+
+	for _, path := range fontPaths {
+		if _, err := os.Stat(path); err == nil {
+			if err := dc.LoadFontFace(path, 16); err == nil {
+				break
+			}
+		}
 	}
 
 	y := float64(margin)
@@ -118,8 +143,33 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 	dc.SetHexColor(colorHex)
 	dc.DrawString(p.Name, 55, y+25)
 
+	imgFile := ""
+	if specs, ok := specIcons[p.ClassID]; ok {
+		if filename, ok2 := specs[p.SpecName]; ok2 {
+			imgFile = "internal/discord/assets/images/" + filename
+		}
+	}
+
+	specTextX := float64(220)
+	if imgFile != "" {
+		img, err := gg.LoadImage(imgFile)
+		if err == nil {
+			// Вычисляем высоту картинки, чтобы отцентрировать её вертикально
+			bounds := img.Bounds()
+			imgW := bounds.Dx()
+			imgH := bounds.Dy()
+			
+			// Если картинка слишком большая, можно было бы сделать ресайз,
+			// но gg не поддерживает ресайз напрямую. Будем считать, что иконки небольшие (~30x30).
+			imgY := int(y) + int(rowHeight)/2 - imgH/2
+			
+			dc.DrawImage(img, 220, imgY)
+			specTextX += float64(imgW + 10) // Смещаем текст правее иконки
+		}
+	}
+
 	dc.SetRGB(0.6, 0.6, 0.6)
-	dc.DrawString(p.SpecName, 220, y+25)
+	dc.DrawString(p.SpecName, specTextX, y+25)
 
 	dc.SetRGB(0.8, 0.8, 0.8)
 	dc.DrawString(fmt.Sprintf("%d", p.Ilvl), 350, y+25)
