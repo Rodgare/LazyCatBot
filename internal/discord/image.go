@@ -157,7 +157,6 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 
 	specTextX := float64(220)
 
-	// Вся логика иконок теперь здесь, лишний imgFile не нужен
 	if specs, ok := specIcons[p.ClassID]; ok {
 		if filename, ok2 := specs[p.SpecName]; ok2 {
 			filePath := "assets/images/" + filename
@@ -186,7 +185,6 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 	dc.SetRGB(0.6, 0.6, 0.6)
 	dc.DrawString(p.SpecName, specTextX, y+25)
 
-	// ... дальше без изменений (iLvl, DPS, Rank)
 	dc.SetRGB(0.8, 0.8, 0.8)
 	dc.DrawString(fmt.Sprintf("%d", p.Ilvl), 350, y+25)
 
