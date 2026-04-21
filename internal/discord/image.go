@@ -2,7 +2,10 @@ package discord
 
 import (
 	"bytes"
+	"embed"
 	"fmt"
+	"image"
+	_ "image/png"
 	"os"
 	"slices"
 
@@ -36,6 +39,9 @@ var specIcons = map[int]map[string]string{
 	11: {"Bal": "DruidB.png", "Feral": "DruidF.png", "Resto": "DruidR.png", "Grd": "DruidF.png"},
 }
 
+//go:embed assets/images/*.png
+var imagesFS embed.FS
+
 func RenderReportImage(report BossKillReport) ([]byte, error) {
 	const (
 		width     = 800
@@ -61,11 +67,10 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 
 	dc := gg.NewContext(width, int(height))
 
-	// Заливаем фон цветом дискорда
-	dc.SetHexColor("#2b2d31")
+	// Фон
+	dc.SetHexColor("#151618ff")
 	dc.Clear()
 
-	// Отказоустойчивая загрузка шрифта (в первую очередь ищем локальный файл в репозитории)
 	fontLoaded := false
 	fontPaths := []string{
 		"internal/discord/assets/fonts/Roboto-Regular.ttf",             // Локальный шрифт из репозитория!
@@ -100,7 +105,7 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 	y += headerH
 
 	if len(dds) > 0 {
-		y = drawRoleHeader(dc, "DAMAGE DEALERS", y, width)
+		y = drawRoleHeader(dc, "Дамагеры", y, width)
 		for i, p := range dds {
 			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, true)
 		}
@@ -108,7 +113,7 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 
 	if len(healers) > 0 {
 		y += 10
-		y = drawRoleHeader(dc, "HEALERS", y, width)
+		y = drawRoleHeader(dc, "Хилы", y, width)
 		for i, p := range healers {
 			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, false)
 		}
@@ -126,10 +131,10 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 
 	dc.SetRGB(0.7, 0.7, 0.7)
 	dc.DrawString(title, 20, y+20)
-	dc.DrawString("Spec", 220, y+20)
+	dc.DrawString("Спек", 220, y+20)
 	dc.DrawString("iLvl", 350, y+20)
-	dc.DrawString("Perf", 500, y+20)
-	dc.DrawString("Spec Rank", 650, y+20)
+	dc.DrawString("Дпс/Хпс", 500, y+20)
+	dc.DrawString("Топ спек", 650, y+20)
 	return y + 35
 }
 
@@ -150,36 +155,38 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 	dc.SetHexColor(colorHex)
 	dc.DrawString(p.Name, 55, y+25)
 
-	imgFile := ""
+	specTextX := float64(220)
+
+	// Вся логика иконок теперь здесь, лишний imgFile не нужен
 	if specs, ok := specIcons[p.ClassID]; ok {
 		if filename, ok2 := specs[p.SpecName]; ok2 {
-			imgFile = "internal/discord/assets/images/" + filename
-		}
-	}
+			filePath := "assets/images/" + filename
 
-	specTextX := float64(220)
-	if imgFile != "" {
-		img, err := gg.LoadImage(imgFile)
-		if err == nil {
-			// Вычисляем высоту картинки, чтобы отцентрировать её вертикально
-			bounds := img.Bounds()
-			imgW := bounds.Dx()
-			imgH := bounds.Dy()
+			fileData, err := imagesFS.ReadFile(filePath)
+			if err == nil {
+				img, _, errDecode := image.Decode(bytes.NewReader(fileData))
+				if errDecode == nil {
+					bounds := img.Bounds()
+					imgW := bounds.Dx()
+					imgH := bounds.Dy()
 
-			// Если картинка слишком большая, можно было бы сделать ресайз,
-			// но gg не поддерживает ресайз напрямую. Будем считать, что иконки небольшие (~30x30).
-			imgY := int(y) + int(rowHeight)/2 - imgH/2
+					imgY := int(y) + int(rowHeight)/2 - imgH/2
+					dc.DrawImage(img, 220, imgY)
 
-			dc.DrawImage(img, 220, imgY)
-			specTextX += float64(imgW + 10) // Смещаем текст правее иконки
-		} else {
-			fmt.Printf("Error loading image %s: %v\n", imgFile, err)
+					specTextX += float64(imgW + 10)
+				} else {
+					fmt.Printf("Error decoding %s: %v\n", filePath, errDecode)
+				}
+			} else {
+				fmt.Printf("Error: file %s not found in embed\n", filePath)
+			}
 		}
 	}
 
 	dc.SetRGB(0.6, 0.6, 0.6)
 	dc.DrawString(p.SpecName, specTextX, y+25)
 
+	// ... дальше без изменений (iLvl, DPS, Rank)
 	dc.SetRGB(0.8, 0.8, 0.8)
 	dc.DrawString(fmt.Sprintf("%d", p.Ilvl), 350, y+25)
 
@@ -192,7 +199,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 	dc.SetRGB(1, 1, 1)
 	dc.DrawString(fmt.Sprintf("%s %s", FormatNum(val), label), 500, y+25)
 
-	dc.SetRGB(1, 0.8, 0.2) // Gold-ish
+	dc.SetRGB(1, 0.8, 0.2)
 	dc.DrawString(fmt.Sprintf("#%d", p.SpecRank), 650, y+25)
 
 	return y + rowHeight
