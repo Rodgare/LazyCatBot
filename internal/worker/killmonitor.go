@@ -5,7 +5,6 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"log"
-	"os"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -26,7 +25,7 @@ func KillMonitor(
 			continue
 		}
 
-		debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
+		// debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
 
 		for _, guildID := range guilds {
 			lastID := guildLastKills[guildID]
@@ -83,9 +82,9 @@ func KillMonitor(
 				kill := newKills[i]
 				channels, _ := subStore.GetSubscribers(kill.GuildId)
 
-				if debugChannel != "" {
-					channels = append(channels, debugChannel)
-				}
+				// if debugChannel != "" {
+				// 	channels = append(channels, debugChannel)
+				// }
 
 				if len(channels) == 0 {
 					continue
