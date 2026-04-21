@@ -103,7 +103,7 @@ func buildBlocks(players []PlayerReport, isDD bool, total int) []string {
 			val = p.Hps
 		}
 
-		line := fmt.Sprintf("**%d**\u2800\u2800%s%s `%s [Топ: спек #%d]`\n",
+		line := fmt.Sprintf("**%d**\u2800\u2800%s\u2800%s `%s [Топ: спек #%d]`\n",
 			i+1, emoji, p.Name, FormatNum(val), p.SpecRank)
 
 		// Discord limit 1024 characters per field value. Safely cut at 1000.
