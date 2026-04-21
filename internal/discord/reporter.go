@@ -3,7 +3,6 @@ package discord
 import (
 	"fmt"
 	"math/rand"
-	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -90,12 +89,11 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name: "Общий DPS",
-		Value: fmt.Sprintf("```ansi\n%s%s%s%s\n```",
-			strings.Repeat(" ", 20),
+		Value: fmt.Sprintf("```ansi\n%s%s%s\n```",
 			ansiColors["red_bold"],
 			FormatNum(report.TotalDps),
 			ansiColors["reset"]),
-		Inline: true,
+		Inline: false,
 	})
 
 	for i, block := range ddBlocks {
@@ -118,8 +116,7 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name: "Общий HPS",
-		Value: fmt.Sprintf("```ansi\n%s%s%s%s\n```",
-			strings.Repeat(" ", 20),
+		Value: fmt.Sprintf("```ansi\n%s%s%s\n```",
 			ansiColors["green_bold"],
 			FormatNum(report.TotalHps),
 			ansiColors["reset"]),
