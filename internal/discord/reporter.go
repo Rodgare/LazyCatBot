@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"bytes"
 	"fmt"
 	"math/rand"
 	"time"
@@ -44,6 +45,9 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 		URL:    fmt.Sprintf("https://sirus.su/base/pve-progression/boss-kill/x3/%d", report.KillID),
 		Color:  0xf1c40f,
 		Fields: buildFields(report, ddBlocks, healBlocks),
+		Image: &discordgo.MessageEmbedImage{
+			URL: "attachment://report.png",
+		},
 		Footer: &discordgo.MessageEmbedFooter{
 			Text: generateJoke(),
 		},
@@ -54,7 +58,20 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 		Embeds: []*discordgo.MessageEmbed{embed},
 	}
 
-	_, err := s.ChannelMessageSendComplex(channelID, params)
+	imgData, err := RenderReportImage(report)
+	if err == nil {
+		params.Files = []*discordgo.File{
+			{
+				Name:        "report.png",
+				ContentType: "image/png",
+				Reader:      bytes.NewReader(imgData),
+			},
+		}
+	} else {
+		fmt.Println("Error rendering image:", err)
+	}
+
+	_, err = s.ChannelMessageSendComplex(channelID, params)
 	if err != nil {
 		fmt.Println("Error sending report:", err)
 	}
