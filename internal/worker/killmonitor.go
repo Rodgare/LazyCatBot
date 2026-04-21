@@ -16,94 +16,102 @@ func KillMonitor(
 	subStore *storage.SubscribeStorage,
 	dg *discordgo.Session,
 ) {
-	var lastID int
-	for {
-		kills, err := sirus.FetchLatestBossKills(1)
-		if err == nil && kills != nil {
-			if len(kills.Data) > 0 {
-				lastID = kills.Data[0].KillID
-			}
-			break
-		}
-		log.Printf("[KillMonitor] Failed to get initial ID: %v. Retrying in 10s...", err)
-		time.Sleep(10 * time.Second)
-	}
+	guildLastKills := make(map[int]int)
 
 	for {
-		var newKills []sirus.BossKill
-		page := 1
-		maxPages := 10
-
-		for page <= maxPages {
-			kills, err := sirus.FetchLatestBossKills(page)
-			if err != nil {
-				log.Printf("[KillMonitor] FetchLatestBossKills page %d error %v", page, err)
-				break
-			}
-
-			if len(kills.Data) == 0 {
-				break
-			}
-
-			pageNewKills := getNewKills(kills, lastID)
-			newKills = append(newKills, pageNewKills...)
-
-			oldestOnPage := kills.Data[len(kills.Data)-1].KillID
-			if oldestOnPage <= lastID {
-				break
-			}
-
-			page++
-			time.Sleep(2 * time.Second)
-		}
-
-		if len(newKills) == 0 {
+		guilds, err := subStore.GetTrackedGuilds()
+		if err != nil {
+			log.Printf("[KillMonitor] Error getting tracked guilds: %v", err)
 			time.Sleep(30 * time.Second)
 			continue
 		}
 
-		maxNewID := lastID
-		for _, kill := range newKills {
-			if kill.KillID > maxNewID {
-				maxNewID = kill.KillID
-			}
-		}
-
 		debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
-		log.Printf("[KillMonitor] Poll found %d new kills (lastID: %d -> %d)", len(newKills), lastID, maxNewID)
 
-		for i := len(newKills) - 1; i >= 0; i-- {
-			kill := newKills[i]
-			channels, _ := subStore.GetSubscribers(kill.GuildId)
-
-			if debugChannel != "" {
-				channels = append(channels, debugChannel)
-			}
-
-			if len(channels) == 0 {
-				log.Printf("[KillMonitor] Skipping kill %d (Guild %d) - no subscribers", kill.KillID, kill.GuildId)
+		for _, guildID := range guilds {
+			lastID := guildLastKills[guildID]
+			if lastID == 0 {
+				kills, err := sirus.FetchGuildLatestBossKills(1, guildID)
+				if err == nil && kills != nil && len(kills.Data) > 0 {
+					guildLastKills[guildID] = kills.Data[0].KillID
+					log.Printf("[KillMonitor] Initialized tracking for guild %d (LastID: %d)", guildID, kills.Data[0].KillID)
+				}
 				continue
 			}
 
-			log.Printf("[KillMonitor] Fetching details for kill %d (Guild %d)...", kill.KillID, kill.GuildId)
-			fight, err := sirus.FetchBossFightDetails(kill.KillID)
-			time.Sleep(2 * time.Second)
-			if err != nil {
-				log.Printf("[KillMonitor] Error fetching details for kill %d: %v", kill.KillID, err)
+			var newKills []sirus.BossKill
+			page := 1
+			maxPages := 5
+
+			for page <= maxPages {
+				kills, err := sirus.FetchGuildLatestBossKills(page, guildID)
+				if err != nil {
+					log.Printf("[KillMonitor] FetchGuildLatestBossKills (Guild: %d, Page: %d) error: %v", guildID, page, err)
+					break
+				}
+
+				if len(kills.Data) == 0 {
+					break
+				}
+
+				pageNewKills := getNewKills(kills, lastID)
+				newKills = append(newKills, pageNewKills...)
+
+				oldestOnPage := kills.Data[len(kills.Data)-1].KillID
+				if oldestOnPage <= lastID {
+					break
+				}
+
+				page++
+				time.Sleep(1 * time.Second)
+			}
+
+			if len(newKills) == 0 {
+				continue
+			}
+
+			maxNewID := lastID
+			for _, kill := range newKills {
+				if kill.KillID > maxNewID {
+					maxNewID = kill.KillID
+				}
+			}
+
+			log.Printf("[KillMonitor] Guild %d found %d new kills (lastID: %d -> %d)", guildID, len(newKills), lastID, maxNewID)
+
+			for i := len(newKills) - 1; i >= 0; i-- {
+				kill := newKills[i]
+				channels, _ := subStore.GetSubscribers(kill.GuildId)
+
+				if debugChannel != "" {
+					channels = append(channels, debugChannel)
+				}
+
+				if len(channels) == 0 {
+					continue
+				}
+
+				log.Printf("[KillMonitor] Fetching details for kill %d (Guild %d)...", kill.KillID, kill.GuildId)
+				fight, err := sirus.FetchBossFightDetails(kill.KillID)
 				time.Sleep(2 * time.Second)
-				continue
+				if err != nil {
+					log.Printf("[KillMonitor] Error fetching details for kill %d: %v", kill.KillID, err)
+					continue
+				}
+
+				log.Printf("[KillMonitor] Successfully fetched details for [%s], creating report...", fight.Data.BossName)
+				report := createReport(fight, lbStore, kill.KillID)
+
+				for _, ch := range channels {
+					discord.SendKillReport(dg, ch, report)
+					log.Printf("[KillMonitor] Sent report for [%s] (KillID %d) to channel %s", fight.Data.BossName, kill.KillID, ch)
+				}
 			}
 
-			log.Printf("[KillMonitor] Successfully fetched details for [%s], creating report...", fight.Data.BossName)
-			report := createReport(fight, lbStore, kill.KillID)
-
-			for _, ch := range channels {
-				discord.SendKillReport(dg, ch, report)
-				log.Printf("[KillMonitor] Sent report for [%s] (KillID %d) to channel %s", fight.Data.BossName, kill.KillID, ch)
-			}
+			guildLastKills[guildID] = maxNewID
+			time.Sleep(2 * time.Second)
 		}
 
-		lastID = maxNewID
 		time.Sleep(30 * time.Second)
 	}
 }

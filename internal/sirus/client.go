@@ -57,8 +57,9 @@ func FetchActualRaids() (ActualRaids, error) {
 	return res, nil
 }
 
-func FetchLatestBossKills(page int) (*LatestBossKills, error) {
-	url := fmt.Sprintf("https://sirus.su/api/base/22/progression/pve/latest-boss-kills?page=%d", page)
+func FetchGuildLatestBossKills(page int, guildID int) (*LatestBossKills, error) {
+	weekFrom, weekTo := GetSirusDates()
+	url := fmt.Sprintf("https://sirus.su/api/base/22/progression/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s&guild=%d", page, weekFrom, weekTo, guildID)
 	var res LatestBossKills
 
 	if err := makeRequest(url, &res); err != nil {
