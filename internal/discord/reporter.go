@@ -137,5 +137,11 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 		})
 	}
 
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "\u200B",
+		Value:  "\u200B",
+		Inline: false,
+	})
+
 	return fields
 }
