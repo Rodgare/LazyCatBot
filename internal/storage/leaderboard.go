@@ -36,6 +36,9 @@ func (s *LeaderboardStorage) InitDB() error {
 }
 
 func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, players []sirus.LeaderboardPlayer) error {
+	if len(players) == 0 {
+		return fmt.Errorf("Empty players list for Raid: %d, Endounter: %d", raidOrder, encounter)
+	}
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
