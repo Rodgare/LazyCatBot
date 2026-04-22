@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -159,15 +160,16 @@ func buildFields(report BossKillReport, ddBlocks, healBlocks []string, lootsBloc
 	})
 
 	if len(lootsBlock) > 0 {
-		var lootList string
+		var sb strings.Builder
+
 		for _, item := range lootsBlock {
-			lootList += fmt.Sprintf("x%d [%s](https://sirus.su/base/item/%d/x3)\n",
+			fmt.Fprintf(&sb, "x%d [%s](https://sirus.su/base/item/%d/x3)\n",
 				item.Count, item.Name, item.ID)
 		}
 
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   "Лут",
-			Value:  lootList,
+			Value:  sb.String(),
 			Inline: false,
 		})
 
