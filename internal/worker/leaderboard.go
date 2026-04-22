@@ -40,12 +40,14 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 
 				if len(players) == 0 {
 					fmt.Printf("[Worker] No player data for Raid:%d Boss:%d\n", raid.Order, bossID)
+					time.Sleep(5 * time.Second)
 					continue
 				}
 
 				err = store.UpdateLeaderboardStorage(raid.Order, bossID, players)
 				if err != nil {
 					log.Printf("[Worker] Error saving to database: %v", err)
+					time.Sleep(5 * time.Second)
 				}
 
 				time.Sleep(5 * time.Second)

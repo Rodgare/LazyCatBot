@@ -112,7 +112,7 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 						Description: "Я помогаю отслеживать прогресс гильдий на Sirus.su!\n\n" +
 							"**/set [id]** — Подписаться на отчеты гильдии в этом канале.\n" +
 							"**/unset [id]** — Отписаться от отчетов.\n" +
-							"**/list** — Список отслеживаемых гильдий.\n" +
+							"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 							"**/help** — Показать это сообщение.",
 						Color: 0xf1c40f,
 					},

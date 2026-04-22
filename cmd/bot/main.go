@@ -16,6 +16,14 @@ import (
 )
 
 func main() {
+	file, err := os.OpenFile("bot.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
+	if err != nil {
+		log.Fatalf("Log read file error: %v", err)
+	}
+	defer file.Close()
+	log.SetOutput(file)
+	log.SetFlags(log.Ldate | log.Ltime)
+
 	if err := godotenv.Load(); err != nil {
 		log.Fatal("Error load .env file")
 	}
@@ -26,7 +34,7 @@ func main() {
 
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
-		fmt.Println("DiscordGo session create error:", err)
+		log.Fatalf("DiscordGo session create error: %v", err)
 		return
 	}
 
@@ -55,7 +63,7 @@ func main() {
 
 	err = dg.Open()
 	if err != nil {
-		fmt.Println("Connection error:", err)
+		log.Println("Connection error:", err)
 		return
 	}
 	defer dg.Close()
@@ -97,7 +105,7 @@ func main() {
 
 	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)
 	if err != nil {
-		log.Printf("Error registering commands: %v", err)
+		log.Fatalf("Error registering commands: %v", err)
 	}
 
 	fmt.Println("Bot is running. Slash Commands registered. Ctrl+C exit")

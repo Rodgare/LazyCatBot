@@ -3,3 +3,4 @@ internal/sirus/testdata/pve_example.json
 internal/sirus/testdata/guildkills_example.json
 *.db
 bot.exe
+bot.log
