@@ -44,7 +44,7 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 		Title:  fmt.Sprintf("%s — %s", report.MapName, report.BossName),
 		URL:    fmt.Sprintf("https://sirus.su/base/pve-progression/boss-kill/x3/%d", report.KillID),
 		Color:  0xf1c40f,
-		Fields: buildFields(report, ddBlocks, healBlocks),
+		Fields: buildFields(report, ddBlocks, healBlocks, report.Loots),
 		Image: &discordgo.MessageEmbedImage{
 			URL: "attachment://report.png",
 		},
@@ -77,7 +77,7 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 	}
 }
 
-func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) []*discordgo.MessageEmbedField {
+func buildFields(report BossKillReport, ddBlocks, healBlocks []string, lootsBlock []LootReport) []*discordgo.MessageEmbedField {
 	var fields []*discordgo.MessageEmbedField
 
 	fields = append(fields, &discordgo.MessageEmbedField{
@@ -148,6 +148,24 @@ func buildFields(report BossKillReport, ddBlocks []string, healBlocks []string) 
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   name,
 			Value:  block,
+			Inline: false,
+		})
+	}
+
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "\u200B",
+		Value:  "\u200B",
+		Inline: false,
+	})
+
+	for i, block := range lootsBlock {
+		name := "Лут"
+		if i > 0 {
+			name = "\u2800"
+		}
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   name,
+			Value:  fmt.Sprintf("x%d [%s](https://sirus.su/base/item/%d/x3)", block.Count, block.Name, block.ID),
 			Inline: false,
 		})
 	}

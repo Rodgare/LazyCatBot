@@ -11,6 +11,13 @@ type PlayerReport struct {
 	ClassID  int
 }
 
+type LootReport struct {
+	ID    int
+	Name  string
+	Count int
+	Icon  string
+}
+
 type BossKillReport struct {
 	MapName   string
 	BossName  string
@@ -23,5 +30,6 @@ type BossKillReport struct {
 	KilledAt  string
 	GuildID   int
 	GuildName string
+	Loots     []LootReport
 	Players   []PlayerReport
 }

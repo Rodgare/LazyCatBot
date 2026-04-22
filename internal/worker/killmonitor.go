@@ -4,6 +4,7 @@ import (
 	"LazyCatBot/internal/discord"
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
+	"fmt"
 	"log"
 	"time"
 
@@ -33,7 +34,7 @@ func KillMonitor(
 				kills, err := sirus.FetchGuildLatestBossKills(1, guildID)
 				if err == nil && kills != nil && len(kills.Data) > 0 {
 					guildLastKills[guildID] = kills.Data[0].KillID
-					log.Printf("[KillMonitor] Initialized tracking for guild %d (LastID: %d)", guildID, kills.Data[0].KillID)
+					fmt.Printf("[KillMonitor] Initialized tracking for guild %d (LastID: %d)", guildID, kills.Data[0].KillID)
 				}
 				continue
 			}
@@ -76,7 +77,7 @@ func KillMonitor(
 				}
 			}
 
-			log.Printf("[KillMonitor] Guild %d found %d new kills (lastID: %d -> %d)", guildID, len(newKills), lastID, maxNewID)
+			fmt.Printf("[KillMonitor] Guild %d found %d new kills (lastID: %d -> %d)", guildID, len(newKills), lastID, maxNewID)
 
 			for i := len(newKills) - 1; i >= 0; i-- {
 				kill := newKills[i]
@@ -134,6 +135,16 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, k
 		GuildName: fight.Data.Guild.Name,
 		TotalDps:  totalDps,
 		TotalHps:  totalHps,
+	}
+
+	for _, loot := range fight.Data.Loots {
+		lootReport := discord.LootReport{
+			ID:    loot.Entry,
+			Name:  loot.Item.Name,
+			Count: loot.Count,
+			Icon:  loot.Item.Icon,
+		}
+		report.Loots = append(report.Loots, lootReport)
 	}
 
 	for _, p := range fight.Data.Players {
