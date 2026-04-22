@@ -158,14 +158,16 @@ func buildFields(report BossKillReport, ddBlocks, healBlocks []string, lootsBloc
 		Inline: false,
 	})
 
-	for i, block := range lootsBlock {
-		name := "Лут"
-		if i > 0 {
-			name = "\u2800"
+	if len(lootsBlock) > 0 {
+		var lootList string
+		for _, item := range lootsBlock {
+			lootList += fmt.Sprintf("x%d [%s](https://sirus.su/base/item/%d/x3)\n",
+				item.Count, item.Name, item.ID)
 		}
+
 		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   name,
-			Value:  fmt.Sprintf("x%d [%s](https://sirus.su/base/item/%d/x3)", block.Count, block.Name, block.ID),
+			Name:   "Лут",
+			Value:  lootList,
 			Inline: false,
 		})
 	}
