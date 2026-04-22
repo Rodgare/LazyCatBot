@@ -21,7 +21,7 @@ func KillMonitor(
 	for {
 		guilds, err := subStore.GetTrackedGuilds()
 		if err != nil {
-			log.Printf("[KillMonitor] Error getting tracked guilds: %v", err)
+			log.Printf("[KillMonitor] Error getting tracked guilds: %v\n", err)
 			time.Sleep(30 * time.Second)
 			continue
 		}
@@ -34,7 +34,7 @@ func KillMonitor(
 				kills, err := sirus.FetchGuildLatestBossKills(1, guildID)
 				if err == nil && kills != nil && len(kills.Data) > 0 {
 					guildLastKills[guildID] = kills.Data[0].KillID
-					fmt.Printf("[KillMonitor] Initialized tracking for guild %d (LastID: %d)", guildID, kills.Data[0].KillID)
+					fmt.Printf("[KillMonitor] Initialized tracking for guild %d (LastID: %d)\n", guildID, kills.Data[0].KillID)
 				}
 				continue
 			}
@@ -46,7 +46,7 @@ func KillMonitor(
 			for page <= maxPages {
 				kills, err := sirus.FetchGuildLatestBossKills(page, guildID)
 				if err != nil {
-					log.Printf("[KillMonitor] FetchGuildLatestBossKills (Guild: %d, Page: %d) error: %v", guildID, page, err)
+					log.Printf("[KillMonitor] FetchGuildLatestBossKills (Guild: %d, Page: %d) error: %v\n", guildID, page, err)
 					break
 				}
 
@@ -77,7 +77,7 @@ func KillMonitor(
 				}
 			}
 
-			fmt.Printf("[KillMonitor] Guild %d found %d new kills (lastID: %d -> %d)", guildID, len(newKills), lastID, maxNewID)
+			fmt.Printf("[KillMonitor] Guild %d found %d new kills (lastID: %d -> %d)\n", guildID, len(newKills), lastID, maxNewID)
 
 			for i := len(newKills) - 1; i >= 0; i-- {
 				kill := newKills[i]
@@ -91,20 +91,20 @@ func KillMonitor(
 					continue
 				}
 
-				log.Printf("[KillMonitor] Fetching details for kill %d (Guild %d)...", kill.KillID, kill.GuildId)
+				log.Printf("[KillMonitor] Fetching details for kill %d (Guild %d)...\n", kill.KillID, kill.GuildId)
 				fight, err := sirus.FetchBossFightDetails(kill.KillID)
 				time.Sleep(2 * time.Second)
 				if err != nil {
-					log.Printf("[KillMonitor] Error fetching details for kill %d: %v", kill.KillID, err)
+					log.Printf("[KillMonitor] Error fetching details for kill %d: %v\n", kill.KillID, err)
 					continue
 				}
 
-				log.Printf("[KillMonitor] Successfully fetched details for [%s], creating report...", fight.Data.BossName)
+				log.Printf("[KillMonitor] Successfully fetched details for [%s], creating report...\n", fight.Data.BossName)
 				report := createReport(fight, lbStore, kill.KillID)
 
 				for _, ch := range channels {
 					discord.SendKillReport(dg, ch, report)
-					log.Printf("[KillMonitor] Sent report for [%s] (KillID %d) to channel %s", fight.Data.BossName, kill.KillID, ch)
+					log.Printf("[KillMonitor] Sent report for [%s] (KillID %d) to channel %s\n", fight.Data.BossName, kill.KillID, ch)
 				}
 			}
 
