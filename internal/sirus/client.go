@@ -26,7 +26,7 @@ func FetchFullLeaderboard(raidID, bossID int) ([]LeaderboardPlayer, error) {
 
 	firstPage, err := GetPage(raidID, bossID, 1)
 	if err != nil {
-		time.Sleep(5 * time.Second)
+		time.Sleep(15 * time.Second)
 		return nil, err
 	}
 	time.Sleep(5 * time.Second)
@@ -37,7 +37,7 @@ func FetchFullLeaderboard(raidID, bossID int) ([]LeaderboardPlayer, error) {
 		nextPage, err := GetPage(raidID, bossID, p)
 		if err != nil {
 			fmt.Printf("Error loading page %d: %v\n", p, err)
-			time.Sleep(5 * time.Second)
+			time.Sleep(15 * time.Second)
 			continue
 		}
 		allPlayers = append(allPlayers, nextPage.Data...)
