@@ -120,14 +120,14 @@ func makeRequest(url string, target any) error {
 		if err != nil {
 			lastErr = err
 			log.Printf("Attempt %d failed (network error): %v", try, err)
-			time.Sleep(5 * time.Second)
+			time.Sleep(15 * time.Second)
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
 			lastErr = fmt.Errorf("API returned status: %d", resp.StatusCode)
 			resp.Body.Close()
 			log.Printf("Attempt %d failed (status %d)", try, resp.StatusCode)
-			time.Sleep(5 * time.Second)
+			time.Sleep(15 * time.Second)
 			continue
 		}
 		defer resp.Body.Close()
