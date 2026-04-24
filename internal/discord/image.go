@@ -12,6 +12,19 @@ import (
 	"github.com/fogleman/gg"
 )
 
+const (
+	width     = 800
+	rowHeight = 35
+	headerH   = 50
+	margin    = 20
+	colRankX  = 20
+	colNameX  = 55
+	colSpecX  = 220
+	colIlvlX  = 350
+	colStatX  = 500
+	colTopX   = 650
+)
+
 var classColors = map[int]string{
 	1:  "#C79C6E", // Warrior
 	2:  "#F58CBA", // Paladin
@@ -43,13 +56,6 @@ var specIcons = map[int]map[string]string{
 var imagesFS embed.FS
 
 func RenderReportImage(report BossKillReport) ([]byte, error) {
-	const (
-		width     = 800
-		rowHeight = 35
-		headerH   = 50
-		margin    = 20
-	)
-
 	var dds, healers []PlayerReport
 	for _, p := range report.Players {
 		if p.Role == 1 {
@@ -130,11 +136,11 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 	dc.Fill()
 
 	dc.SetRGB(0.7, 0.7, 0.7)
-	dc.DrawString(title, 20, y+20)
-	dc.DrawString("Спек", 220, y+20)
-	dc.DrawString("iLvl", 350, y+20)
-	dc.DrawString("Дпс/Хпс", 500, y+20)
-	dc.DrawString("Топ спек", 650, y+20)
+	dc.DrawString(title, colRankX, y+20)
+	dc.DrawString("Спек", colSpecX, y+20)
+	dc.DrawString("iLvl", colIlvlX, y+20)
+	dc.DrawString("Дпс/Хпс", colStatX, y+20)
+	dc.DrawString("Топ спек", colTopX, y+20)
 	return y + 35
 }
 
@@ -146,16 +152,16 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 	}
 
 	dc.SetRGB(0.5, 0.5, 0.5)
-	dc.DrawString(fmt.Sprintf("%d.", rank), 20, y+25)
+	dc.DrawString(fmt.Sprintf("%d.", rank), colRankX, y+25)
 
 	colorHex, ok := classColors[p.ClassID]
 	if !ok {
 		colorHex = "#FFFFFF"
 	}
 	dc.SetHexColor(colorHex)
-	dc.DrawString(p.Name, 55, y+25)
+	dc.DrawString(p.Name, colNameX, y+25)
 
-	specTextX := float64(220)
+	specTextX := float64(colSpecX)
 
 	if specs, ok := specIcons[p.ClassID]; ok {
 		if filename, ok2 := specs[p.SpecName]; ok2 {
@@ -170,7 +176,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 					imgH := bounds.Dy()
 
 					imgY := int(y) + int(rowHeight)/2 - imgH/2
-					dc.DrawImage(img, 220, imgY)
+					dc.DrawImage(img, colSpecX, imgY)
 
 					specTextX += float64(imgW + 10)
 				} else {

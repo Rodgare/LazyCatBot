@@ -5,6 +5,7 @@ type PlayerReport struct {
 	Dps      int
 	Hps      int
 	Ilvl     int
+	SpecID   int
 	SpecName string
 	SpecRank int
 	Role     int

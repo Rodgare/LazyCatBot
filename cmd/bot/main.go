@@ -46,8 +46,10 @@ func main() {
 
 	lbStore := storage.NewLeaderboardStorage(db)
 	subStore := storage.NewSubscribeStorage(db)
+	gmStore := storage.NewGuildMembersStorage(db)
 	lbStore.InitDB()
 	subStore.InitDB()
+	gmStore.InitDB()
 
 	go worker.StartLeaderboardSync(lbStore)
 	go worker.KillMonitor(lbStore, subStore, dg)
@@ -59,7 +61,7 @@ func main() {
 		SubStore: subStore,
 	}
 	dg.AddHandler(h.InteractionCreate)
-	dg.AddHandler(h.GuildCreate)
+	// dg.AddHandler(h.GuildCreate)
 
 	err = dg.Open()
 	if err != nil {

@@ -29,7 +29,7 @@ func FetchFullLeaderboard(raidID, bossID int) ([]LeaderboardPlayer, error) {
 		time.Sleep(15 * time.Second)
 		return nil, err
 	}
-	time.Sleep(5 * time.Second)
+	time.Sleep(2 * time.Second)
 	allPlayers = append(allPlayers, firstPage.Data...)
 	totalPages := firstPage.Meta.LastPage
 

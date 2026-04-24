@@ -4,8 +4,10 @@ import (
 	"LazyCatBot/internal/discord"
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
+	"encoding/json"
 	"fmt"
 	"log"
+	"os"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -27,6 +29,13 @@ func KillMonitor(
 		}
 
 		// debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
+
+		mockReport, err := makeMockReport()
+		if err != nil {
+			fmt.Printf("makeMockReport err: %v", err)
+		}
+		debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
+		discord.SendKillReport(dg, debugChannel, mockReport)
 
 		for _, guildID := range guilds {
 			lastID := guildLastKills[guildID]
@@ -91,7 +100,7 @@ func KillMonitor(
 					continue
 				}
 
-				log.Printf("[KillMonitor] Fetching details for kill %d (Guild %d)...\n", kill.KillID, kill.GuildId)
+				fmt.Printf("[KillMonitor] Fetching details for kill %d (Guild %d)...\n", kill.KillID, kill.GuildId)
 				fight, err := sirus.FetchBossFightDetails(kill.KillID)
 				time.Sleep(2 * time.Second)
 				if err != nil {
@@ -99,12 +108,12 @@ func KillMonitor(
 					continue
 				}
 
-				log.Printf("[KillMonitor] Successfully fetched details for [%s], creating report...\n", fight.Data.BossName)
+				fmt.Printf("[KillMonitor] Successfully fetched details for [%s], creating report...\n", fight.Data.BossName)
 				report := createReport(fight, lbStore, kill.KillID)
 
 				for _, ch := range channels {
 					discord.SendKillReport(dg, ch, report)
-					log.Printf("[KillMonitor] Sent report for [%s] (KillID %d) to channel %s\n", fight.Data.BossName, kill.KillID, ch)
+					fmt.Printf("[KillMonitor] Sent report for [%s] (KillID %d) to channel %s\n", fight.Data.BossName, kill.KillID, ch)
 				}
 			}
 
@@ -114,6 +123,21 @@ func KillMonitor(
 
 		time.Sleep(30 * time.Second)
 	}
+}
+
+func makeMockReport() (discord.BossKillReport, error) {
+	var report discord.BossKillReport
+
+	data, err := os.ReadFile("internal/sirus/testdata/mock_sirus_boss_fight.json")
+	if err != nil {
+		return report, err
+	}
+	err = json.Unmarshal(data, &report)
+	if err != nil {
+		return report, err
+	}
+
+	return report, nil
 }
 
 func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, killID int) discord.BossKillReport {
@@ -157,6 +181,7 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, k
 			ClassID:  p.ClassID,
 			Role:     sirus.GetRole(p.ClassID, p.Spec),
 			SpecName: specName,
+			SpecID:   p.Spec,
 			SpecRank: lbStore.GetSpecRank(fight.Order, fight.Encounter, p.ClassID,
 				p.Spec, p.Dps),
 		}

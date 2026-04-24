@@ -4,3 +4,4 @@ internal/sirus/testdata/guildkills_example.json
 *.db
 bot.exe
 bot.log
+internal/sirus/testdata/mock_sirus_boss_fight.json
