@@ -122,31 +122,31 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 	}
 }
 
-// func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
-// 	var channelID string
-// 	if g.SystemChannelID != "" {
-// 		channelID = g.SystemChannelID
-// 	} else {
-// 		for _, ch := range g.Channels {
-// 			if ch.Type == discordgo.ChannelTypeGuildText {
-// 				channelID = ch.ID
-// 				break
-// 			}
-// 		}
-// 	}
+func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
+	var channelID string
+	if g.SystemChannelID != "" {
+		channelID = g.SystemChannelID
+	} else {
+		for _, ch := range g.Channels {
+			if ch.Type == discordgo.ChannelTypeGuildText {
+				channelID = ch.ID
+				break
+			}
+		}
+	}
 
-// 	if channelID == "" {
-// 		return
-// 	}
+	if channelID == "" {
+		return
+	}
 
-// 	embed := &discordgo.MessageEmbed{
-// 		Title: "🐈 Привет! Я LazyCatBot",
-// 		Description: "Я помогу вам отслеживать убийства боссов вашей гильдии!\n\n" +
-// 			"**Как меня настроить:**\n" +
-// 			"Создайте текстовый канал и введите в этом канале комманду /set id_гильдии (/set 1234)\n\n" +
-// 			"*(ID гильдии можно найти в ссылке на вашу гильдию на сайте Sirus)*",
-// 		Color: 0xf1c40f,
-// 	}
+	embed := &discordgo.MessageEmbed{
+		Title: "🐈 Привет! Я LazyCatBot",
+		Description: "Я помогу вам отслеживать убийства боссов вашей гильдии!\n\n" +
+			"**Как меня настроить:**\n" +
+			"Создайте текстовый канал и введите в этом канале комманду /set id_гильдии (/set 1234)\n\n" +
+			"*(ID гильдии можно найти в ссылке на вашу гильдию на сайте Sirus)*",
+		Color: 0xf1c40f,
+	}
 
-// 	s.ChannelMessageSendEmbed(channelID, embed)
-// }
+	s.ChannelMessageSendEmbed(channelID, embed)
+}
