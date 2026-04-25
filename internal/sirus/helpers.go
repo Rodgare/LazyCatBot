@@ -1,8 +1,20 @@
 package sirus
 
-import "fmt"
+import (
+	"fmt"
+	"strings"
+)
 
-// GetSpecName возвращает сокращенное название специализации по ID класса и спека
+func GetT4Count(itemset []Itemset) int {
+	for _, set := range itemset {
+		if strings.Contains(set.Name, "Тир 4") {
+			return set.Count
+		}
+	}
+
+	return 0
+}
+
 func GetSpecName(classID, specID int) string {
 	specs := map[int]map[int]string{
 		1:  {0: "Arms", 1: "Fury", 2: "Prot"},            // Warrior
@@ -27,12 +39,10 @@ func GetSpecName(classID, specID int) string {
 	return fmt.Sprintf("Spec:%d", specID)
 }
 
-// GetZodiacName возвращает сокращенное название созвездия (опционально)
 func GetZodiacName(fullName string) string {
 	return fullName
 }
 
-// GetRole возвращает роль игрока: 0 - DD/Tank, 1 - Healer
 func GetRole(classID, specID int) int {
 	healers := map[int][]int{
 		2:  {0},    // Paladin (Holy)

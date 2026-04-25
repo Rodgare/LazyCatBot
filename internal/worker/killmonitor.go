@@ -173,17 +173,34 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, k
 
 	for _, p := range fight.Data.Players {
 		specName := sirus.GetSpecName(p.ClassID, p.Spec)
+		t4Count := sirus.GetT4Count(p.Itemset)
+
+		specRank, specPrcnt, classRank, classPrcnt, ilvlRank, ilvlPrcnt, overallRank, overallPrcnt, err := lbStore.GetRank(fight.Order, fight.Encounter, p)
+		if err != nil {
+			log.Printf("Get player rank error %v\n", err)
+			continue
+		}
+
 		playerReport := discord.PlayerReport{
-			Name:     p.Name,
-			Dps:      p.Dps,
-			Hps:      p.Hps,
-			Ilvl:     p.Ilvl,
-			ClassID:  p.ClassID,
-			Role:     sirus.GetRole(p.ClassID, p.Spec),
-			SpecName: specName,
-			SpecID:   p.Spec,
-			SpecRank: lbStore.GetSpecRank(fight.Order, fight.Encounter, p.ClassID,
-				p.Spec, p.Dps),
+			Name:            p.Name,
+			Dps:             p.Dps,
+			Hps:             p.Hps,
+			Ilvl:            p.Ilvl,
+			ClassID:         p.ClassID,
+			Role:            sirus.GetRole(p.ClassID, p.Spec),
+			SpecName:        specName,
+			SpecID:          p.Spec,
+			T4:              t4Count,
+			SpecRank:        specRank,
+			SpecPercentile:  specPrcnt,
+			ClassRank:       classRank,
+			ClassPercentile: classPrcnt,
+			IlvlRank:        ilvlRank,
+			IlvlPercentile:  ilvlPrcnt,
+			OverallRank:     overallRank,
+			OverallPercentile: overallPrcnt,
+			Zodiac:          p.Zodiac.ID,
+			Category:        p.Category,
 		}
 		report.Players = append(report.Players, playerReport)
 	}

@@ -13,6 +13,7 @@ type LeaderboardPlayer struct {
 	Dps     int    `json:"dps"`
 	ClassID int    `json:"class_id"`
 	SpecID  int    `json:"spec"`
+	Ilvl    int    `json:"ilvl"`
 }
 
 type LatestBossKills struct {
@@ -23,6 +24,36 @@ type BossKill struct {
 	KillID  int    `json:"id"`
 	GuildId int    `json:"guildId"`
 	TimeEnd string `json:"timeEnd"`
+}
+
+type Itemset struct {
+	Id    int    `json:"id"`
+	Name  string `json:"name"`
+	Count int    `json:"count"`
+}
+
+type Player struct {
+	GUID     int    `json:"guid"`
+	Name     string `json:"name"`
+	Level    int    `json:"level"`
+	ClassID  int    `json:"class_id"`
+	RaceID   int    `json:"race_id"`
+	Gender   int    `json:"gender"`
+	Spec     int    `json:"spec"`
+	Ilvl     int    `json:"ilvl"`
+	Category int    `json:"category"`
+	Dps      int    `json:"dps"`
+	Hps      int    `json:"hps"`
+	Guild    struct {
+		ID    int    `json:"id"`
+		Name  string `json:"name"`
+		Level int    `json:"level"`
+	} `json:"guild"`
+	Zodiac struct {
+		ID   int    `json:"id"`
+		Name string `json:"name"`
+	} `json:"zodiac"`
+	Itemset []Itemset `json:"itemset"`
 }
 
 type BossFight struct {
@@ -47,35 +78,9 @@ type BossFight struct {
 			ID   int    `json:"id"`
 			Name string `json:"name"`
 		} `json:"guild"`
-		KilledAt    string `json:"killed_at"`
-		FightLength string `json:"fight_length"`
-		Players     []struct {
-			GUID     int    `json:"guid"`
-			Name     string `json:"name"`
-			Level    int    `json:"level"`
-			ClassID  int    `json:"class_id"`
-			RaceID   int    `json:"race_id"`
-			Gender   int    `json:"gender"`
-			Spec     int    `json:"spec"`
-			Ilvl     int    `json:"ilvl"`
-			Category int    `json:"category"`
-			Dps      int    `json:"dps"`
-			Hps      int    `json:"hps"`
-			Guild    struct {
-				ID    int    `json:"id"`
-				Name  string `json:"name"`
-				Level int    `json:"level"`
-			} `json:"guild"`
-			Zodiac struct {
-				ID   int    `json:"id"`
-				Name string `json:"name"`
-			} `json:"zodiac"`
-			Itemset []struct {
-				ID    int    `json:"id"`
-				Name  string `json:"name"`
-				Count int    `json:"count"`
-			} `json:"itemset"`
-		} `json:"players"`
+		KilledAt    string   `json:"killed_at"`
+		FightLength string   `json:"fight_length"`
+		Players     []Player `json:"players"`
 	} `json:"data"`
 	Order     int `json:"order"`
 	Encounter int `json:"encounter"`

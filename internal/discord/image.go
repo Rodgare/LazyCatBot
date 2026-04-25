@@ -13,16 +13,21 @@ import (
 )
 
 const (
-	width     = 800
-	rowHeight = 35
-	headerH   = 50
-	margin    = 20
-	colRankX  = 20
-	colNameX  = 55
-	colSpecX  = 220
-	colIlvlX  = 350
-	colStatX  = 500
-	colTopX   = 650
+	width           = 800
+	rowHeight       = 35
+	headerH         = 50
+	margin          = 20
+	colRankX        = 20
+	colCategoryX    = 45
+	colNameX        = 70
+	colIlvlX        = 230
+	colZodiacX      = 270
+	ColSetX         = 310
+	colDpsX         = 350
+	colIlvlRankX    = 430
+	colSpecRankX    = 530
+	colClassRankX   = 630
+	colOverallRankX = 730
 )
 
 var classColors = map[int]string{
@@ -52,7 +57,7 @@ var specIcons = map[int]map[string]string{
 	11: {"Bal": "DruidB.png", "Feral": "DruidF.png", "Resto": "DruidR.png", "Grd": "DruidF.png"},
 }
 
-//go:embed assets/images/*.png
+//go:embed assets/images
 var imagesFS embed.FS
 
 func RenderReportImage(report BossKillReport) ([]byte, error) {
@@ -105,24 +110,29 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 
 	y := float64(margin)
 
-	// Заголовок
+	// Title
 	dc.SetRGB(1, 1, 1)
 	dc.DrawStringAnchored(fmt.Sprintf("%s — %s", report.MapName, report.BossName), width/2, y+20, 0.5, 0.5)
 	y += headerH
 
 	if len(dds) > 0 {
+		dc.DrawString("Дпс", colDpsX, y+20)
 		y = drawRoleHeader(dc, "Дамагеры", y, width)
 		for i, p := range dds {
 			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, true)
 		}
+
 	}
 
 	if len(healers) > 0 {
 		y += 10
+		dc.SetRGB(1, 1, 1)
+		dc.DrawString("Хпс", colDpsX, y+20)
 		y = drawRoleHeader(dc, "Хилы", y, width)
 		for i, p := range healers {
 			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, false)
 		}
+
 	}
 
 	buf := new(bytes.Buffer)
@@ -137,14 +147,18 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 
 	dc.SetRGB(0.7, 0.7, 0.7)
 	dc.DrawString(title, colRankX, y+20)
-	dc.DrawString("Спек", colSpecX, y+20)
-	dc.DrawString("iLvl", colIlvlX, y+20)
-	dc.DrawString("Дпс/Хпс", colStatX, y+20)
-	dc.DrawString("Топ спек", colTopX, y+20)
+	dc.DrawString("ILvl", colIlvlX, y+20)
+	dc.DrawString("Созв", colZodiacX-7, y+20)
+	dc.DrawString("t4", ColSetX, y+20)
+	dc.DrawString("Спек/Илвл", colIlvlRankX-10, y+20)
+	dc.DrawString("Спек", colSpecRankX, y+20)
+	dc.DrawString("Класс", colClassRankX, y+20)
+	dc.DrawString("Все", colOverallRankX, y+20)
 	return y + 35
 }
 
 func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width int, rowHeight float64, isDD bool) float64 {
+	//rank
 	if rank%2 == 0 {
 		dc.SetRGBA(1, 1, 1, 0.03)
 		dc.DrawRectangle(0, y, float64(width), rowHeight)
@@ -154,6 +168,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 	dc.SetRGB(0.5, 0.5, 0.5)
 	dc.DrawString(fmt.Sprintf("%d.", rank), colRankX, y+25)
 
+	//name
 	colorHex, ok := classColors[p.ClassID]
 	if !ok {
 		colorHex = "#FFFFFF"
@@ -161,11 +176,47 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 	dc.SetHexColor(colorHex)
 	dc.DrawString(p.Name, colNameX, y+25)
 
-	specTextX := float64(colSpecX)
+	//zodiac
+	zodiacFilePath := fmt.Sprintf("assets/images/zodiac/%d.png", p.Zodiac)
+	zodiacFileData, err := imagesFS.ReadFile(zodiacFilePath)
+	if err == nil {
+		img, _, errDecode := image.Decode(bytes.NewReader(zodiacFileData))
+		if errDecode == nil {
+			bounds := img.Bounds()
+			imgH := bounds.Dy()
+			imgY := int(y) + int(rowHeight)/2 - imgH/2
+			dc.DrawImage(img, colZodiacX, imgY)
+		} else {
+			fmt.Printf("Error decoding %s: %v\n", zodiacFilePath, errDecode)
+		}
+	} else {
+		fmt.Printf("Error: file %s not found in embed\n", zodiacFilePath)
+	}
+
+	//category
+	categoryImgName := getCategoryImageName(p.Category)
+	categoryFilePath := "assets/images/category/" + categoryImgName
+	categoryFileData, err := imagesFS.ReadFile(categoryFilePath)
+	if err == nil {
+		img, _, errDecode := image.Decode(bytes.NewReader(categoryFileData))
+		if errDecode == nil {
+			bounds := img.Bounds()
+			imgH := bounds.Dy()
+			imgY := int(y) + int(rowHeight)/2 - imgH/2
+			dc.DrawImage(img, colCategoryX, imgY+3)
+		} else {
+			fmt.Printf("Error decoding %s: %v\n", categoryFilePath, errDecode)
+		}
+	} else {
+		fmt.Printf("Error: file %s not found in embed\n", categoryFilePath)
+	}
+
+	//ilvl rank
+	ilvlRankTextX := float64(colIlvlRankX)
 
 	if specs, ok := specIcons[p.ClassID]; ok {
 		if filename, ok2 := specs[p.SpecName]; ok2 {
-			filePath := "assets/images/" + filename
+			filePath := "assets/images/spec/" + filename
 
 			fileData, err := imagesFS.ReadFile(filePath)
 			if err == nil {
@@ -176,7 +227,39 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 					imgH := bounds.Dy()
 
 					imgY := int(y) + int(rowHeight)/2 - imgH/2
-					dc.DrawImage(img, colSpecX, imgY)
+					dc.DrawImage(img, colIlvlRankX, imgY)
+
+					ilvlRankTextX += float64(imgW + 10)
+				} else {
+					fmt.Printf("Error decoding %s: %v\n", filePath, errDecode)
+				}
+			} else {
+				fmt.Printf("Error: file %s not found in embed\n", filePath)
+			}
+		}
+	}
+
+	r, g, b := getColorByPercentile(p.IlvlPercentile)
+	dc.SetRGB(r, g, b)
+	dc.DrawString(fmt.Sprintf("%d", p.IlvlRank), ilvlRankTextX, y+25)
+
+	//SpecRank
+	specTextX := float64(colSpecRankX)
+
+	if specs, ok := specIcons[p.ClassID]; ok {
+		if filename, ok2 := specs[p.SpecName]; ok2 {
+			filePath := "assets/images/spec/" + filename
+
+			fileData, err := imagesFS.ReadFile(filePath)
+			if err == nil {
+				img, _, errDecode := image.Decode(bytes.NewReader(fileData))
+				if errDecode == nil {
+					bounds := img.Bounds()
+					imgW := bounds.Dx()
+					imgH := bounds.Dy()
+
+					imgY := int(y) + int(rowHeight)/2 - imgH/2
+					dc.DrawImage(img, colSpecRankX, imgY)
 
 					specTextX += float64(imgW + 10)
 				} else {
@@ -188,23 +271,98 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 		}
 	}
 
-	dc.SetRGB(0.6, 0.6, 0.6)
-	dc.DrawString(p.SpecName, specTextX, y+25)
+	r, g, b = getColorByPercentile(p.SpecPercentile)
+	dc.SetRGB(r, g, b)
+	dc.DrawString(fmt.Sprintf("%d", p.SpecRank), specTextX, y+25)
 
+	//ClassRank
+	classTextX := float64(colClassRankX)
+
+	filename := fmt.Sprintf("%d.png", p.ClassID)
+	filePath := "assets/images/class/" + filename
+
+	fileData, err := imagesFS.ReadFile(filePath)
+	if err == nil {
+		img, _, errDecode := image.Decode(bytes.NewReader(fileData))
+		if errDecode == nil {
+			bounds := img.Bounds()
+			imgW := bounds.Dx()
+			imgH := bounds.Dy()
+
+			imgY := int(y) + int(rowHeight)/2 - imgH/2
+			dc.DrawImage(img, colClassRankX, imgY)
+
+			classTextX += float64(imgW + 10)
+		} else {
+			fmt.Printf("Error decoding %s: %v\n", filePath, errDecode)
+		}
+	} else {
+		fmt.Printf("Error: file %s not found in embed\n", filePath)
+	}
+	r, g, b = getColorByPercentile(p.ClassPercentile)
+	dc.SetRGB(r, g, b)
+	dc.DrawString(fmt.Sprintf("%d", p.ClassRank), classTextX, y+25)
+
+	//overall rank
+	r, g, b = getColorByPercentile(p.OverallPercentile)
+	dc.SetRGB(r, g, b)
+	dc.DrawString(fmt.Sprintf("%d", p.OverallRank), colOverallRankX, y+25)
+
+	//ilvl
 	dc.SetRGB(0.8, 0.8, 0.8)
-	dc.DrawString(fmt.Sprintf("%d", p.Ilvl), 350, y+25)
+	dc.DrawString(fmt.Sprintf("%d", p.Ilvl), colIlvlX, y+25)
+
+	//T4
+	dc.SetRGB(0.7, 0.2, 1.0)
+	dc.DrawString(fmt.Sprintf("%d", p.T4), ColSetX+5, y+25)
 
 	val := p.Dps
-	label := "DPS"
 	if !isDD {
 		val = p.Hps
-		label = "HPS"
 	}
 	dc.SetRGB(1, 1, 1)
-	dc.DrawString(fmt.Sprintf("%s %s", FormatNum(val), label), 500, y+25)
+	dc.DrawString(fmt.Sprintf("%s", FormatNum(val)), colDpsX, y+25)
 
-	dc.SetRGB(1, 0.8, 0.2)
-	dc.DrawString(fmt.Sprintf("#%d", p.SpecRank), 650, y+25)
+	// dc.SetRGB(1, 0.8, 0.2)
+	// dc.DrawString(fmt.Sprintf("#%d", p.SpecRank), colClassRankX, y+25)
 
 	return y + rowHeight
+}
+
+func getColorByPercentile(p int) (float64, float64, float64) {
+	switch {
+	case p >= 99:
+		return 0.89, 0.41, 0.66 // Розовый
+	case p >= 95:
+		return 1.0, 0.69, 0.0 // ЗОЛОТОЙ (Epic)
+	case p >= 75:
+		return 0.64, 0.21, 0.93 // Фиолетовый (Rare)
+	case p >= 50:
+		return 0.00, 0.44, 1.00 // Синий (Uncommon)
+	case p >= 25:
+		return 0.12, 1.00, 0.00 // Зеленый (Common)
+	default:
+		return 0.60, 0.60, 0.60 // Серый (Poor)
+	}
+}
+
+func getCategoryImageName(cat int) string {
+	switch {
+	case cat <= 90002:
+		return "custom_category_7.png"
+	case cat <= 90005:
+		return "custom_category_6.png"
+	case cat <= 90009:
+		return "custom_category_5.png"
+	case cat <= 90014:
+		return "custom_category_4.png"
+	case cat <= 90020:
+		return "custom_category_3.png"
+	case cat <= 90027:
+		return "custom_category_2.png"
+	case cat <= 90035:
+		return "custom_category_1.png"
+	default:
+		return "custom_category_ooc_1.png"
+	}
 }
