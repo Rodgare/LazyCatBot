@@ -30,12 +30,12 @@ func KillMonitor(
 
 		// debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
 
-		mockReport, err := makeMockReport()
-		if err != nil {
-			fmt.Printf("makeMockReport err: %v", err)
-		}
-		debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
-		discord.SendKillReport(dg, debugChannel, mockReport)
+		// mockReport, err := makeMockReport()
+		// if err != nil {
+		// 	fmt.Printf("makeMockReport err: %v", err)
+		// }
+		// debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
+		// discord.SendKillReport(dg, debugChannel, mockReport)
 
 		for _, guildID := range guilds {
 			lastID := guildLastKills[guildID]
@@ -182,25 +182,25 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, k
 		}
 
 		playerReport := discord.PlayerReport{
-			Name:            p.Name,
-			Dps:             p.Dps,
-			Hps:             p.Hps,
-			Ilvl:            p.Ilvl,
-			ClassID:         p.ClassID,
-			Role:            sirus.GetRole(p.ClassID, p.Spec),
-			SpecName:        specName,
-			SpecID:          p.Spec,
-			T4:              t4Count,
-			SpecRank:        specRank,
-			SpecPercentile:  specPrcnt,
-			ClassRank:       classRank,
-			ClassPercentile: classPrcnt,
-			IlvlRank:        ilvlRank,
-			IlvlPercentile:  ilvlPrcnt,
-			OverallRank:     overallRank,
+			Name:              p.Name,
+			Dps:               p.Dps,
+			Hps:               p.Hps,
+			Ilvl:              p.Ilvl,
+			ClassID:           p.ClassID,
+			Role:              sirus.GetRole(p.ClassID, p.Spec),
+			SpecName:          specName,
+			SpecID:            p.Spec,
+			T4:                t4Count,
+			SpecRank:          specRank,
+			SpecPercentile:    specPrcnt,
+			ClassRank:         classRank,
+			ClassPercentile:   classPrcnt,
+			IlvlRank:          ilvlRank,
+			IlvlPercentile:    ilvlPrcnt,
+			OverallRank:       overallRank,
 			OverallPercentile: overallPrcnt,
-			Zodiac:          p.Zodiac.ID,
-			Category:        p.Category,
+			Zodiac:            p.Zodiac.ID,
+			Category:          p.Category,
 		}
 		report.Players = append(report.Players, playerReport)
 	}
