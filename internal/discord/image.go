@@ -331,18 +331,20 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 
 func getColorByPercentile(p int) (float64, float64, float64) {
 	switch {
+	case p >= 100:
+		return 0.90, 0.80, 0.50 //золото/песочный (#e5cc80)
 	case p >= 99:
-		return 0.89, 0.41, 0.66 // Розовый
+		return 0.89, 0.41, 0.66 // розовый (#e268a8)
 	case p >= 95:
-		return 1.0, 0.69, 0.0 // ЗОЛОТОЙ (Epic)
+		return 1.00, 0.50, 0.00 // оранжевый (#ff8000)
 	case p >= 75:
-		return 0.64, 0.21, 0.93 // Фиолетовый (Rare)
+		return 0.64, 0.21, 0.93 // фиолетовый (#a335ee)
 	case p >= 50:
-		return 0.00, 0.44, 1.00 // Синий (Uncommon)
+		return 0.00, 0.44, 1.00 // синий (#0070ff)
 	case p >= 25:
-		return 0.12, 1.00, 0.00 // Зеленый (Common)
+		return 0.12, 1.00, 0.00 // зелёный (#1eff00)
 	default:
-		return 0.60, 0.60, 0.60 // Серый (Poor)
+		return 0.40, 0.40, 0.40 // серый (#666666)
 	}
 }
 
