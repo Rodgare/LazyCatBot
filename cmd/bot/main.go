@@ -47,12 +47,14 @@ func main() {
 	lbStore := storage.NewLeaderboardStorage(db)
 	subStore := storage.NewSubscribeStorage(db)
 	gmStore := storage.NewGuildMembersStorage(db)
+	chSubStore := storage.NewCharacterSubscribeStorage(db)
 	lbStore.InitDB()
 	subStore.InitDB()
 	gmStore.InitDB()
+	chSubStore.InitDB()
 
 	go worker.StartLeaderboardSync(lbStore)
-	go worker.KillMonitor(lbStore, subStore, dg)
+	go worker.KillMonitor(lbStore, subStore, chSubStore, dg)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 

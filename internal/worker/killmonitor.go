@@ -16,9 +16,11 @@ import (
 func KillMonitor(
 	lbStore *storage.LeaderboardStorage,
 	subStore *storage.SubscribeStorage,
+	chSubStore *storage.CharacterSubscribeStorage,
 	dg *discordgo.Session,
 ) {
 	guildLastKills := make(map[int]int)
+	// playerLastKills := make(map[int]int)
 
 	for {
 		guilds, err := subStore.GetTrackedGuilds()
