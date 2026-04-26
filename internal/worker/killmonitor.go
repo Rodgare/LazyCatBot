@@ -19,8 +19,6 @@ func KillMonitor(
 	pSubStore *storage.PlayerSubscribeStorage,
 	dg *discordgo.Session,
 ) {
-	firstRun := true
-
 	for {
 		guilds, err := subStore.GetTrackedGuilds()
 		if err != nil {
@@ -38,16 +36,6 @@ func KillMonitor(
 
 		kills := getKills(guilds, characters, subStore)
 		sortedKillsIDs := sortKills(kills)
-
-		if firstRun {
-			for id := range kills {
-				subStore.MarkKillProcessed(id)
-			}
-			log.Printf("[KillMonitor] Initialized with %d historical kills. Monitoring for new ones...", len(kills))
-			firstRun = false
-			time.Sleep(20 * time.Second)
-			continue
-		}
 
 		for _, killID := range sortedKillsIDs {
 			enrichedKill, err := sirus.FetchBossFightDetails(killID)
@@ -85,9 +73,9 @@ func sortKills(kills map[int]map[string]bool) []int {
 }
 
 func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStorage) map[int]map[string]bool {
-	// [killID][channel]true
 	kills := make(map[int]map[string]bool)
 
+	// Гильдии
 	for gID, channels := range guilds {
 		gKills, err := sirus.FetchGuildLatestBossKills(gID)
 		if err != nil {
@@ -96,20 +84,20 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 		}
 
 		for _, kill := range gKills.Data {
-			if !subStore.IsKillProcessed(kill.KillID) {
-				if _, ok := kills[kill.KillID]; !ok {
-					kills[kill.KillID] = make(map[string]bool)
+			id := kill.KillID
+			if !subStore.IsKillProcessed(id) {
+				if _, ok := kills[id]; !ok {
+					kills[id] = make(map[string]bool)
 				}
-
 				for _, ch := range channels {
-					kills[kill.KillID][ch] = true
+					kills[id][ch] = true
 				}
 			}
 		}
-
 		time.Sleep(5 * time.Second)
 	}
 
+	// Игроки
 	for pID, channels := range players {
 		pKills, err := sirus.FetchPlayerLatestBossKills(pID)
 		if err != nil {
@@ -118,13 +106,13 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 		}
 
 		for _, kill := range pKills.Data {
-			if !subStore.IsKillProcessed(kill.ID) {
-				if _, ok := kills[kill.ID]; !ok {
-					kills[kill.ID] = make(map[string]bool)
+			id := kill.ID
+			if !subStore.IsKillProcessed(id) {
+				if _, ok := kills[id]; !ok {
+					kills[id] = make(map[string]bool)
 				}
-
 				for _, ch := range channels {
-					kills[kill.ID][ch] = true
+					kills[id][ch] = true
 				}
 			}
 		}
