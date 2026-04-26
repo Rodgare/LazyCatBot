@@ -21,7 +21,7 @@ func (s *PlayerSubscribeStorage) InitDB() error {
 		name TEXT
         channel_id TEXT,
         discord_id TEXT,
-        PRIMARY KEY (id, name, channel_id, discord_id)
+        PRIMARY KEY (id, channel_id)
     );`
 
 	_, err := s.db.Exec(query)
