@@ -158,7 +158,7 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 		})
 
 	case "listcats":
-		characters, err := h.PlayerSubStore.GetCharactersByChannel(channelID)
+		characters, err := h.PlayerSubStore.GetPlayersByChannel(channelID)
 		if err != nil {
 			log.Printf("listcats err: %v", err)
 			return

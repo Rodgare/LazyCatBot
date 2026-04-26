@@ -34,14 +34,14 @@ func (s *PlayerSubscribeStorage) Subscribe(id int, name string, channelID, disco
 	return err
 }
 
-func (s *PlayerSubscribeStorage) Unsubscribe(character int, channelID, discordID string) error {
-	query := `DELETE FROM player_subscribe WHERE character_id = ? AND channel_id = ? AND discord_id = ?`
-	_, err := s.db.Exec(query, character, channelID, discordID)
+func (s *PlayerSubscribeStorage) Unsubscribe(player int, channelID, discordID string) error {
+	query := `DELETE FROM player_subscribe WHERE id = ? AND channel_id = ? AND discord_id = ?`
+	_, err := s.db.Exec(query, player, channelID, discordID)
 	return err
 }
 
-func (s *PlayerSubscribeStorage) GetTrackedCharacters() (map[int][]string, error) {
-	query := `SELECT character_id, channel_id FROM player_subscribe`
+func (s *PlayerSubscribeStorage) GetTrackedPlayers() (map[int][]string, error) {
+	query := `SELECT id, channel_id FROM player_subscribe`
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -50,31 +50,31 @@ func (s *PlayerSubscribeStorage) GetTrackedCharacters() (map[int][]string, error
 
 	res := make(map[int][]string)
 	for rows.Next() {
-		var character int
+		var player int
 		var channel string
-		if err := rows.Scan(&character, &channel); err != nil {
+		if err := rows.Scan(&player, &channel); err != nil {
 			return nil, err
 		}
-		res[character] = append(res[character], channel)
+		res[player] = append(res[player], channel)
 	}
 
 	return res, nil
 }
 
-func (s *PlayerSubscribeStorage) GetCharactersByChannel(channelID string) ([]int, error) {
-	query := `SELECT character_id FROM player_subscribe WHERE channel_id = ?`
+func (s *PlayerSubscribeStorage) GetPlayersByChannel(channelID string) ([]int, error) {
+	query := `SELECT id FROM player_subscribe WHERE channel_id = ?`
 	rows, err := s.db.Query(query, channelID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var characters []int
+	var players []int
 	for rows.Next() {
 		var id int
 		if err := rows.Scan(&id); err != nil {
 			return nil, err
 		}
-		characters = append(characters, id)
+		players = append(players, id)
 	}
-	return characters, nil
+	return players, nil
 }

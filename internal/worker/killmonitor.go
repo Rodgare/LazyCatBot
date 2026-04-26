@@ -30,7 +30,7 @@ func KillMonitor(
 			continue
 		}
 
-		characters, err := pSubStore.GetTrackedCharacters()
+		characters, err := pSubStore.GetTrackedPlayers()
 		if err != nil {
 			log.Printf("[KillMonitor] Getting tracked characters err: %v", err)
 			continue
