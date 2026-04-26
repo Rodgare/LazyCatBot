@@ -3,13 +3,15 @@ package discord
 import (
 	"LazyCatBot/internal/storage"
 	"fmt"
+	"log"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 type BotHandler struct {
-	LbStore  *storage.LeaderboardStorage
-	SubStore *storage.SubscribeStorage
+	LbStore        *storage.LeaderboardStorage
+	SubStore       *storage.SubscribeStorage
+	PlayerSubStore *storage.CharacterSubscribeStorage
 }
 
 func (h *BotHandler) MessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -67,6 +69,48 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 			},
 		})
 
+	case "setcat":
+		playerID := int(data.Options[0].IntValue())
+		err := h.PlayerSubStore.Subscribe(playerID, channelID, guildID)
+		if err != nil {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "❌ Ошибка при сохранении подписки.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			return
+		}
+
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("✅ Теперь я слежу за игроком %d в этом канале!", playerID),
+			},
+		})
+
+	case "unsetcat":
+		playerID := int(data.Options[0].IntValue())
+		err := h.PlayerSubStore.Unsubscribe(playerID, channelID, guildID)
+		if err != nil {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "❌ Ошибка при удалении подписки.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			return
+		}
+
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("❌ Я больше не слежу за игроком %d в этом канале.", playerID),
+			},
+		})
+
 	case "list":
 		guilds, err := h.SubStore.GetGuildsByChannel(channelID)
 		if err != nil {
@@ -102,6 +146,32 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 			},
 		})
 
+	case "listcats":
+		characters, err := h.PlayerSubStore.GetCharactersByChannel(channelID)
+		if err != nil {
+			log.Printf("listcats err: %v", err)
+			return
+		}
+		if len(characters) == 0 {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "В этом канале не отслеживается ни один игрок.",
+				},
+			})
+			return
+		}
+		content := "📊 **Отслеживаемые игроки в этом канале:**\n"
+		for _, id := range characters {
+			content += fmt.Sprintf("— Игрок ID `%d`\n", id)
+		}
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: content,
+			},
+		})
+
 	case "help":
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -110,9 +180,12 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 					{
 						Title: "🐈 Справка LazyCatBot",
 						Description: "Я помогаю отслеживать прогресс гильдий на Sirus.su!\n\n" +
-							"**/set [id]** — Подписаться на отчеты гильдии в этом канале.\n" +
-							"**/unset [id]** — Отписаться от отчетов.\n" +
+							"**/set id_гильдии** — Подписаться на отчеты гильдии в этом канале.\n" +
+							"**/setcat id_игрока** - Подписаться на отчеты конкретного игрока\n" +
+							"**/unset id_гильдии** — Отписаться от отчетов гильдии.\n" +
+							"**/unsetcat id_игрока** — Отписаться от отчетов.\n" +
 							"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
+							"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
 							"**/help** — Показать это сообщение.",
 						Color: 0xf1c40f,
 					},
@@ -144,6 +217,7 @@ func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate)
 		Description: "Я помогу вам отслеживать убийства боссов вашей гильдии!\n\n" +
 			"**Как меня настроить:**\n" +
 			"Создайте текстовый канал и введите в этом канале комманду /set id_гильдии (/set 1234)\n\n" +
+			"Список комманд /help\n\n" +
 			"*(ID гильдии можно найти в ссылке на вашу гильдию на сайте Sirus)*",
 		Color: 0xf1c40f,
 	}

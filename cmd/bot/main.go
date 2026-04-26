@@ -47,20 +47,21 @@ func main() {
 	lbStore := storage.NewLeaderboardStorage(db)
 	subStore := storage.NewSubscribeStorage(db)
 	gmStore := storage.NewGuildMembersStorage(db)
-	chSubStore := storage.NewCharacterSubscribeStorage(db)
+	playerSubStore := storage.NewCharacterSubscribeStorage(db)
 	lbStore.InitDB()
 	subStore.InitDB()
 	gmStore.InitDB()
-	chSubStore.InitDB()
+	playerSubStore.InitDB()
 
 	go worker.StartLeaderboardSync(lbStore)
-	go worker.KillMonitor(lbStore, subStore, chSubStore, dg)
+	go worker.KillMonitor(lbStore, subStore, playerSubStore, dg)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
 	h := &discord.BotHandler{
-		LbStore:  lbStore,
-		SubStore: subStore,
+		LbStore:        lbStore,
+		SubStore:       subStore,
+		PlayerSubStore: playerSubStore,
 	}
 	dg.AddHandler(h.InteractionCreate)
 	dg.AddHandler(h.GuildCreate)
@@ -98,12 +99,40 @@ func main() {
 			},
 		},
 		{
+			Name:        "setcat",
+			Description: "Добавить трекинг игрока в этом канале",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "id",
+					Description: "ID игрока на Сирусе",
+					Required:    true,
+				},
+			},
+		},
+		{
+			Name:        "unsetcat",
+			Description: "Отписаться от отчетов игроков в этом канале",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Type:        discordgo.ApplicationCommandOptionInteger,
+					Name:        "id",
+					Description: "ID игрока на Сирусе",
+					Required:    true,
+				},
+			},
+		},
+		{
 			Name:        "help",
 			Description: "Показать справку по боту",
 		},
 		{
 			Name:        "list",
 			Description: "Показать список отслеживаемых гильдий в текущем канале",
+		},
+		{
+			Name:        "listcats",
+			Description: "Список отслеживаемых игроков в данном канале",
 		},
 	}
 

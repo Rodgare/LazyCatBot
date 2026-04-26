@@ -59,3 +59,21 @@ func (s *CharacterSubscribeStorage) GetTrackedCharacters() (map[int][]string, er
 
 	return res, nil
 }
+
+func (s *CharacterSubscribeStorage) GetCharactersByChannel(channelID string) ([]int, error) {
+	query := `SELECT character_id FROM character_subscribe WHERE channel_id = ?`
+	rows, err := s.db.Query(query, channelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var characters []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		characters = append(characters, id)
+	}
+	return characters, nil
+}
