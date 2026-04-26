@@ -27,12 +27,14 @@ func KillMonitor(
 		guilds, err := subStore.GetTrackedGuilds()
 		if err != nil {
 			log.Printf("[KillMonitor] Getting tracked guilds err: %v", err)
+			time.Sleep(1 * time.Minute)
 			continue
 		}
 
 		characters, err := pSubStore.GetTrackedPlayers()
 		if err != nil {
 			log.Printf("[KillMonitor] Getting tracked characters err: %v", err)
+			time.Sleep(1 * time.Minute)
 			continue
 		}
 
@@ -43,6 +45,7 @@ func KillMonitor(
 			for id := range kills {
 				lastKillID = max(lastKillID, id)
 			}
+			time.Sleep(1 * time.Minute)
 			continue
 		}
 

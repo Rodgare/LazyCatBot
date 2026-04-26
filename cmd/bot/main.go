@@ -70,8 +70,7 @@ func main() {
 
 	err = dg.Open()
 	if err != nil {
-		log.Println("Connection error:", err)
-		return
+		log.Fatalf("Discord connection error: %v", err)
 	}
 	defer dg.Close()
 
