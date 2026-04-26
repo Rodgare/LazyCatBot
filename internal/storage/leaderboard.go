@@ -36,8 +36,8 @@ func (s *LeaderboardStorage) InitDB() error {
 }
 
 func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, players []sirus.LeaderboardPlayer) error {
-	if len(players) < 10 {
-		return fmt.Errorf("Less then 5 players for Raid: %d, Endounter: %d", raidOrder, encounter)
+	if len(players) < 2 {
+		return fmt.Errorf("Less then 2 players for Raid: %d, Endounter: %d", raidOrder, encounter)
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
