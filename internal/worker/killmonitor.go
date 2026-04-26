@@ -5,9 +5,9 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
+	"sort"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -19,127 +19,114 @@ func KillMonitor(
 	chSubStore *storage.CharacterSubscribeStorage,
 	dg *discordgo.Session,
 ) {
-	guildLastKills := make(map[int]int)
-	// playerLastKills := make(map[int]int)
+	var lastKillID int
 
 	for {
 		guilds, err := subStore.GetTrackedGuilds()
 		if err != nil {
-			log.Printf("[KillMonitor] Error getting tracked guilds: %v\n", err)
-			time.Sleep(30 * time.Second)
+			log.Fatalf("[KillMonitor] Getting tracked guilds err: %v", err)
+		}
+
+		characters, err := chSubStore.GetTrackedCharacters()
+		if err != nil {
+			log.Fatalf("[KillMonitor] Getting tracked characters err: %v", err)
+		}
+
+		kills := getKills(guilds, characters, lastKillID)
+		sortedKillsIDs := sortKills(kills)
+
+		if lastKillID == 0 {
+			for id := range kills {
+				lastKillID = max(lastKillID, id)
+			}
 			continue
 		}
 
-		// debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
-
-		// mockReport, err := makeMockReport()
-		// if err != nil {
-		// 	fmt.Printf("makeMockReport err: %v", err)
-		// }
-		// debugChannel := os.Getenv("DEBUG_CHANNEL_ID")
-		// discord.SendKillReport(dg, debugChannel, mockReport)
-
-		for _, guildID := range guilds {
-			lastID := guildLastKills[guildID]
-			if lastID == 0 {
-				kills, err := sirus.FetchGuildLatestBossKills(1, guildID)
-				if err == nil && kills != nil && len(kills.Data) > 0 {
-					guildLastKills[guildID] = kills.Data[0].KillID
-					fmt.Printf("[KillMonitor] Initialized tracking for guild %d (LastID: %d)\n", guildID, kills.Data[0].KillID)
-				}
+		for _, killID := range sortedKillsIDs {
+			enrichedKill, err := sirus.FetchBossFightDetails(killID)
+			if err != nil {
+				log.Printf("[KillMonitor] Fetch Boss Fight Details err: %v", err)
+				time.Sleep(1 * time.Minute)
 				continue
 			}
 
-			var newKills []sirus.BossKill
-			page := 1
-			maxPages := 5
+			report := createReport(enrichedKill, lbStore, killID)
+			channels := kills[killID]
 
-			for page <= maxPages {
-				kills, err := sirus.FetchGuildLatestBossKills(page, guildID)
-				if err != nil {
-					log.Printf("[KillMonitor] FetchGuildLatestBossKills (Guild: %d, Page: %d) error: %v\n", guildID, page, err)
-					break
-				}
-
-				if len(kills.Data) == 0 {
-					break
-				}
-
-				pageNewKills := getNewKills(kills, lastID)
-				newKills = append(newKills, pageNewKills...)
-
-				oldestOnPage := kills.Data[len(kills.Data)-1].KillID
-				if oldestOnPage <= lastID {
-					break
-				}
-
-				page++
-				time.Sleep(1 * time.Second)
+			for ch := range channels {
+				discord.SendKillReport(dg, ch, report)
 			}
 
-			if len(newKills) == 0 {
-				continue
-			}
-
-			maxNewID := lastID
-			for _, kill := range newKills {
-				if kill.KillID > maxNewID {
-					maxNewID = kill.KillID
-				}
-			}
-
-			fmt.Printf("[KillMonitor] Guild %d found %d new kills (lastID: %d -> %d)\n", guildID, len(newKills), lastID, maxNewID)
-
-			for i := len(newKills) - 1; i >= 0; i-- {
-				kill := newKills[i]
-				channels, _ := subStore.GetSubscribers(kill.GuildId)
-
-				// if debugChannel != "" {
-				// 	channels = append(channels, debugChannel)
-				// }
-
-				if len(channels) == 0 {
-					continue
-				}
-
-				fmt.Printf("[KillMonitor] Fetching details for kill %d (Guild %d)...\n", kill.KillID, kill.GuildId)
-				fight, err := sirus.FetchBossFightDetails(kill.KillID)
-				time.Sleep(2 * time.Second)
-				if err != nil {
-					log.Printf("[KillMonitor] Error fetching details for kill %d: %v\n", kill.KillID, err)
-					continue
-				}
-
-				fmt.Printf("[KillMonitor] Successfully fetched details for [%s], creating report...\n", fight.Data.BossName)
-				report := createReport(fight, lbStore, kill.KillID)
-
-				for _, ch := range channels {
-					discord.SendKillReport(dg, ch, report)
-					fmt.Printf("[KillMonitor] Sent report for [%s] (KillID %d) to channel %s\n", fight.Data.BossName, kill.KillID, ch)
-				}
-			}
-
-			guildLastKills[guildID] = maxNewID
-			time.Sleep(2 * time.Second)
+			lastKillID = max(lastKillID, killID)
 		}
 
-		time.Sleep(30 * time.Second)
+		time.Sleep(1 * time.Minute)
 	}
+
 }
 
-func makeMockReport() (discord.BossKillReport, error) {
-	var report discord.BossKillReport
+func sortKills(kills map[int]map[string]bool) []int {
+	ids := make([]int, 0, len(kills))
 
-	data, err := os.ReadFile("internal/sirus/testdata/mock_sirus_boss_fight.json")
-	if err != nil {
-		return report, err
-	}
-	err = json.Unmarshal(data, &report)
-	if err != nil {
-		return report, err
+	for id := range kills {
+		ids = append(ids, id)
 	}
 
-	return report, nil
+	sort.Ints(ids)
+
+	return ids
+}
+
+func getKills(guilds, players map[int][]string, lastID int) map[int]map[string]bool {
+	// [killID][channel]true
+	kills := make(map[int]map[string]bool, len(guilds)+len(players))
+
+	for gID, channels := range guilds {
+		gKills, err := sirus.FetchGuildLatestBossKills(gID)
+		if err != nil {
+			log.Printf("[KillMonitor] Fetch Guild Latest BossKills err: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		for _, kill := range gKills.Data {
+			if kill.KillID > lastID {
+				if _, ok := kills[kill.KillID]; !ok {
+					kills[kill.KillID] = make(map[string]bool)
+				}
+
+				for _, ch := range channels {
+					kills[kill.KillID][ch] = true
+				}
+			}
+		}
+
+		time.Sleep(5 * time.Second)
+	}
+
+	for pID, channels := range players {
+		pKills, err := sirus.FetchPlayerLatestBossKills(pID)
+		if err != nil {
+			log.Printf("[KillMonitor] Fetch Player Latest BossKills err: %v", err)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+
+		for _, kill := range pKills.Data {
+			if kill.ID > lastID {
+				if _, ok := kills[kill.ID]; !ok {
+					kills[kill.ID] = make(map[string]bool)
+				}
+
+				for _, ch := range channels {
+					kills[kill.ID][ch] = true
+				}
+			}
+		}
+		time.Sleep(5 * time.Second)
+	}
+
+	return kills
 }
 
 func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, killID int) discord.BossKillReport {
@@ -210,14 +197,17 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, k
 	return report
 }
 
-func getNewKills(kills *sirus.LatestBossKills, lastID int) []sirus.BossKill {
-	var newKills []sirus.BossKill
+func makeMockReport() (discord.BossKillReport, error) {
+	var report discord.BossKillReport
 
-	for _, kill := range kills.Data {
-		if kill.KillID > lastID {
-			newKills = append(newKills, kill)
-		}
+	data, err := os.ReadFile("internal/sirus/testdata/mock_sirus_boss_fight.json")
+	if err != nil {
+		return report, err
+	}
+	err = json.Unmarshal(data, &report)
+	if err != nil {
+		return report, err
 	}
 
-	return newKills
+	return report, nil
 }

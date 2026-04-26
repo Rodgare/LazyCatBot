@@ -39,42 +39,23 @@ func (s *CharacterSubscribeStorage) Unsubscribe(character int, channelID, discor
 	return err
 }
 
-func (s *CharacterSubscribeStorage) GetSubscribers(character int) ([]string, error) {
-	query := `SELECT channel_id FROM character_subscribe WHERE character_id = ?`
-	rows, err := s.db.Query(query, character)
-	if err != nil {
-		return nil, err
-	}
-	defer rows.Close()
-
-	var channels []string
-	for rows.Next() {
-		var channelID string
-		if err := rows.Scan(&channelID); err != nil {
-			return nil, err
-		}
-		channels = append(channels, channelID)
-	}
-
-	return channels, nil
-}
-
-func (s *CharacterSubscribeStorage) GetTrackedCharacters() ([]int, error) {
-	query := `SELECT DISTINCT character_id FROM character_subscribe`
+func (s *CharacterSubscribeStorage) GetTrackedCharacters() (map[int][]string, error) {
+	query := `SELECT character_id, channel_id FROM character_subscribe`
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var characters []int
+	res := make(map[int][]string)
 	for rows.Next() {
 		var character int
-		if err := rows.Scan(&character); err != nil {
+		var channel string
+		if err := rows.Scan(&character, &channel); err != nil {
 			return nil, err
 		}
-		characters = append(characters, character)
+		res[character] = append(res[character], channel)
 	}
 
-	return characters, nil
+	return res, nil
 }

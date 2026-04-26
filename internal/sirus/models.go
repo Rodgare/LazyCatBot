@@ -26,6 +26,14 @@ type BossKill struct {
 	TimeEnd string `json:"timeEnd"`
 }
 
+type LatestPlayerBossKills struct {
+	Data []PlayerBossKill `json:"data"`
+}
+
+type PlayerBossKill struct {
+	ID int `json:"id"`
+}
+
 type Itemset struct {
 	Id    int    `json:"id"`
 	Name  string `json:"name"`

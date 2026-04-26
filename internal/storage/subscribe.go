@@ -41,7 +41,7 @@ func (s *SubscribeStorage) Unsubscribe(guild int, channelID, discordID string) e
 	return err
 }
 
-func (s *SubscribeStorage) GetSubscribers(guild int) ([]string, error) {
+func (s *SubscribeStorage) GetChannels(guild int) ([]string, error) {
 	query := `SELECT channel_id FROM subscribe WHERE guild_id = ?`
 	rows, err := s.db.Query(query, guild)
 	if err != nil {
@@ -81,22 +81,23 @@ func (s *SubscribeStorage) GetGuildsByChannel(channelID string) ([]int, error) {
 	return guilds, nil
 }
 
-func (s *SubscribeStorage) GetTrackedGuilds() ([]int, error) {
-	query := `SELECT DISTINCT guild_id FROM subscribe`
+func (s *SubscribeStorage) GetTrackedGuilds() (map[int][]string, error) {
+	query := `SELECT guild_id, channel_id FROM subscribe`
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	var guilds []int
+	res := make(map[int][]string)
 	for rows.Next() {
 		var guild int
-		if err := rows.Scan(&guild); err != nil {
+		var channel string
+		if err := rows.Scan(&guild, &channel); err != nil {
 			return nil, err
 		}
-		guilds = append(guilds, guild)
+		res[guild] = append(res[guild], channel)
 	}
 
-	return guilds, nil
+	return res, nil
 }
