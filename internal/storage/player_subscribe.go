@@ -29,19 +29,19 @@ func (s *PlayerSubscribeStorage) InitDB() error {
 }
 
 func (s *PlayerSubscribeStorage) Subscribe(id int, name string, channelID, discordID string) error {
-	query := `INSERT OR REPLACE INTO character_subscribe (id, name, channel_id, discord_id) VALUES (?, ?, ?, ?)`
+	query := `INSERT OR REPLACE INTO player_subscribe (id, name, channel_id, discord_id) VALUES (?, ?, ?, ?)`
 	_, err := s.db.Exec(query, id, name, channelID, discordID)
 	return err
 }
 
 func (s *PlayerSubscribeStorage) Unsubscribe(character int, channelID, discordID string) error {
-	query := `DELETE FROM character_subscribe WHERE character_id = ? AND channel_id = ? AND discord_id = ?`
+	query := `DELETE FROM player_subscribe WHERE character_id = ? AND channel_id = ? AND discord_id = ?`
 	_, err := s.db.Exec(query, character, channelID, discordID)
 	return err
 }
 
 func (s *PlayerSubscribeStorage) GetTrackedCharacters() (map[int][]string, error) {
-	query := `SELECT character_id, channel_id FROM character_subscribe`
+	query := `SELECT character_id, channel_id FROM player_subscribe`
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -62,7 +62,7 @@ func (s *PlayerSubscribeStorage) GetTrackedCharacters() (map[int][]string, error
 }
 
 func (s *PlayerSubscribeStorage) GetCharactersByChannel(channelID string) ([]int, error) {
-	query := `SELECT character_id FROM character_subscribe WHERE channel_id = ?`
+	query := `SELECT character_id FROM player_subscribe WHERE channel_id = ?`
 	rows, err := s.db.Query(query, channelID)
 	if err != nil {
 		return nil, err
