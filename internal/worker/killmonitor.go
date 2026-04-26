@@ -27,11 +27,13 @@ func KillMonitor(
 		guilds, err := subStore.GetTrackedGuilds()
 		if err != nil {
 			log.Printf("[KillMonitor] Getting tracked guilds err: %v", err)
+			continue
 		}
 
 		characters, err := chSubStore.GetTrackedCharacters()
 		if err != nil {
 			log.Printf("[KillMonitor] Getting tracked characters err: %v", err)
+			continue
 		}
 
 		kills := getKills(guilds, characters, lastKillID)
