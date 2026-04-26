@@ -117,7 +117,7 @@ func buildFields(report BossKillReport, ddBlocks, healBlocks []string, lootsBloc
 	for i, block := range ddBlocks {
 		name := "ДД"
 		if i > 0 {
-			name = "\u2800"
+			name = "\u200B"
 		}
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   name,
@@ -144,7 +144,7 @@ func buildFields(report BossKillReport, ddBlocks, healBlocks []string, lootsBloc
 	for i, block := range healBlocks {
 		name := "Хилы"
 		if i > 0 {
-			name = "\u2800"
+			name = "\u200B"
 		}
 		fields = append(fields, &discordgo.MessageEmbedField{
 			Name:   name,
