@@ -42,6 +42,8 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
+	db.Exec("PRAGMA journal_mode=WAL;")
+	db.Exec("PRAGMA busy_timeout=5000;")
 	defer db.Close()
 
 	lbStore := storage.NewLeaderboardStorage(db)
