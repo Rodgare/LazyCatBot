@@ -18,7 +18,7 @@ func (s *PlayerSubscribeStorage) InitDB() error {
 	query := `
     CREATE TABLE IF NOT EXISTS player_subscribe (
         id INTEGER,
-		name TEXT
+		name TEXT,
         channel_id TEXT,
         discord_id TEXT,
         PRIMARY KEY (id, channel_id)
