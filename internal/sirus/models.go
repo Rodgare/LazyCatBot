@@ -108,3 +108,9 @@ type ActualRaid struct {
 }
 
 type ActualRaids []ActualRaid
+
+type PlayerProfile struct {
+	Player struct {
+		ID int `json:"guid"`
+	} `json:"character"`
+}

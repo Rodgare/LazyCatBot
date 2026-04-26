@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"fmt"
 	"log"
@@ -11,7 +12,7 @@ import (
 type BotHandler struct {
 	LbStore        *storage.LeaderboardStorage
 	SubStore       *storage.SubscribeStorage
-	PlayerSubStore *storage.CharacterSubscribeStorage
+	PlayerSubStore *storage.PlayerSubscribeStorage
 }
 
 func (h *BotHandler) MessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
@@ -70,23 +71,33 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 		})
 
 	case "setcat":
-		playerID := int(data.Options[0].IntValue())
-		err := h.PlayerSubStore.Subscribe(playerID, channelID, guildID)
+		name := data.Options[0].StringValue()
+		id, err := sirus.FetchPlayerID(name)
 		if err != nil {
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: "❌ Ошибка при сохранении подписки.",
+					Content: fmt.Sprintf("❌ Не удалось найти персонажа «%s». Проверьте правильность написания.", name),
 					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
 			return
 		}
-
+		err = h.PlayerSubStore.Subscribe(id, name, channelID, guildID)
+		if err != nil {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "❌ Ошибка при сохранении подписки в базу данных.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			return
+		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("✅ Теперь я слежу за игроком %d в этом канале!", playerID),
+				Content: fmt.Sprintf("✅ Теперь я слежу за игроком **%s** (ID: %d) в этом канале!", name, id),
 			},
 		})
 

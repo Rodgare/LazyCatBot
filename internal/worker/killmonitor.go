@@ -16,7 +16,7 @@ import (
 func KillMonitor(
 	lbStore *storage.LeaderboardStorage,
 	subStore *storage.SubscribeStorage,
-	chSubStore *storage.CharacterSubscribeStorage,
+	pSubStore *storage.PlayerSubscribeStorage,
 	dg *discordgo.Session,
 ) {
 	var lastKillID int
@@ -30,7 +30,7 @@ func KillMonitor(
 			continue
 		}
 
-		characters, err := chSubStore.GetTrackedCharacters()
+		characters, err := pSubStore.GetTrackedCharacters()
 		if err != nil {
 			log.Printf("[KillMonitor] Getting tracked characters err: %v", err)
 			continue

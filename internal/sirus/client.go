@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -93,6 +94,18 @@ func FetchBossFightDetails(fightID int) (*BossFight, error) {
 	}
 
 	return &fight, nil
+}
+
+func FetchPlayerID(name string) (int, error) {
+	url := fmt.Sprintf("https://sirus.su/api/base/22/character/%s", url.QueryEscape(name))
+	var res PlayerProfile
+
+	err := makeRequest(url, &res)
+	if err != nil {
+		return 0, err
+	}
+
+	return res.Player.ID, nil
 }
 
 func GetSirusDates() (string, string) {

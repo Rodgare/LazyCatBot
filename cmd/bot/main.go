@@ -49,7 +49,7 @@ func main() {
 	lbStore := storage.NewLeaderboardStorage(db)
 	subStore := storage.NewSubscribeStorage(db)
 	gmStore := storage.NewGuildMembersStorage(db)
-	playerSubStore := storage.NewCharacterSubscribeStorage(db)
+	playerSubStore := storage.NewPlayerSubscribeStorage(db)
 	lbStore.InitDB()
 	subStore.InitDB()
 	gmStore.InitDB()
@@ -105,9 +105,9 @@ func main() {
 			Description: "Добавить трекинг игрока в этом канале",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
-					Type:        discordgo.ApplicationCommandOptionInteger,
-					Name:        "id",
-					Description: "ID игрока на Сирусе",
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "name",
+					Description: "Имя игрока на Сервере х3",
 					Required:    true,
 				},
 			},
