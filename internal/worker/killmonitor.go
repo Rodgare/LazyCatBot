@@ -22,6 +22,8 @@ func KillMonitor(
 	var lastKillID int
 
 	for {
+		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
+
 		guilds, err := subStore.GetTrackedGuilds()
 		if err != nil {
 			log.Fatalf("[KillMonitor] Getting tracked guilds err: %v", err)
@@ -197,17 +199,11 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, k
 	return report
 }
 
-func makeMockReport() (discord.BossKillReport, error) {
+func makeMockReport() discord.BossKillReport {
 	var report discord.BossKillReport
 
-	data, err := os.ReadFile("internal/sirus/testdata/mock_sirus_boss_fight.json")
-	if err != nil {
-		return report, err
-	}
-	err = json.Unmarshal(data, &report)
-	if err != nil {
-		return report, err
-	}
+	data, _ := os.ReadFile("internal/sirus/testdata/mock_sirus_boss_fight.json")
+	json.Unmarshal(data, &report)
 
-	return report, nil
+	return report
 }

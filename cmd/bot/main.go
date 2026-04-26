@@ -63,7 +63,7 @@ func main() {
 		SubStore: subStore,
 	}
 	dg.AddHandler(h.InteractionCreate)
-	// dg.AddHandler(h.GuildCreate)
+	dg.AddHandler(h.GuildCreate)
 
 	err = dg.Open()
 	if err != nil {

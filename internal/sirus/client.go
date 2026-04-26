@@ -105,13 +105,11 @@ func calculateSirusDates(now time.Time) (string, string) {
 	if daysSinceThursday < 0 {
 		daysSinceThursday += 7
 	}
+	lastThursday := now.AddDate(0, 0, -daysSinceThursday)
+
+	weekFrom := lastThursday.Format("2006-01-02")
 
 	weekTo := now.Format("2006-01-02")
-
-	lastThursday := now.AddDate(0, 0, -daysSinceThursday)
-	weekFromDate := lastThursday.AddDate(0, 0, -28)
-	weekFrom := weekFromDate.Format("2006-01-02")
-
 	return weekFrom, weekTo
 }
 
