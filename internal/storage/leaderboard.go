@@ -37,7 +37,7 @@ func (s *LeaderboardStorage) InitDB() error {
 
 func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, players []sirus.LeaderboardPlayer) error {
 	if len(players) < 10 {
-		return fmt.Errorf("Less then 10 players for Raid: %d, Endounter: %d", raidOrder, encounter)
+		return fmt.Errorf("Less then 5 players for Raid: %d, Endounter: %d", raidOrder, encounter)
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -81,24 +81,24 @@ func (s *LeaderboardStorage) GetRank(raid, boss int, p sirus.Player) (int, int, 
 	maxIlvl := minIlvl + 4
 
 	query := `SELECT 
-	(SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND spec_id = ? AND ilvl BETWEEN ? AND ? AND dps > ?) as ilvl_rank,
-	(SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND spec_id = ? AND ilvl BETWEEN ? AND ?) as ilvl_total,
-    (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND spec_id = ? AND dps > ?) as spec_rank,
-    (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND spec_id = ?) as spec_total,
+	(SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl BETWEEN ? AND ? AND dps > ?) as ilvl_rank,
+	(SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl BETWEEN ? AND ?) as ilvl_total,
+    (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND dps > ?) as spec_rank,
+    (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ?) as spec_total,
     (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND dps > ?) as class_rank,
     (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ?) as class_total,
     (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND dps > ?) as overall_rank,
     (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ?) as overall_total;`
 
 	err := s.db.QueryRow(query,
-		raid, boss, p.Spec, minIlvl, maxIlvl, p.Dps, // ilvl_rank
-		raid, boss, p.Spec, minIlvl, maxIlvl,        // ilvl_total
-		raid, boss, p.Spec, p.Dps,                   // spec_rank
-		raid, boss, p.Spec,                          // spec_total
-		raid, boss, p.ClassID, p.Dps,                // class_rank
-		raid, boss, p.ClassID,                       // class_total
-		raid, boss, p.Dps,                           // overall_rank
-		raid, boss,                                  // overall_total
+		raid, boss, p.ClassID, p.Spec, minIlvl, maxIlvl, p.Dps, // ilvl_rank
+		raid, boss, p.ClassID, p.Spec, minIlvl, maxIlvl, // ilvl_total
+		raid, boss, p.ClassID, p.Spec, p.Dps, // spec_rank
+		raid, boss, p.ClassID, p.Spec, // spec_total
+		raid, boss, p.ClassID, p.Dps, // class_rank
+		raid, boss, p.ClassID, // class_total
+		raid, boss, p.Dps, // overall_rank
+		raid, boss, // overall_total
 	).Scan(&ilvlRank, &ilvlTotal, &specRank, &specTotal, &classRank, &classTotal, &overallRank, &overallTotal)
 
 	if err != nil {
