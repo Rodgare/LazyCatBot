@@ -19,11 +19,9 @@ func KillMonitor(
 	pSubStore *storage.PlayerSubscribeStorage,
 	dg *discordgo.Session,
 ) {
-	var lastKillID int
+	firstRun := true
 
 	for {
-		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
-
 		guilds, err := subStore.GetTrackedGuilds()
 		if err != nil {
 			log.Printf("[KillMonitor] Getting tracked guilds err: %v", err)
@@ -38,14 +36,16 @@ func KillMonitor(
 			continue
 		}
 
-		kills := getKills(guilds, characters, lastKillID)
+		kills := getKills(guilds, characters, subStore)
 		sortedKillsIDs := sortKills(kills)
 
-		if lastKillID == 0 {
+		if firstRun {
 			for id := range kills {
-				lastKillID = max(lastKillID, id)
+				subStore.MarkKillProcessed(id)
 			}
-			time.Sleep(1 * time.Minute)
+			log.Printf("[KillMonitor] Initialized with %d historical kills. Monitoring for new ones...", len(kills))
+			firstRun = false
+			time.Sleep(20 * time.Second)
 			continue
 		}
 
@@ -53,7 +53,7 @@ func KillMonitor(
 			enrichedKill, err := sirus.FetchBossFightDetails(killID)
 			if err != nil {
 				log.Printf("[KillMonitor] Fetch Boss Fight Details err: %v", err)
-				time.Sleep(1 * time.Minute)
+				time.Sleep(10 * time.Second)
 				continue
 			}
 
@@ -64,12 +64,12 @@ func KillMonitor(
 				discord.SendKillReport(dg, ch, report)
 			}
 
-			lastKillID = max(lastKillID, killID)
+			subStore.MarkKillProcessed(killID)
+			time.Sleep(2 * time.Second) // Small delay between reports
 		}
 
 		time.Sleep(1 * time.Minute)
 	}
-
 }
 
 func sortKills(kills map[int]map[string]bool) []int {
@@ -84,20 +84,19 @@ func sortKills(kills map[int]map[string]bool) []int {
 	return ids
 }
 
-func getKills(guilds, players map[int][]string, lastID int) map[int]map[string]bool {
+func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStorage) map[int]map[string]bool {
 	// [killID][channel]true
-	kills := make(map[int]map[string]bool, len(guilds)+len(players))
+	kills := make(map[int]map[string]bool)
 
 	for gID, channels := range guilds {
 		gKills, err := sirus.FetchGuildLatestBossKills(gID)
 		if err != nil {
-			log.Printf("[KillMonitor] Fetch Guild Latest BossKills err: %v", err)
-			time.Sleep(5 * time.Second)
+			log.Printf("[KillMonitor] Fetch Guild %d Latest BossKills err: %v", gID, err)
 			continue
 		}
 
 		for _, kill := range gKills.Data {
-			if kill.KillID > lastID {
+			if !subStore.IsKillProcessed(kill.KillID) {
 				if _, ok := kills[kill.KillID]; !ok {
 					kills[kill.KillID] = make(map[string]bool)
 				}
@@ -114,13 +113,12 @@ func getKills(guilds, players map[int][]string, lastID int) map[int]map[string]b
 	for pID, channels := range players {
 		pKills, err := sirus.FetchPlayerLatestBossKills(pID)
 		if err != nil {
-			log.Printf("[KillMonitor] Fetch Player Latest BossKills err: %v", err)
-			time.Sleep(5 * time.Second)
+			log.Printf("[KillMonitor] Fetch Player %d Latest BossKills err: %v", pID, err)
 			continue
 		}
 
 		for _, kill := range pKills.Data {
-			if kill.ID > lastID {
+			if !subStore.IsKillProcessed(kill.ID) {
 				if _, ok := kills[kill.ID]; !ok {
 					kills[kill.ID] = make(map[string]bool)
 				}
