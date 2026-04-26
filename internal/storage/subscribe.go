@@ -101,3 +101,10 @@ func (s *SubscribeStorage) GetTrackedGuilds() (map[int][]string, error) {
 
 	return res, nil
 }
+
+func (s *SubscribeStorage) IsDiscordGuildSubscribed(discordID string) bool {
+	var exists bool
+	query := `SELECT EXISTS(SELECT 1 FROM subscribe WHERE discord_id = ?)`
+	s.db.QueryRow(query, discordID).Scan(&exists)
+	return exists
+}

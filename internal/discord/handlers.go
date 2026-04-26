@@ -207,6 +207,10 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 }
 
 func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
+	if h.SubStore.IsDiscordGuildSubscribed(g.ID) {
+		return
+	}
+
 	var channelID string
 	if g.SystemChannelID != "" {
 		channelID = g.SystemChannelID
