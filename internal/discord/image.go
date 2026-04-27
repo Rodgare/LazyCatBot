@@ -274,7 +274,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 			bounds := img.Bounds()
 			imgH := bounds.Dy()
 			imgY := int(y) + int(rowHeight)/2 - imgH/2
-			dc.DrawImage(img, colCategoryX, imgY+5)
+			dc.DrawImage(img, colCategoryX+2, imgY+2)
 		} else {
 			fmt.Printf("Error decoding %s: %v\n", categoryFilePath, errDecode)
 		}
