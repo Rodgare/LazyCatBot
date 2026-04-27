@@ -61,20 +61,23 @@ func (s *PlayerSubscribeStorage) GetTrackedPlayers() (map[int][]string, error) {
 	return res, nil
 }
 
-func (s *PlayerSubscribeStorage) GetPlayersByChannel(channelID string) ([]int, error) {
-	query := `SELECT id FROM player_subscribe WHERE channel_id = ?`
+func (s *PlayerSubscribeStorage) GetPlayersByChannel(channelID string) (map[int]string, error) {
+	query := `SELECT id, name FROM player_subscribe WHERE channel_id = ?`
 	rows, err := s.db.Query(query, channelID)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
-	var players []int
+
+	players := make(map[int]string)
+
 	for rows.Next() {
 		var id int
-		if err := rows.Scan(&id); err != nil {
+		var name string
+		if err := rows.Scan(&id, &name); err != nil {
 			return nil, err
 		}
-		players = append(players, id)
+		players[id] = name
 	}
 	return players, nil
 }

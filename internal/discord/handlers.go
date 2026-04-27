@@ -173,8 +173,8 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 			return
 		}
 		content := "📊 **Отслеживаемые игроки в этом канале:**\n"
-		for _, id := range characters {
-			content += fmt.Sprintf("— Игрок ID `%d`\n", id)
+		for id, name := range characters {
+			content += fmt.Sprintf("— Игрок ID `%d`, Имя `%s`\n", id, name)
 		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
