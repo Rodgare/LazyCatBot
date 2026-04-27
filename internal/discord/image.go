@@ -204,7 +204,7 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 
 	//footer
 	dc.SetRGB(0.4, 0.4, 0.4)
-	dc.DrawString("*Рейтинг за текущее кд", 600, y+20)
+	dc.DrawString("*Рейтинг за текущее кд", 570, y+20)
 
 	buf := new(bytes.Buffer)
 	err := dc.EncodePNG(buf)
@@ -274,7 +274,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 			bounds := img.Bounds()
 			imgH := bounds.Dy()
 			imgY := int(y) + int(rowHeight)/2 - imgH/2
-			dc.DrawImage(img, colCategoryX, imgY+3)
+			dc.DrawImage(img, colCategoryX, imgY+5)
 		} else {
 			fmt.Printf("Error decoding %s: %v\n", categoryFilePath, errDecode)
 		}
