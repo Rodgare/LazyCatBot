@@ -51,9 +51,9 @@ func KillMonitor(
 
 			for ch := range channels {
 				discord.SendKillReport(dg, ch, report)
+				subStore.MarkKillProcessed(killID, ch)
 			}
 
-			subStore.MarkKillProcessed(killID)
 			time.Sleep(2 * time.Second)
 		}
 
@@ -84,12 +84,13 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 		}
 
 		for _, kill := range gKills.Data {
-			id := kill.KillID
-			if !subStore.IsKillProcessed(id) {
-				if _, ok := kills[id]; !ok {
-					kills[id] = make(map[string]bool)
-				}
-				for _, ch := range channels {
+			for _, ch := range channels {
+				id := kill.KillID
+				if !subStore.IsKillProcessed(id, ch) {
+					if _, ok := kills[id]; !ok {
+						kills[id] = make(map[string]bool)
+					}
+
 					kills[id][ch] = true
 				}
 			}
@@ -105,12 +106,13 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 		}
 
 		for _, kill := range pKills.Data {
-			id := kill.ID
-			if !subStore.IsKillProcessed(id) {
-				if _, ok := kills[id]; !ok {
-					kills[id] = make(map[string]bool)
-				}
-				for _, ch := range channels {
+			for _, ch := range channels {
+				id := kill.ID
+				if !subStore.IsKillProcessed(id, ch) {
+					if _, ok := kills[id]; !ok {
+						kills[id] = make(map[string]bool)
+					}
+
 					kills[id][ch] = true
 				}
 			}

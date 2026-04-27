@@ -23,8 +23,11 @@ func (s *SubscribeStorage) InitDB() error {
         PRIMARY KEY (guild_id, channel_id, discord_id)
     );
     CREATE INDEX IF NOT EXISTS idx_rank_lookup ON subscribe (guild_id, channel_id, discord_id);
-    CREATE TABLE IF NOT EXISTS processed_kills (kill_id INTEGER PRIMARY KEY);
-    `
+    CREATE TABLE IF NOT EXISTS processed_kills (
+    	kill_id INTEGER,
+    	channel_id TEXT,
+    	PRIMARY KEY (kill_id, channel_id)
+	);`
 
 	_, err := s.db.Exec(query)
 	return err
@@ -110,13 +113,14 @@ func (s *SubscribeStorage) IsDiscordGuildSubscribed(discordID string) bool {
 	return exists
 }
 
-func (s *SubscribeStorage) IsKillProcessed(id int) bool {
+func (s *SubscribeStorage) IsKillProcessed(id int, ch string) bool {
 	var exists bool
-	s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM processed_kills WHERE kill_id=?)", id).Scan(&exists)
+	s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM processed_kills WHERE kill_id=? AND channel_id=?)", id, ch).
+		Scan(&exists)
 	return exists
 }
 
-func (s *SubscribeStorage) MarkKillProcessed(id int) error {
-	_, err := s.db.Exec("INSERT OR IGNORE INTO processed_kills (kill_id) VALUES (?)", id)
+func (s *SubscribeStorage) MarkKillProcessed(id int, ch string) error {
+	_, err := s.db.Exec("INSERT OR IGNORE INTO processed_kills (kill_id, channel_id) VALUES (?, ?)", id, ch)
 	return err
 }
