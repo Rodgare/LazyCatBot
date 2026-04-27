@@ -163,21 +163,24 @@ func buildFields(report BossKillReport, ddBlocks, healBlocks []string, lootsBloc
 		var sb strings.Builder
 
 		for _, item := range lootsBlock {
-			fmt.Fprintf(&sb, "x%d [%s](https://sirus.su/base/item/%d/x3)\n",
-				item.Count, item.Name, item.ID)
+			if item.Name != "" {
+				fmt.Fprintf(&sb, "x%d [%s](https://sirus.su/base/item/%d/x3)\n",
+					item.Count, item.Name, item.ID)
+			}
 		}
+		if sb.Len() > 0 {
+			fields = append(fields, &discordgo.MessageEmbedField{
+				Name:   "Лут",
+				Value:  sb.String(),
+				Inline: false,
+			})
 
-		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   "Лут",
-			Value:  sb.String(),
-			Inline: false,
-		})
-
-		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   "\u200B",
-			Value:  "\u200B",
-			Inline: false,
-		})
+			fields = append(fields, &discordgo.MessageEmbedField{
+				Name:   "\u200B",
+				Value:  "\u200B",
+				Inline: false,
+			})
+		}
 	}
 
 	return fields
