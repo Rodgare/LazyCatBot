@@ -5,6 +5,7 @@ import (
 	"embed"
 	"fmt"
 	"image"
+	"image/color"
 	_ "image/png"
 	"os"
 	"slices"
@@ -16,6 +17,7 @@ const (
 	width           = 800
 	rowHeight       = 35
 	headerH         = 50
+	footerH         = 20
 	margin          = 20
 	colRankX        = 20
 	colCategoryX    = 45
@@ -57,6 +59,62 @@ var specIcons = map[int]map[string]string{
 	11: {"Bal": "DruidB.png", "Feral": "DruidF.png", "Resto": "DruidR.png", "Grd": "DruidF.png"},
 }
 
+var raidColors = map[int]string{
+	1:  "#020000",
+	2:  "#020000",
+	3:  "#0c1011",
+	4:  "#0c1011",
+	5:  "#121018",
+	6:  "#121018",
+	7:  "#0c1011",
+	8:  "#0c1011",
+	9:  "#080a0e",
+	10: "#080a0e",
+	11: "#0c0d12",
+	12: "#080c0e",
+	13: "#080c0e",
+	14: "#03060a",
+	15: "#03060a",
+	16: "#080801",
+	17: "#010000",
+	18: "#03060a",
+	19: "#03060a",
+	20: "#0c0d12",
+	21: "#080801",
+	22: "#010000",
+	23: "#090a0d",
+	24: "#090a0d",
+	25: "#0a0c0e",
+	26: "#0a0c0e",
+	27: "#09090d",
+	28: "#0c0607",
+	29: "#0c0607",
+	30: "#0a0c0e",
+	31: "#0a0c0e",
+	32: "#0c0607",
+	33: "#0c0607",
+	34: "#070404",
+	35: "#070404",
+	36: "#0a030d",
+	37: "#0a1013",
+	38: "#0a030d",
+	39: "#0a1013",
+	40: "#080a0e",
+	41: "#080a0e",
+	42: "#070a0c",
+	43: "#070a0c",
+	44: "#0f0c0f",
+	45: "#0f0c0f",
+	46: "#020700",
+}
+
+func getRaidColor(raidID int) string {
+	if col, ok := raidColors[raidID]; ok {
+		return col
+	}
+	return "#151618" // Дефолтный фон
+}
+
 //go:embed assets/images
 var imagesFS embed.FS
 
@@ -74,13 +132,17 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 	slices.SortFunc(healers, func(a, b PlayerReport) int { return b.Hps - a.Hps })
 
 	totalRows := len(dds) + len(healers)
-	height := headerH + (totalRows+2)*rowHeight + margin*2
+	height := headerH + footerH + (totalRows+2)*rowHeight + margin*2
 
 	dc := gg.NewContext(width, int(height))
 
 	// Фон
-	dc.SetHexColor("#151618ff")
+	bgColor := getRaidColor(report.RaidOrder)
+	dc.SetHexColor(bgColor + "ff")
 	dc.Clear()
+
+	// Картинка рейда (800px)
+	drawRaidBackground(dc, report.RaidOrder, bgColor)
 
 	fontLoaded := false
 	fontPaths := []string{
@@ -112,9 +174,14 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 
 	// Title
 	dc.SetRGB(1, 1, 1)
+	// Добавим небольшую тень для заголовка, чтобы он читался на фоне картинки
+	dc.SetRGBA(0, 0, 0, 0.8)
+	dc.DrawStringAnchored(fmt.Sprintf("%s — %s", report.MapName, report.BossName), width/2+1, y+21, 0.5, 0.5)
+	dc.SetRGB(1, 1, 1)
 	dc.DrawStringAnchored(fmt.Sprintf("%s — %s", report.MapName, report.BossName), width/2, y+20, 0.5, 0.5)
-	y += headerH
 
+	y += headerH
+	//dd
 	if len(dds) > 0 {
 		dc.DrawString("Дпс", colDpsX, y+20)
 		y = drawRoleHeader(dc, "Дамагеры", y, width)
@@ -123,7 +190,7 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 		}
 
 	}
-
+	//heals
 	if len(healers) > 0 {
 		y += 10
 		dc.SetRGB(1, 1, 1)
@@ -134,6 +201,10 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 		}
 
 	}
+
+	//footer
+	dc.SetRGB(0.4, 0.4, 0.4)
+	dc.DrawString("*Рейтинг за текущее кд", 600, y+20)
 
 	buf := new(bytes.Buffer)
 	err := dc.EncodePNG(buf)
@@ -185,7 +256,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width in
 			bounds := img.Bounds()
 			imgH := bounds.Dy()
 			imgY := int(y) + int(rowHeight)/2 - imgH/2
-			dc.DrawImage(img, colZodiacX, imgY)
+			dc.DrawImage(img, colZodiacX+4, imgY)
 		} else {
 			fmt.Printf("Error decoding %s: %v\n", zodiacFilePath, errDecode)
 		}
@@ -367,4 +438,46 @@ func getCategoryImageName(cat int) string {
 	default:
 		return "custom_category_ooc_1.png"
 	}
+}
+
+func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
+	filePath := fmt.Sprintf("assets/images/raid/%d.png", raidID)
+	fileData, err := imagesFS.ReadFile(filePath)
+	if err != nil {
+		return // Если картинки нет в embed, просто выходим
+	}
+
+	img, _, errDecode := image.Decode(bytes.NewReader(fileData))
+	if errDecode != nil {
+		fmt.Printf("Error decoding raid image %s: %v\n", filePath, errDecode)
+		return
+	}
+
+	// 1. Рисуем картинку в шапке (она 400px высотой)
+	dc.DrawImage(img, 0, 0)
+
+	// 2. --- ЕДИНЫЙ БЕСШОВНЫЙ ГРАДИЕНТ (Затемнение + Переход) ---
+	// Этот градиент до середины просто затемняет, а потом плавно уводит в фон
+	grad := gg.NewLinearGradient(0, 0, 0, 400)
+
+	// Парсим HEX в RGBA для градиента
+	var r, g, b int
+	fmt.Sscanf(bgColor, "#%02x%02x%02x", &r, &g, &b)
+	bgR, bgG, bgB := uint8(r), uint8(g), uint8(b)
+
+	// От 0 до 200px: Держим стабильное затемнение (оверлей)
+	grad.AddColorStop(0, color.RGBA{0, 0, 0, 200})   // 80% черного вверху
+	grad.AddColorStop(0.5, color.RGBA{0, 0, 0, 200}) // Держим ту же темноту до 200px
+
+	// От 200px до 400px: Плавно переходим из темноты в цвет фона
+	grad.AddColorStop(1.0, color.RGBA{bgR, bgG, bgB, 255})
+
+	dc.SetFillStyle(grad)
+	dc.DrawRectangle(0, 0, float64(width), 400)
+	dc.Fill()
+
+	// 3. --- ЗАГЛУШКА (Закрашиваем всё, что ниже 400px) ---
+	dc.SetHexColor(bgColor + "ff")
+	dc.DrawRectangle(0, 400, float64(width), 5000) // С большим запасом вниз
+	dc.Fill()
 }

@@ -20,6 +20,7 @@ func KillMonitor(
 	dg *discordgo.Session,
 ) {
 	for {
+		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
 		guilds, err := subStore.GetTrackedGuilds()
 		if err != nil {
 			log.Printf("[KillMonitor] Getting tracked guilds err: %v", err)
@@ -53,7 +54,7 @@ func KillMonitor(
 			}
 
 			subStore.MarkKillProcessed(killID)
-			time.Sleep(2 * time.Second) // Small delay between reports
+			time.Sleep(2 * time.Second)
 		}
 
 		time.Sleep(1 * time.Minute)
@@ -75,7 +76,6 @@ func sortKills(kills map[int]map[string]bool) []int {
 func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStorage) map[int]map[string]bool {
 	kills := make(map[int]map[string]bool)
 
-	// Гильдии
 	for gID, channels := range guilds {
 		gKills, err := sirus.FetchGuildLatestBossKills(gID)
 		if err != nil {
@@ -97,7 +97,6 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 		time.Sleep(5 * time.Second)
 	}
 
-	// Игроки
 	for pID, channels := range players {
 		pKills, err := sirus.FetchPlayerLatestBossKills(pID)
 		if err != nil {
@@ -133,6 +132,7 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, k
 	report := discord.BossKillReport{
 		MapName:   fight.Data.MapName,
 		BossName:  fight.Data.BossName,
+		RaidOrder: fight.Order,
 		KillID:    killID,
 		Duration:  fight.Data.FightLength,
 		Attempts:  fight.Data.Attempts,
