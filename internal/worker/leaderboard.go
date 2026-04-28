@@ -46,7 +46,7 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 							}
 
 							if len(players) == 0 {
-								fmt.Printf("[Worker] No player data for Raid:%d Boss:%d\n", raid.Order, bossID)
+								fmt.Printf("[Worker] No player data for R:%d B:%d classID%d, specID%d, ilvlFrom%d, ilvlTo%d\n", raid.Order, bossID, classID, specID, ilvlFrom, ilvlTo)
 								time.Sleep(10 * time.Second)
 								continue
 							}
