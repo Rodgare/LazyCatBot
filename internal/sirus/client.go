@@ -44,9 +44,8 @@ func FetchLeaderboard(raidID, bossID, classID, specID int, role string) ([]Leade
 		nextPage, err := GetPage(raidID, bossID, classID, specID, role, p)
 
 		if err != nil {
-			fmt.Printf("Error loading page %d: %v\n", p, err)
-			time.Sleep(15 * time.Second)
-			continue
+			fmt.Printf("Error loading page %d: %v — skipping remaining pages\n", p, err)
+			break
 		}
 		allPlayers = append(allPlayers, nextPage.Data...)
 		time.Sleep(2 * time.Second)
@@ -123,7 +122,7 @@ func FetchGuildLatestBossKills(guildID int) (*LatestBossKills, error) {
 
 func FetchPlayerLatestBossKills(playerID int) (*LatestPlayerBossKills, error) {
 	page := 1
-	weekFrom, weekTo := GetSirusDates()
+	weekFrom, weekTo := GetLastWeek()
 	url := fmt.Sprintf("https://sirus.su/api/base/22/statistics/%d/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s", playerID, page, weekFrom, weekTo)
 	var res LatestPlayerBossKills
 
@@ -167,7 +166,7 @@ func calculateSirusDates(now time.Time) (string, string) {
 	if daysSinceThursday < 0 {
 		daysSinceThursday += 7
 	}
-	lastThursday := now.AddDate(0, 0, -daysSinceThursday)
+	lastThursday := now.AddDate(0, 0, -daysSinceThursday-7)
 
 	weekFrom := lastThursday.Format("2006-01-02")
 
@@ -208,18 +207,19 @@ func makeRequest(url string, target any) error {
 
 	var lastErr error
 	for try := 1; try <= 3; try++ {
+		fmt.Printf("makeRequest try #%d", try)
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			lastErr = err
 			log.Printf("Attempt %d failed (network error): %v", try, err)
-			time.Sleep(15 * time.Second)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
 			lastErr = fmt.Errorf("API returned status: %d", resp.StatusCode)
 			resp.Body.Close()
 			log.Printf("Attempt %d failed (status %d)", try, resp.StatusCode)
-			time.Sleep(15 * time.Second)
+			time.Sleep(5 * time.Second)
 			continue
 		}
 		defer resp.Body.Close()

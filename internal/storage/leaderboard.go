@@ -99,7 +99,7 @@ func (s *LeaderboardStorage) GetDpsRank(raid, boss int, p sirus.Player) (int, in
     (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND dps > ?) as class_rank,
     (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ?) as class_total,
     (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND dps > ?) as overall_rank,
-    (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ?) as overall_total;`
+    (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND dps > 0) as overall_total;`
 
 	err := s.db.QueryRow(query,
 		raid, boss, p.ClassID, p.Spec, minIlvl, maxIlvl, p.Dps, // ilvl_rank

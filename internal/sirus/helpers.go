@@ -67,8 +67,12 @@ func GetRoleString(classID, specID int) string {
 		9:  {0: "dps", 1: "dps", 2: "dps"}, // Warlock
 		11: {0: "dps", 1: "dps", 2: "hps"}, // Druid
 	}
+	role, ok := specs[classID][specID]
+	if !ok {
+		return "dps"
+	}
 
-	return specs[classID][specID]
+	return role
 }
 
 func GetZodiacName(fullName string) string {

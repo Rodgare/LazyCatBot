@@ -6,8 +6,6 @@ import (
 	"fmt"
 	"log"
 	"time"
-
-	"github.com/robfig/cron/v3"
 )
 
 func StartLeaderboardSync(store *storage.LeaderboardStorage) {
@@ -63,21 +61,21 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 	}
 }
 
-func StartCronScheduler(lbStore *storage.LeaderboardStorage) {
-	msk := time.FixedZone("MSK", 3*3600)
+// func StartCronScheduler(lbStore *storage.LeaderboardStorage) {
+// 	msk := time.FixedZone("MSK", 3*3600)
 
-	c := cron.New(cron.WithLocation(msk))
+// 	c := cron.New(cron.WithLocation(msk))
 
-	_, err := c.AddFunc("0 3 * * *", func() {
-		log.Println("[Cron] 03:00 MSK: Погнали синхронизировать Sirus...")
-		StartLeaderboardSync(lbStore)
-	})
+// 	_, err := c.AddFunc("0 3 * * *", func() {
+// 		log.Println("[Cron] 03:00 MSK: Погнали синхронизировать Sirus...")
+// 		StartLeaderboardSync(lbStore)
+// 	})
 
-	if err != nil {
-		log.Printf("[Cron] Критическая ошибка планировщика: %v", err)
-		return
-	}
+// 	if err != nil {
+// 		log.Printf("[Cron] Критическая ошибка планировщика: %v", err)
+// 		return
+// 	}
 
-	c.Start()
-	log.Println("[Cron] Планировщик успешно запущен на 03:00 MSK")
-}
+// 	c.Start()
+// 	log.Println("[Cron] Планировщик успешно запущен на 03:00 MSK")
+// }

@@ -85,6 +85,7 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 
 		for _, kill := range gKills.Data {
 			for _, ch := range channels {
+
 				id := kill.KillID
 				if !subStore.IsKillProcessed(id, ch) {
 					if _, ok := kills[id]; !ok {
