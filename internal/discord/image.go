@@ -204,7 +204,7 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 
 	//footer
 	dc.SetRGB(0.4, 0.4, 0.4)
-	dc.DrawString("*Рейтинг за 2 кд", 580, y+20)
+	dc.DrawString("*Рейтинг за 2 кд", 630, y+20)
 
 	buf := new(bytes.Buffer)
 	err := dc.EncodePNG(buf)
