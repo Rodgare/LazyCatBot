@@ -211,14 +211,14 @@ func makeRequest(url string, target any) error {
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			lastErr = err
-			log.Printf("Attempt %d failed (network error): %v", try, err)
+			log.Printf("Attempt %d failed (network error): %v\n", try, err)
 			time.Sleep(5 * time.Second)
 			continue
 		}
 		if resp.StatusCode != http.StatusOK {
-			lastErr = fmt.Errorf("API returned status: %d", resp.StatusCode)
+			lastErr = fmt.Errorf("API returned status: %d\n", resp.StatusCode)
 			resp.Body.Close()
-			log.Printf("Attempt %d failed (status %d)", try, resp.StatusCode)
+			log.Printf("Attempt %d failed (status %d)\n", try, resp.StatusCode)
 			time.Sleep(5 * time.Second)
 			continue
 		}

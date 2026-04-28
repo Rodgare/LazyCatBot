@@ -102,6 +102,11 @@ type PlayerBossKill struct {
 	ID int `json:"id"`
 }
 
+type PlayerLastActions []struct {
+	Type    string `json:"type"`
+	FightID int    `json:"id"`
+}
+
 type Itemset struct {
 	Id    int    `json:"id"`
 	Name  string `json:"name"`
