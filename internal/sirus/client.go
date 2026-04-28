@@ -110,7 +110,7 @@ func FetchActualRaids() (ActualRaids, error) {
 
 func FetchGuildLatestBossKills(guildID int) (*LatestBossKills, error) {
 	page := 1
-	weekFrom, weekTo := GetSirusDates()
+	weekFrom, weekTo := GetLastWeek()
 	url := fmt.Sprintf("https://sirus.su/api/base/22/progression/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s&guild=%d", page, weekFrom, weekTo, guildID)
 	var res LatestBossKills
 
@@ -168,6 +168,24 @@ func calculateSirusDates(now time.Time) (string, string) {
 		daysSinceThursday += 7
 	}
 	lastThursday := now.AddDate(0, 0, -daysSinceThursday-7)
+
+	weekFrom := lastThursday.Format("2006-01-02")
+
+	weekTo := now.Format("2006-01-02")
+	return weekFrom, weekTo
+}
+
+func GetLastWeek() (string, string) {
+	loc := time.FixedZone("MSK", 3*3600)
+	return calculateWeek(time.Now().In(loc))
+}
+
+func calculateWeek(now time.Time) (string, string) {
+	daysSinceThursday := int(now.Weekday()) - int(time.Thursday)
+	if daysSinceThursday < 0 {
+		daysSinceThursday += 7
+	}
+	lastThursday := now.AddDate(0, 0, -daysSinceThursday)
 
 	weekFrom := lastThursday.Format("2006-01-02")
 
