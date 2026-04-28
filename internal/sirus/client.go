@@ -6,7 +6,12 @@ import (
 	"log"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
+
+	"context"
+
+	"github.com/chromedp/chromedp"
 )
 
 func GetPage(raidID, bossID int, page int) (*Leaderboard, error) {
@@ -46,6 +51,48 @@ func FetchFullLeaderboard(raidID, bossID int) ([]LeaderboardPlayer, error) {
 	}
 
 	return allPlayers, nil
+}
+
+func FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]MetasirusLeaderboardPlayer, error) {
+	var allPlayers []MetasirusLeaderboardPlayer
+
+	fmt.Println("Парсинг первой страницы")
+	firstPage, err := GetMetasirusLbPage(mapID, bossID, difficulty, 1)
+	if err != nil {
+		time.Sleep(15 * time.Second)
+		return nil, err
+	}
+	time.Sleep(1 * time.Second)
+	allPlayers = append(allPlayers, firstPage.Data...)
+	totalPages := firstPage.Meta.LastPage
+
+	for p := 2; p <= totalPages; p++ {
+		fmt.Printf("Парсинг страинцы %d/%d\n", p, totalPages)
+		nextPage, err := GetMetasirusLbPage(mapID, bossID, difficulty, p)
+		if err != nil {
+			log.Printf("GetMetasirusLbPage Error loading page %d: %v\n", p, err)
+			time.Sleep(15 * time.Second)
+			continue
+		}
+
+		allPlayers = append(allPlayers, nextPage.Data...)
+		time.Sleep(1 * time.Second)
+	}
+
+	return allPlayers, nil
+}
+
+func GetMetasirusLbPage(mapID, bossID, difficulty, page int) (*MetasirusLeaderboard, error) {
+	fmt.Printf("GetMetasirusLbPage  mapID:%d, bossID:%d, difficulty:%d page:%d\n", mapID, bossID, difficulty, page)
+	url := fmt.Sprintf("https://metasirus.su/api/realm/22/map/%d/boss/%d/aggregation/character?difficulty=%d&type=&spec=&specs=&date=current&ilvl_from=&ilvl_to=&page=%d",
+		mapID, bossID, difficulty, page)
+
+	var res MetasirusLeaderboard
+	if err := makeMetasirusRequest(url, &res); err != nil {
+		return nil, err
+	}
+	fmt.Printf("Получен MetasirusLeaderboard от сервера, ДПС первого игрока %d\n", res.Data[0].Dps)
+	return &res, nil
 }
 
 func FetchActualRaids() (ActualRaids, error) {
@@ -160,4 +207,36 @@ func makeRequest(url string, target any) error {
 	}
 
 	return fmt.Errorf("all request attempts failed: %w", lastErr)
+}
+
+func makeMetasirusRequest(url string, target any) error {
+	opts := append(chromedp.DefaultExecAllocatorOptions[:],
+		chromedp.NoSandbox,
+		chromedp.DisableGPU,
+		chromedp.Flag("headless", true),
+		chromedp.Flag("disable-dev-shm-usage", true),
+	)
+
+	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
+	defer cancel()
+
+	ctx, cancel := chromedp.NewContext(allocCtx)
+	defer cancel()
+	pageCtx, cancel := context.WithTimeout(ctx, 40*time.Second)
+	defer cancel()
+	defer cancel()
+	var body string
+	err := chromedp.Run(pageCtx,
+		chromedp.Navigate(url),
+		chromedp.Sleep(10*time.Second),
+		chromedp.Text(`body`, &body, chromedp.ByQuery),
+	)
+
+	if err != nil {
+		return fmt.Errorf("chromedp error: %w", err)
+	}
+
+	body = strings.TrimSpace(body)
+
+	return json.Unmarshal([]byte(body), target)
 }

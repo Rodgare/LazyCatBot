@@ -26,18 +26,20 @@ func (s *LeaderboardStorage) InitDB() error {
         player_name TEXT,
         ilvl INTEGER,
         dps INTEGER,
+		hps INTEGER,
         PRIMARY KEY (raid_id, boss_id, class_id, spec_id, player_name)
     );
     CREATE INDEX IF NOT EXISTS idx_rank_lookup ON leaderboard (raid_id, boss_id, class_id, spec_id, dps DESC);
+	CREATE INDEX IF NOT EXISTS idx_hps_rank_lookup ON leaderboard (raid_id, boss_id, class_id, spec_id, hps DESC);
     `
 
 	_, err := s.db.Exec(query)
 	return err
 }
 
-func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, players []sirus.LeaderboardPlayer) error {
+func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, players []sirus.MetasirusLeaderboardPlayer) error {
 	if len(players) < 2 {
-		return fmt.Errorf("Less then 2 players for Raid: %d, Endounter: %d", raidOrder, encounter)
+		return fmt.Errorf("Less then 2 players for Raid: %d, Encounter: %d", raidOrder, encounter)
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -51,15 +53,16 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, 
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, dps) 
-		VALUES (?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, dps, hps) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
 	for _, p := range players {
-		_, err = stmt.Exec(raidOrder, encounter, p.ClassID, p.SpecID, p.Name, p.Ilvl, p.Dps)
+		sirusSpecID := sirus.GetSirusSpecID(p.MetasirusSpecID)
+		_, err = stmt.Exec(raidOrder, encounter, p.ClassID, sirusSpecID, p.Character.Name, p.Ilvl, p.Dps, p.Hps)
 
 		if err != nil {
 			return err

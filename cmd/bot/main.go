@@ -55,7 +55,8 @@ func main() {
 	gmStore.InitDB()
 	playerSubStore.InitDB()
 
-	go worker.StartLeaderboardSync(lbStore)
+	// go worker.StartLeaderboardSync(lbStore)
+	go worker.StartMetasirusLbSync(lbStore)
 	go worker.KillMonitor(lbStore, subStore, playerSubStore, dg)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
@@ -66,7 +67,7 @@ func main() {
 		PlayerSubStore: playerSubStore,
 	}
 	dg.AddHandler(h.InteractionCreate)
-	dg.AddHandler(h.GuildCreate)
+	// dg.AddHandler(h.GuildCreate)
 
 	err = dg.Open()
 	if err != nil {
