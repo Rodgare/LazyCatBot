@@ -28,15 +28,13 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 			// 	continue
 			// }
 
-			fmt.Printf("[Worker] === Processing actual raid: %s (ID: %d) ===\n", raid.MapName, raid.Order)
-
 			for bossID, encounter := range raid.Encounters {
 				classes := sirus.GetSpecs()
 
 				for classID, specs := range classes {
 					for specID := range specs {
 						for ilvlFrom, ilvlTo := 200, 205; ilvlTo < 310; ilvlFrom, ilvlTo = ilvlFrom+5, ilvlTo+5 {
-							fmt.Printf("[Worker] Parsing boss %s (R:%d, B:%d)...\n", encounter.Name, raid.Order, bossID)
+							fmt.Printf("[Worker] Parsing %s R: %d B: %d classID: %d, specID: %d, ilvlFrom: %d, ilvlTo: %d\n", encounter.Name, raid.Order, bossID, classID, specID, ilvlFrom, ilvlTo)
 
 							players, err := sirus.FetchLeaderboard(raid.Order, bossID, classID, specID, ilvlFrom, ilvlTo)
 							if err != nil {

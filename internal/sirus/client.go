@@ -15,6 +15,7 @@ import (
 )
 
 func GetPage(raidID, bossID, classID, specID, ilvlFrom, ilvlTo int, role string, page int) (*Leaderboard, error) {
+	fmt.Printf("[Worker] Pasing page %d R: %d B: %d classID: %d, specID: %d, ilvlFrom: %d, ilvlTo: %d\n", page, raidID, bossID, classID, specID, ilvlFrom, ilvlTo)
 	weekFrom, weekTo := GetSirusDates()
 	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=%d&ilvl_to=%d&page=%d&i=%d&boss=%d&specs=%d:%d",
 		role, weekFrom, weekTo, ilvlFrom, ilvlTo, page, raidID, bossID, classID, specID)
