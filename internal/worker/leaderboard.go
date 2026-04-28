@@ -32,7 +32,7 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 						players, err := sirus.FetchLeaderboard(raid.Order, bossID, classID, specID, role)
 						if err != nil {
 							log.Printf("[Worker] Error (Raid:%d Boss:%d): %v", raid.Order, bossID, err)
-							time.Sleep(1 * time.Hour)
+							time.Sleep(2 * time.Second)
 							continue
 						}
 
@@ -45,7 +45,7 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 						err = store.UpdateLeaderboardStorage(raid.Order, bossID, classID, specID, players)
 						if err != nil {
 							log.Printf("[Worker] Error saving to database: %v\n", err)
-							time.Sleep(1 * time.Hour)
+							time.Sleep(5 * time.Second)
 						}
 
 						time.Sleep(5 * time.Second)
