@@ -78,7 +78,7 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter, clas
 func (s *LeaderboardStorage) UpsertPlayer(raid, boss int, p sirus.Player) error {
 	query := `
 		INSERT OR IGNORE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, dps, hps) 
-		VALUES (?, ?, ?, ?, ?, ?, ?)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 	`
 	_, err := s.db.Exec(query, raid, boss, p.ClassID, p.Spec, p.Name, p.Ilvl, p.Dps, p.Hps)
 	return err
