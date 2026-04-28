@@ -215,6 +215,7 @@ func makeMetasirusRequest(url string, target any) error {
 		chromedp.DisableGPU,
 		chromedp.Flag("headless", true),
 		chromedp.Flag("disable-dev-shm-usage", true),
+		chromedp.Flag("disk-cache-size", "1048576"),
 	)
 
 	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
