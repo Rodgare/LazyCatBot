@@ -70,7 +70,7 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter, clas
 
 	err = tx.Commit()
 	if err == nil {
-		fmt.Printf("[DB] Successfully saved %d players for boss %d (raid %d)\n", len(players), encounter, raidOrder)
+		fmt.Printf("[DB] Successfully saved %d players R:%d B:%d classID%d, specID%d, ilvlFrom%d, ilvlTo%d\n\n", len(players), raidOrder, encounter, classID, specID, ilvlFrom, ilvlTo)
 	}
 	return err
 }
