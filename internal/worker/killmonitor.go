@@ -39,18 +39,18 @@ func KillMonitor(
 		sortedKillsIDs := sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
-			// enrichedKill, err := sirus.FetchBossFightDetails(killID)
-			// if err != nil {
-			// 	log.Printf("[KillMonitor] Fetch Boss Fight Details err: %v", err)
-			// 	time.Sleep(10 * time.Second)
-			// 	continue
-			// }
+			enrichedKill, err := sirus.FetchBossFightDetails(killID)
+			if err != nil {
+				log.Printf("[KillMonitor] Fetch Boss Fight Details err: %v", err)
+				time.Sleep(10 * time.Second)
+				continue
+			}
 
-			// report := createReport(enrichedKill, lbStore, killID)
+			report := createReport(enrichedKill, lbStore, killID)
 			channels := kills[killID]
 
 			for ch := range channels {
-				// discord.SendKillReport(dg, ch, report)
+				discord.SendKillReport(dg, ch, report)
 				subStore.MarkKillProcessed(killID, ch)
 			}
 
