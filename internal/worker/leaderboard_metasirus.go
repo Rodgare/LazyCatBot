@@ -41,11 +41,11 @@ func StartMetasirusLbSync(store *storage.LeaderboardStorage) {
 					continue
 				}
 
-				err = store.UpdateLeaderboardStorage(raid.Order, sirusBossID, players)
-				if err != nil {
-					log.Printf("[Worker] Error saving to database: %v\n", err)
-					time.Sleep(1 * time.Hour)
-				}
+				// err = store.UpdateLeaderboardStorage(raid.Order, sirusBossID, players)
+				// if err != nil {
+				// 	log.Printf("[Worker] Error saving to database: %v\n", err)
+				// 	time.Sleep(1 * time.Hour)
+				// }
 
 				time.Sleep(5 * time.Second)
 			}

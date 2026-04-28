@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/bwmarrin/discordgo"
-	"github.com/robfig/cron/v3"
 )
 
 func KillMonitor(
@@ -205,23 +204,4 @@ func makeMockReport() discord.BossKillReport {
 	json.Unmarshal(data, &report)
 
 	return report
-}
-
-func StartCronScheduler(lbStore *storage.LeaderboardStorage) {
-	msk := time.FixedZone("MSK", 3*3600)
-
-	c := cron.New(cron.WithLocation(msk))
-
-	_, err := c.AddFunc("0 3 * * *", func() {
-		log.Println("[Cron] 03:00 MSK: Погнали синхронизировать MetaSirus...")
-		StartMetasirusLbSync(lbStore)
-	})
-
-	if err != nil {
-		log.Printf("[Cron] Критическая ошибка планировщика: %v", err)
-		return
-	}
-
-	c.Start()
-	log.Println("[Cron] Планировщик успешно запущен на 03:00 MSK")
 }

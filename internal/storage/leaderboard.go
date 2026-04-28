@@ -37,9 +37,9 @@ func (s *LeaderboardStorage) InitDB() error {
 	return err
 }
 
-func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, players []sirus.MetasirusLeaderboardPlayer) error {
+func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter, classID, specID, ilvlFrom, ilvlTo int, players []sirus.LeaderboardPlayer) error {
 	if len(players) < 2 {
-		return fmt.Errorf("Less then 2 players for Raid: %d, Encounter: %d", raidOrder, encounter)
+		return fmt.Errorf("Less then 2 players for Raid: %d, Endounter: %d", raidOrder, encounter)
 	}
 	tx, err := s.db.Begin()
 	if err != nil {
@@ -47,22 +47,21 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, 
 	}
 	defer tx.Rollback()
 
-	_, err = tx.Exec("DELETE FROM leaderboard WHERE raid_id=? AND boss_id=?",
-		raidOrder, encounter)
+	_, err = tx.Exec("DELETE FROM leaderboard WHERE raid_id=? AND boss_id=? AND class_id=? AND spec_id=? AND ilvl>=? AND ilvl <=?",
+		raidOrder, encounter, classID, specID, ilvlFrom, ilvlTo)
 	if err != nil {
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, dps, hps) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, dps) 
+		VALUES (?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
 	for _, p := range players {
-		sirusSpecID := sirus.GetSirusSpecID(p.MetasirusSpecID)
-		_, err = stmt.Exec(raidOrder, encounter, p.ClassID, sirusSpecID, p.Character.Name, p.Ilvl, p.Dps, p.Hps)
+		_, err = stmt.Exec(raidOrder, encounter, p.ClassID, p.SpecID, p.Name, p.Ilvl, p.Dps)
 
 		if err != nil {
 			return err

@@ -14,10 +14,10 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-func GetPage(raidID, bossID int, page int) (*Leaderboard, error) {
+func GetPage(raidID, bossID, classID, specID, ilvlFrom, ilvlTo int, role string, page int) (*Leaderboard, error) {
 	weekFrom, weekTo := GetSirusDates()
-	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=dps&aggregation=max&week_from=%s&week_to=%s&i=%d&boss=%d&page=%d",
-		weekFrom, weekTo, raidID, bossID, page)
+	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=%d&ilvl_to=%d&page=%d&i=%d&boss=%d&specs=%d:%d",
+		role, weekFrom, weekTo, ilvlFrom, ilvlTo, page, raidID, bossID, classID, specID)
 
 	var res Leaderboard
 	if err := makeRequest(url, &res); err != nil {
@@ -27,10 +27,10 @@ func GetPage(raidID, bossID int, page int) (*Leaderboard, error) {
 	return &res, nil
 }
 
-func FetchFullLeaderboard(raidID, bossID int) ([]LeaderboardPlayer, error) {
+func FetchLeaderboard(raidID, bossID, classID, specID, ilvlFrom, ilvlTo int) ([]LeaderboardPlayer, error) {
 	var allPlayers []LeaderboardPlayer
-
-	firstPage, err := GetPage(raidID, bossID, 1)
+	role := "dps"
+	firstPage, err := GetPage(raidID, bossID, classID, specID, ilvlFrom, ilvlTo, role, 1)
 	if err != nil {
 		time.Sleep(15 * time.Second)
 		return nil, err
@@ -40,14 +40,14 @@ func FetchFullLeaderboard(raidID, bossID int) ([]LeaderboardPlayer, error) {
 	totalPages := firstPage.Meta.LastPage
 
 	for p := 2; p <= totalPages; p++ {
-		nextPage, err := GetPage(raidID, bossID, p)
+		nextPage, err := GetPage(raidID, bossID, classID, specID, ilvlFrom, ilvlTo, role, p)
 		if err != nil {
 			fmt.Printf("Error loading page %d: %v\n", p, err)
 			time.Sleep(15 * time.Second)
 			continue
 		}
 		allPlayers = append(allPlayers, nextPage.Data...)
-		time.Sleep(5 * time.Second)
+		time.Sleep(2 * time.Second)
 	}
 
 	return allPlayers, nil
@@ -212,8 +212,10 @@ func makeRequest(url string, target any) error {
 func makeMetasirusRequest(url string, target any) error {
 	opts := append(chromedp.DefaultExecAllocatorOptions[:],
 		chromedp.NoSandbox,
+		chromedp.Flag("disable-setuid-sandbox", true),
 		chromedp.DisableGPU,
-		chromedp.Flag("headless", true),
+		chromedp.Flag("single-process", true),
+		chromedp.Flag("headless", "new"),
 		chromedp.Flag("disable-dev-shm-usage", true),
 		chromedp.Flag("disk-cache-size", "1048576"),
 	)
