@@ -14,11 +14,11 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-func GetPage(raidID, bossID, classID, specID, ilvlFrom, ilvlTo int, role string, page int) (*Leaderboard, error) {
-	fmt.Printf("[Worker] Pasing page %d R: %d B: %d classID: %d, specID: %d, ilvlFrom: %d, ilvlTo: %d\n", page, raidID, bossID, classID, specID, ilvlFrom, ilvlTo)
+func GetPage(raidID, bossID, classID, specID int, role string, page int) (*Leaderboard, error) {
+	fmt.Printf("[Worker] Pasing page %d R: %d B: %d classID: %d, specID: %d\n", page, raidID, bossID, classID, specID)
 	weekFrom, weekTo := GetSirusDates()
-	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=%d&ilvl_to=%d&page=%d&i=%d&boss=%d&specs=%d:%d",
-		role, weekFrom, weekTo, ilvlFrom, ilvlTo, page, raidID, bossID, classID, specID)
+	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=100&ilvl_to=300&page=%d&i=%d&boss=%d&specs=%d:%d",
+		role, weekFrom, weekTo, page, raidID, bossID, classID, specID)
 
 	var res Leaderboard
 	if err := makeRequest(url, &res); err != nil {
@@ -28,10 +28,10 @@ func GetPage(raidID, bossID, classID, specID, ilvlFrom, ilvlTo int, role string,
 	return &res, nil
 }
 
-func FetchLeaderboard(raidID, bossID, classID, specID, ilvlFrom, ilvlTo int) ([]LeaderboardPlayer, error) {
+func FetchLeaderboard(raidID, bossID, classID, specID int, role string) ([]LeaderboardPlayer, error) {
 	var allPlayers []LeaderboardPlayer
-	role := "dps"
-	firstPage, err := GetPage(raidID, bossID, classID, specID, ilvlFrom, ilvlTo, role, 1)
+
+	firstPage, err := GetPage(raidID, bossID, classID, specID, role, 1)
 	if err != nil {
 		time.Sleep(15 * time.Second)
 		return nil, err
@@ -41,7 +41,8 @@ func FetchLeaderboard(raidID, bossID, classID, specID, ilvlFrom, ilvlTo int) ([]
 	totalPages := firstPage.Meta.LastPage
 
 	for p := 2; p <= totalPages; p++ {
-		nextPage, err := GetPage(raidID, bossID, classID, specID, ilvlFrom, ilvlTo, role, p)
+		nextPage, err := GetPage(raidID, bossID, classID, specID, role, p)
+
 		if err != nil {
 			fmt.Printf("Error loading page %d: %v\n", p, err)
 			time.Sleep(15 * time.Second)
@@ -166,7 +167,7 @@ func calculateSirusDates(now time.Time) (string, string) {
 	if daysSinceThursday < 0 {
 		daysSinceThursday += 7
 	}
-	lastThursday := now.AddDate(0, 0, -daysSinceThursday)
+	lastThursday := now.AddDate(0, 0, -daysSinceThursday-7)
 
 	weekFrom := lastThursday.Format("2006-01-02")
 

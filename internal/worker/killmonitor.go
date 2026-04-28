@@ -163,8 +163,14 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, k
 		if err != nil {
 			log.Printf("Upsert player in db error %v\n", err)
 		}
+		role := sirus.GetRoleString(p.ClassID, p.Spec)
 
-		specRank, specPrcnt, classRank, classPrcnt, ilvlRank, ilvlPrcnt, overallRank, overallPrcnt, err := lbStore.GetRank(fight.Order, fight.Encounter, p)
+		var specRank, specPrcnt, classRank, classPrcnt, ilvlRank, ilvlPrcnt, overallRank, overallPrcnt int
+		if role == "dps" {
+			specRank, specPrcnt, classRank, classPrcnt, ilvlRank, ilvlPrcnt, overallRank, overallPrcnt, err = lbStore.GetDpsRank(fight.Order, fight.Encounter, p)
+		} else {
+			specRank, specPrcnt, classRank, classPrcnt, ilvlRank, ilvlPrcnt, overallRank, overallPrcnt, err = lbStore.GetHpsRank(fight.Order, fight.Encounter, p)
+		}
 		if err != nil {
 			log.Printf("Get player rank error %v\n", err)
 			continue

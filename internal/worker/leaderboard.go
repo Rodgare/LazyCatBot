@@ -24,39 +24,33 @@ func StartLeaderboardSync(store *storage.LeaderboardStorage) {
 		}
 
 		for _, raid := range actualRaids {
-			// if !raid.Actual {
-			// 	continue
-			// }
-
 			for bossID, encounter := range raid.Encounters {
 				classes := sirus.GetSpecs()
 
 				for classID, specs := range classes {
 					for specID := range specs {
-						for ilvlFrom, ilvlTo := 200, 205; ilvlTo < 310; ilvlFrom, ilvlTo = ilvlFrom+5, ilvlTo+5 {
-							fmt.Printf("[Worker] Parsing %s R: %d B: %d classID: %d, specID: %d, ilvlFrom: %d, ilvlTo: %d\n", encounter.Name, raid.Order, bossID, classID, specID, ilvlFrom, ilvlTo)
-
-							players, err := sirus.FetchLeaderboard(raid.Order, bossID, classID, specID, ilvlFrom, ilvlTo)
-							if err != nil {
-								log.Printf("[Worker] Error (Raid:%d Boss:%d): %v", raid.Order, bossID, err)
-								time.Sleep(1 * time.Hour)
-								continue
-							}
-
-							if len(players) == 0 {
-								fmt.Printf("[Worker] No player data for R: %d B: %d classID: %d, specID: %d, ilvlFrom: %d, ilvlTo: %d\n", raid.Order, bossID, classID, specID, ilvlFrom, ilvlTo)
-								time.Sleep(1 * time.Second)
-								continue
-							}
-
-							err = store.UpdateLeaderboardStorage(raid.Order, bossID, classID, specID, ilvlFrom, ilvlTo, players)
-							if err != nil {
-								log.Printf("[Worker] Error saving to database: %v\n", err)
-								time.Sleep(1 * time.Hour)
-							}
-
-							time.Sleep(5 * time.Second)
+						fmt.Printf("[Worker] Parsing %s R: %d B: %d classID: %d, specID: %d\n", encounter.Name, raid.Order, bossID, classID, specID)
+						role := sirus.GetRoleString(classID, specID)
+						players, err := sirus.FetchLeaderboard(raid.Order, bossID, classID, specID, role)
+						if err != nil {
+							log.Printf("[Worker] Error (Raid:%d Boss:%d): %v", raid.Order, bossID, err)
+							time.Sleep(1 * time.Hour)
+							continue
 						}
+
+						if len(players) == 0 {
+							fmt.Printf("[Worker] No player data for R: %d B: %d classID: %d, specID: %d\n", raid.Order, bossID, classID, specID)
+							time.Sleep(1 * time.Second)
+							continue
+						}
+
+						err = store.UpdateLeaderboardStorage(raid.Order, bossID, classID, specID, players)
+						if err != nil {
+							log.Printf("[Worker] Error saving to database: %v\n", err)
+							time.Sleep(1 * time.Hour)
+						}
+
+						time.Sleep(5 * time.Second)
 
 					}
 				}

@@ -54,6 +54,23 @@ func GetSpecs() map[int]map[int]string {
 	return specs
 }
 
+func GetRoleString(classID, specID int) string {
+	specs := map[int]map[int]string{
+		1:  {0: "dps", 1: "dps", 2: "dps"}, // Warrior
+		2:  {0: "hps", 1: "dps", 2: "dps"}, // Paladin
+		3:  {0: "dps", 1: "dps", 2: "dps"}, // Hunter
+		4:  {0: "dps", 1: "dps", 2: "dps"}, // Rogue
+		5:  {0: "hps", 1: "hps", 2: "dps"}, // Priest
+		6:  {0: "dps", 1: "dps", 2: "dps"}, // DK
+		7:  {0: "dps", 1: "dps", 2: "hps"}, // Shaman
+		8:  {0: "dps", 1: "dps", 2: "dps"}, // Mage
+		9:  {0: "dps", 1: "dps", 2: "dps"}, // Warlock
+		11: {0: "dps", 1: "dps", 2: "hps"}, // Druid
+	}
+
+	return specs[classID][specID]
+}
+
 func GetZodiacName(fullName string) string {
 	return fullName
 }

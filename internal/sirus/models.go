@@ -13,6 +13,7 @@ type LeaderboardPlayer struct {
 	Name    string `json:"name"`
 	Rank    int    `json:"rank"`
 	Dps     int    `json:"dps"`
+	Hps     int    `json:"hps"`
 	ClassID int    `json:"class_id"`
 	SpecID  int    `json:"spec"`
 	Ilvl    int    `json:"ilvl"`
