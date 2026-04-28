@@ -73,6 +73,15 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter int, 
 	return err
 }
 
+func (s *LeaderboardStorage) UpsertPlayer(raid, boss int, p sirus.Player) error {
+	query := `
+		INSERT OR IGNORE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, dps) 
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`
+	_, err := s.db.Exec(query, raid, boss, p.ClassID, p.Spec, p.Name, p.Ilvl, p.Dps)
+	return err
+}
+
 func (s *LeaderboardStorage) GetRank(raid, boss int, p sirus.Player) (int, int, int, int, int, int, int, int, error) {
 	var ilvlRank, ilvlTotal, specRank, specTotal, classRank, classTotal, overallRank, overallTotal int
 	var specPrcnt, classPrcnt, ilvlPrcnt, overallPrcnt int

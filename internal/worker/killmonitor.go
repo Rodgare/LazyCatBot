@@ -159,6 +159,12 @@ func createReport(fight *sirus.BossFight, lbStore *storage.LeaderboardStorage, k
 		specName := sirus.GetSpecName(p.ClassID, p.Spec)
 		t4Count := sirus.GetT4Count(p.Itemset)
 
+		err := lbStore.UpsertPlayer(fight.Order, fight.Encounter, p)
+		if err != nil {
+			log.Printf("Upsert player in db error %v\n", err)
+		}
+		time.Sleep(1 * time.Millisecond)
+
 		specRank, specPrcnt, classRank, classPrcnt, ilvlRank, ilvlPrcnt, overallRank, overallPrcnt, err := lbStore.GetRank(fight.Order, fight.Encounter, p)
 		if err != nil {
 			log.Printf("Get player rank error %v\n", err)
