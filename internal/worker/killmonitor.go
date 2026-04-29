@@ -42,7 +42,7 @@ func KillMonitor(
 			enrichedKill, err := sirus.FetchBossFightDetails(killID)
 			if err != nil {
 				log.Printf("[KillMonitor] Fetch Boss Fight Details err: %v", err)
-				time.Sleep(10 * time.Second)
+				time.Sleep(1 * time.Second)
 				continue
 			}
 
@@ -54,7 +54,7 @@ func KillMonitor(
 				subStore.MarkKillProcessed(killID, ch)
 			}
 
-			time.Sleep(2 * time.Second)
+			time.Sleep(1 * time.Second)
 		}
 
 		time.Sleep(1 * time.Minute)
@@ -96,7 +96,7 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 				}
 			}
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 
 	for pID, channels := range players {
@@ -107,13 +107,13 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 		}
 
 		for _, kill := range *pKills {
-			if kill.Type != "bosskill" {
+			if kill.Type != "bosskill" || !sirus.IsPlayerKillToday(kill.Date) {
 				continue
 			}
 			for _, ch := range channels {
 				id := kill.FightID
 
-				if sirus.IsPlayerKillToday(kill.Date) && !subStore.IsKillProcessed(id, ch) {
+				if !subStore.IsKillProcessed(id, ch) {
 					if _, ok := kills[id]; !ok {
 						kills[id] = make(map[string]bool)
 					}
@@ -122,7 +122,7 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 				}
 			}
 		}
-		time.Sleep(5 * time.Second)
+		time.Sleep(1 * time.Second)
 	}
 
 	return kills
