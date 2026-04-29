@@ -57,7 +57,7 @@ func KillMonitor(
 			time.Sleep(2 * time.Second)
 		}
 
-		time.Sleep(2 * time.Minute)
+		time.Sleep(1 * time.Minute)
 	}
 }
 
