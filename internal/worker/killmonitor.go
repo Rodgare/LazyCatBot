@@ -114,7 +114,7 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 			for _, ch := range channels {
 				id := kill.FightID
 
-				fmt.Println(sirus.IsKillToday(kill.Date))
+				fmt.Printf("killID %d, isToday kill %v\n", kill.FightID, sirus.IsKillToday(kill.Date))
 
 				if sirus.IsKillToday(kill.Date) && !subStore.IsKillProcessed(id, ch) {
 					if _, ok := kills[id]; !ok {
