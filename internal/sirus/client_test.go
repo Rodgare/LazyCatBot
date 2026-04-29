@@ -11,7 +11,7 @@ func TestCalculateSirusDates(t *testing.T) {
 	from, to := calculateSirusDates(fixedTime)
 
 	wantTo := "2026-04-16"
-	wantFrom := "2026-03-19"
+	wantFrom := "2026-04-09"
 
 	if to != wantTo {
 		t.Errorf("calculateSirusDates() to = %v, want %v", to, wantTo)
@@ -27,7 +27,7 @@ func TestCalculateSirusDates_Wednesday(t *testing.T) {
 	from, to := calculateSirusDates(fixedTime)
 
 	wantTo := "2026-04-15"
-	wantFrom := "2026-03-12"
+	wantFrom := "2026-04-02"
 
 	if to != wantTo {
 		t.Errorf("Wednesday: calculateSirusDates() to = %v, want %v", to, wantTo)

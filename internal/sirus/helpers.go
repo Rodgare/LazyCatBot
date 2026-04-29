@@ -309,7 +309,7 @@ func GetSirusSpecID(metaSirusSpecID int) int {
 	return sirusSpecIDs[metaSirusSpecID]
 }
 
-func IsKillToday(dateStr string) bool {
+func IsPlayerKillToday(dateStr string) bool {
 	killTime, err := time.Parse(time.RFC3339, dateStr)
 	if err != nil {
 		log.Printf("Ошибка парсинга даты: %v", err)
@@ -322,4 +322,21 @@ func IsKillToday(dateStr string) bool {
 	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
 
 	return killTime.After(todayStart)
+}
+
+func IsGuildKillToday(dateStr string) bool {
+	loc := time.FixedZone("MSK", 3*3600)
+
+	layout := "2006-01-02 15:04:05"
+
+	actionTime, err := time.ParseInLocation(layout, dateStr, loc)
+	if err != nil {
+		log.Printf("Ошибка парсинга: %v", err)
+		return false
+	}
+
+	now := time.Now().In(loc)
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	return actionTime.After(todayStart)
 }
