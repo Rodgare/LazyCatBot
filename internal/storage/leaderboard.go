@@ -88,8 +88,8 @@ func (s *LeaderboardStorage) GetDpsRank(raid, boss int, p sirus.Player) (int, in
 	var ilvlRank, ilvlTotal, specRank, specTotal, classRank, classTotal, overallRank, overallTotal int
 	var specPrcnt, classPrcnt, ilvlPrcnt, overallPrcnt int
 
-	minIlvl := (p.Ilvl / 5) * 5
-	maxIlvl := minIlvl + 4
+	// minIlvl := (p.Ilvl / 5) * 5
+	// maxIlvl := minIlvl + 4
 
 	query := `SELECT 
 	(SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl <= ? AND dps > ?) as ilvl_rank,
@@ -102,8 +102,8 @@ func (s *LeaderboardStorage) GetDpsRank(raid, boss int, p sirus.Player) (int, in
     (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND dps > 0) as overall_total;`
 
 	err := s.db.QueryRow(query,
-		raid, boss, p.ClassID, p.Spec, maxIlvl, p.Dps, // ilvl_rank
-		raid, boss, p.ClassID, p.Spec, maxIlvl, // ilvl_total
+		raid, boss, p.ClassID, p.Spec, p.Ilvl, p.Dps, // ilvl_rank
+		raid, boss, p.ClassID, p.Spec, p.Ilvl, // ilvl_total
 		raid, boss, p.ClassID, p.Spec, p.Dps, // spec_rank
 		raid, boss, p.ClassID, p.Spec, // spec_total
 		raid, boss, p.ClassID, p.Dps, // class_rank
@@ -136,8 +136,8 @@ func (s *LeaderboardStorage) GetHpsRank(raid, boss int, p sirus.Player) (int, in
 	var ilvlRank, ilvlTotal, specRank, specTotal, classRank, classTotal, overallRank, overallTotal int
 	var specPrcnt, classPrcnt, ilvlPrcnt, overallPrcnt int
 
-	minIlvl := (p.Ilvl / 5) * 5
-	maxIlvl := minIlvl + 4
+	// minIlvl := (p.Ilvl / 5) * 5
+	// maxIlvl := minIlvl + 4
 
 	query := `SELECT 
 	(SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl <= ? AND hps > ?) as ilvl_rank,
@@ -150,8 +150,8 @@ func (s *LeaderboardStorage) GetHpsRank(raid, boss int, p sirus.Player) (int, in
     (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND hps > 0) as overall_total;`
 
 	err := s.db.QueryRow(query,
-		raid, boss, p.ClassID, p.Spec, maxIlvl, p.Hps, // ilvl_rank
-		raid, boss, p.ClassID, p.Spec, maxIlvl, // ilvl_total
+		raid, boss, p.ClassID, p.Spec, p.Ilvl, p.Hps, // ilvl_rank
+		raid, boss, p.ClassID, p.Spec, p.Ilvl, // ilvl_total
 		raid, boss, p.ClassID, p.Spec, p.Hps, // spec_rank
 		raid, boss, p.ClassID, p.Spec, // spec_total
 		raid, boss, p.ClassID, p.Hps, // class_rank
