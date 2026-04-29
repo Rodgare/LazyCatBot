@@ -2,7 +2,9 @@ package sirus
 
 import (
 	"fmt"
+	"log"
 	"strings"
+	"time"
 )
 
 func GetT4Count(itemset []Itemset) int {
@@ -305,4 +307,19 @@ func GetSirusSpecID(metaSirusSpecID int) int {
 	}
 
 	return sirusSpecIDs[metaSirusSpecID]
+}
+
+func IsKillToday(dateStr string) bool {
+	killTime, err := time.Parse(time.RFC3339, dateStr)
+	if err != nil {
+		log.Printf("Ошибка парсинга даты: %v", err)
+		return false
+	}
+
+	loc := time.FixedZone("MSK", 3*3600)
+	now := time.Now().In(loc)
+
+	todayStart := time.Date(now.Year(), now.Month(), now.Day(), 0, 0, 0, 0, loc)
+
+	return killTime.After(todayStart)
 }

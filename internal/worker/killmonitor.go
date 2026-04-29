@@ -5,6 +5,7 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"sort"
@@ -112,7 +113,10 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 			}
 			for _, ch := range channels {
 				id := kill.FightID
-				if !subStore.IsKillProcessed(id, ch) {
+
+				fmt.Println(sirus.IsKillToday(kill.Date))
+
+				if sirus.IsKillToday(kill.Date) && !subStore.IsKillProcessed(id, ch) {
 					if _, ok := kills[id]; !ok {
 						kills[id] = make(map[string]bool)
 					}
