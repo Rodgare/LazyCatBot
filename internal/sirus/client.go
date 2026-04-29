@@ -207,7 +207,7 @@ func makeRequest(url string, target any) error {
 
 	var lastErr error
 	for try := 1; try <= 3; try++ {
-		fmt.Printf("makeRequest try #%d\n", try)
+		// fmt.Printf("makeRequest try #%d\n", try)
 		resp, err := httpClient.Do(req)
 		if err != nil {
 			lastErr = err
