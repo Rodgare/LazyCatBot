@@ -5,6 +5,7 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"encoding/json"
+	"fmt"
 	"log"
 	"os"
 	"sort"
@@ -54,7 +55,7 @@ func KillMonitor(
 				subStore.MarkKillProcessed(killID, ch)
 			}
 
-			time.Sleep(1 * time.Second)
+			time.Sleep(300 * time.Millisecond)
 		}
 
 		time.Sleep(1 * time.Minute)
@@ -85,6 +86,7 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 
 		for _, kill := range gKills.Data {
 			for _, ch := range channels {
+				fmt.Printf("for kills killID %d\n", kill.KillID)
 
 				id := kill.KillID
 				if sirus.IsGuildKillToday(kill.TimeEnd) && !subStore.IsKillProcessed(id, ch) {
@@ -96,17 +98,23 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 				}
 			}
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(300 * time.Millisecond)
 	}
 
 	for pID, channels := range players {
 		pKills, err := sirus.FetchPlayerLastActions(pID)
+		lastKills := *pKills
+
+		if len(lastKills) >= 10 {
+			lastKills = lastKills[:10]
+		}
+
 		if err != nil {
 			log.Printf("[KillMonitor] Fetch Player %d Latest BossKills err: %v", pID, err)
 			continue
 		}
 
-		for _, kill := range *pKills {
+		for _, kill := range lastKills {
 			if kill.Type != "bosskill" || !sirus.IsPlayerKillToday(kill.Date) {
 				continue
 			}
@@ -122,7 +130,7 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 				}
 			}
 		}
-		time.Sleep(1 * time.Second)
+		time.Sleep(300 * time.Millisecond)
 	}
 
 	return kills
