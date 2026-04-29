@@ -133,6 +133,18 @@ func FetchPlayerLatestBossKills(playerID int) (*LatestPlayerBossKills, error) {
 	return &res, nil
 }
 
+func FetchPlayerLastActions(pID int) (*PlayerLastActions, error) {
+	url := fmt.Sprintf("https://sirus.su/api/base/22/statistics/%d/latest-actions", pID)
+
+	var res PlayerLastActions
+
+	if err := makeRequest(url, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+}
+
 func FetchBossFightDetails(fightID int) (*BossFight, error) {
 	url := fmt.Sprintf("https://sirus.su/api/base/22/details/bossfight/%v", fightID)
 	var fight BossFight

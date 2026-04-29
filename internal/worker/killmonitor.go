@@ -28,14 +28,14 @@ func KillMonitor(
 			continue
 		}
 
-		characters, err := pSubStore.GetTrackedPlayers()
+		players, err := pSubStore.GetTrackedPlayers()
 		if err != nil {
-			log.Printf("[KillMonitor] Getting tracked characters err: %v", err)
+			log.Printf("[KillMonitor] Getting tracked players err: %v", err)
 			time.Sleep(1 * time.Minute)
 			continue
 		}
 
-		kills := getKills(guilds, characters, subStore)
+		kills := getKills(guilds, players, subStore)
 		sortedKillsIDs := sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
@@ -100,15 +100,18 @@ func getKills(guilds, players map[int][]string, subStore *storage.SubscribeStora
 	}
 
 	for pID, channels := range players {
-		pKills, err := sirus.FetchPlayerLatestBossKills(pID)
+		pKills, err := sirus.FetchPlayerLastActions(pID)
 		if err != nil {
 			log.Printf("[KillMonitor] Fetch Player %d Latest BossKills err: %v", pID, err)
 			continue
 		}
 
-		for _, kill := range pKills.Data {
+		for _, kill := range *pKills {
+			if kill.Type != "bosskill" {
+				continue
+			}
 			for _, ch := range channels {
-				id := kill.ID
+				id := kill.FightID
 				if !subStore.IsKillProcessed(id, ch) {
 					if _, ok := kills[id]; !ok {
 						kills[id] = make(map[string]bool)

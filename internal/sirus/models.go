@@ -1,6 +1,8 @@
 package sirus
 
-import "time"
+import (
+	"time"
+)
 
 type Leaderboard struct {
 	Data []LeaderboardPlayer `json:"data"`
@@ -105,6 +107,7 @@ type PlayerBossKill struct {
 type PlayerLastActions []struct {
 	Type    string `json:"type"`
 	FightID int    `json:"id"`
+	Date    string `json:"datetime"`
 }
 
 type Itemset struct {
