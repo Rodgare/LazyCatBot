@@ -92,8 +92,8 @@ func (s *LeaderboardStorage) GetDpsRank(raid, boss int, p sirus.Player) (int, in
 	maxIlvl := minIlvl + 4
 
 	query := `SELECT 
-	(SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl BETWEEN ? AND ? AND dps > ?) as ilvl_rank,
-	(SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl BETWEEN ? AND ?) as ilvl_total,
+	(SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl <= ? AND dps > ?) as ilvl_rank,
+	(SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl <= ?) as ilvl_total,
     (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND dps > ?) as spec_rank,
     (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ?) as spec_total,
     (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND dps > ?) as class_rank,
@@ -102,8 +102,8 @@ func (s *LeaderboardStorage) GetDpsRank(raid, boss int, p sirus.Player) (int, in
     (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND dps > 0) as overall_total;`
 
 	err := s.db.QueryRow(query,
-		raid, boss, p.ClassID, p.Spec, minIlvl, maxIlvl, p.Dps, // ilvl_rank
-		raid, boss, p.ClassID, p.Spec, minIlvl, maxIlvl, // ilvl_total
+		raid, boss, p.ClassID, p.Spec, maxIlvl, p.Dps, // ilvl_rank
+		raid, boss, p.ClassID, p.Spec, maxIlvl, // ilvl_total
 		raid, boss, p.ClassID, p.Spec, p.Dps, // spec_rank
 		raid, boss, p.ClassID, p.Spec, // spec_total
 		raid, boss, p.ClassID, p.Dps, // class_rank
@@ -140,8 +140,8 @@ func (s *LeaderboardStorage) GetHpsRank(raid, boss int, p sirus.Player) (int, in
 	maxIlvl := minIlvl + 4
 
 	query := `SELECT 
-	(SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl BETWEEN ? AND ? AND hps > ?) as ilvl_rank,
-	(SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl BETWEEN ? AND ?) as ilvl_total,
+	(SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl <= ? AND hps > ?) as ilvl_rank,
+	(SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND ilvl <= ?) as ilvl_total,
     (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ? AND hps > ?) as spec_rank,
     (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND spec_id = ?) as spec_total,
     (SELECT COUNT(*) + 1 FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND class_id = ? AND hps > ?) as class_rank,
@@ -150,8 +150,8 @@ func (s *LeaderboardStorage) GetHpsRank(raid, boss int, p sirus.Player) (int, in
     (SELECT COUNT(*) FROM leaderboard WHERE raid_id = ? AND boss_id = ? AND hps > 0) as overall_total;`
 
 	err := s.db.QueryRow(query,
-		raid, boss, p.ClassID, p.Spec, minIlvl, maxIlvl, p.Hps, // ilvl_rank
-		raid, boss, p.ClassID, p.Spec, minIlvl, maxIlvl, // ilvl_total
+		raid, boss, p.ClassID, p.Spec, maxIlvl, p.Hps, // ilvl_rank
+		raid, boss, p.ClassID, p.Spec, maxIlvl, // ilvl_total
 		raid, boss, p.ClassID, p.Spec, p.Hps, // spec_rank
 		raid, boss, p.ClassID, p.Spec, // spec_total
 		raid, boss, p.ClassID, p.Hps, // class_rank
