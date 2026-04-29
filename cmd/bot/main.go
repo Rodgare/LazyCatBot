@@ -55,9 +55,9 @@ func main() {
 	gmStore.InitDB()
 	playerSubStore.InitDB()
 
-	go worker.StartLeaderboardSync(lbStore)
+	// go worker.StartLeaderboardSync(lbStore)
 	// go worker.StartMetasirusLbSync(lbStore)
-	// worker.StartCronScheduler(lbStore)
+	worker.StartCronScheduler(lbStore)
 	go worker.KillMonitor(lbStore, subStore, playerSubStore, dg)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
