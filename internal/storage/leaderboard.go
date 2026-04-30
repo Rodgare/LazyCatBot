@@ -75,11 +75,22 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter, clas
 	return err
 }
 
-func (s *LeaderboardStorage) UpsertPlayer(raid, boss int, p sirus.Player) error {
-	query := `
-		INSERT OR IGNORE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, dps, hps) 
+func (s *LeaderboardStorage) UpsertPlayer(raid, boss int, p sirus.Player, role string) error {
+	condition := "excluded.dps > leaderboard.dps"
+	if role == "heal" {
+		condition = "excluded.hps > leaderboard.hps"
+	}
+
+	query := fmt.Sprintf(`
+		INSERT INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, dps, hps) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-	`
+		ON CONFLICT(raid_id, boss_id, class_id, spec_id, player_name) 
+		DO UPDATE SET 
+    		ilvl = excluded.ilvl,
+    		dps = excluded.dps,
+    		hps = excluded.hps
+		WHERE %s;
+	`, condition)
 	_, err := s.db.Exec(query, raid, boss, p.ClassID, p.Spec, p.Name, p.Ilvl, p.Dps, p.Hps)
 	return err
 }

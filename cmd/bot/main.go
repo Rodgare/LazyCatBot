@@ -49,23 +49,28 @@ func main() {
 	lbStore := storage.NewLeaderboardStorage(db)
 	subStore := storage.NewSubscribeStorage(db)
 	gmStore := storage.NewGuildMembersStorage(db)
-	playerSubStore := storage.NewPlayerSubscribeStorage(db)
+	pSubStore := storage.NewPlayerSubscribeStorage(db)
 	lbStore.InitDB()
 	subStore.InitDB()
 	gmStore.InitDB()
-	playerSubStore.InitDB()
+	pSubStore.InitDB()
 
 	// go worker.StartLeaderboardSync(lbStore)
 	// go worker.StartMetasirusLbSync(lbStore)
 	worker.StartCronScheduler(lbStore)
-	go worker.KillMonitor(lbStore, subStore, playerSubStore, dg)
+
+	killWorker := worker.NewWorker(lbStore, subStore, pSubStore, dg)
+	go killWorker.StartProcessor()
+	go killWorker.GuildKillMonitor()
+	go killWorker.PlayerKillMonitor()
+	// go worker.KillMonitor(lbStore, subStore, playerSubStore, dg)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
 	h := &discord.BotHandler{
 		LbStore:        lbStore,
 		SubStore:       subStore,
-		PlayerSubStore: playerSubStore,
+		PlayerSubStore: pSubStore,
 	}
 	dg.AddHandler(h.InteractionCreate)
 	// dg.AddHandler(h.GuildCreate)
