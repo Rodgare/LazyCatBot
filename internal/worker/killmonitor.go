@@ -5,7 +5,6 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"encoding/json"
-	"fmt"
 	"log"
 	"os"
 	"sort"
@@ -130,7 +129,7 @@ func (w *Worker) getKills(data map[int][]string, isGuild bool) map[int]map[strin
 
 			for _, kill := range gKills.Data {
 				for _, ch := range channels {
-					fmt.Printf("for kills killID %d\n", kill.KillID)
+					// fmt.Printf("for kills killID %d\n", kill.KillID)
 
 					id := kill.KillID
 					if sirus.IsGuildKillToday(kill.TimeEnd) && !w.subStore.IsKillProcessed(id, ch) {
