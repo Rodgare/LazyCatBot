@@ -132,7 +132,7 @@ func (w *Worker) getKills(data map[int][]string, isGuild bool) map[int]map[strin
 					// fmt.Printf("for kills killID %d\n", kill.KillID)
 
 					id := kill.KillID
-					if sirus.IsGuildKillToday(kill.TimeEnd) && !w.subStore.IsKillProcessed(id, ch) {
+					if !w.subStore.IsKillProcessed(id, ch) {
 						if _, ok := kills[id]; !ok {
 							kills[id] = make(map[string]bool)
 						}
