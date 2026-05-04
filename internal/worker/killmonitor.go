@@ -219,7 +219,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int) models.BossKi
 		t4Count := sirus.GetT4Count(p.Itemset)
 		role := sirus.GetRoleString(p.ClassID, p.Spec)
 
-		err := w.lbStore.UpsertPlayer(fight.Order, fight.Encounter, p, role)
+		err := w.lbStore.UpsertPlayer(fight.Order, fight.Encounter, p)
 		if err != nil {
 			log.Printf("Upsert player in db error %v\n", err)
 		}
