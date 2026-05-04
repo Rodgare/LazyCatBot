@@ -108,7 +108,9 @@ func (w *Worker) StartProcessor() {
 				report = &rep
 			}
 
-			discord.SendKillReport(w.dg, ch, *report)
+			if w.subStore.IsReportsEnabled(report.GuildID, ch) {
+				discord.SendKillReport(w.dg, ch, *report)
+			}
 			w.subStore.MarkKillProcessed(job.KillID, ch)
 
 			time.Sleep(300 * time.Millisecond)

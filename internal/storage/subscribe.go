@@ -20,6 +20,7 @@ func (s *SubscribeStorage) InitDB() error {
         guild_id INTEGER,
         channel_id TEXT,
         discord_id TEXT,
+		is_send INTEGER DEFAULT 1,
         PRIMARY KEY (guild_id, channel_id, discord_id)
     );
     CREATE INDEX IF NOT EXISTS idx_rank_lookup ON subscribe (guild_id, channel_id, discord_id);
@@ -37,6 +38,29 @@ func (s *SubscribeStorage) Subscribe(guild int, channelID, discordID string) err
 	query := `INSERT OR REPLACE INTO subscribe (guild_id, channel_id, discord_id) VALUES (?, ?, ?)`
 	_, err := s.db.Exec(query, guild, channelID, discordID)
 	return err
+}
+
+func (s *SubscribeStorage) ToggleReports(guild int, channelID string) (bool, error) {
+	var current int
+	err := s.db.QueryRow("SELECT is_send FROM subscribe WHERE guild_id = ? AND channel_id = ?", guild, channelID).Scan(&current)
+	if err != nil {
+		return false, err
+	}
+	newVal := 0
+	if current == 0 {
+		newVal = 1
+	}
+	_, err = s.db.Exec("UPDATE subscribe SET is_send = ? WHERE guild_id = ? AND channel_id = ?", newVal, guild, channelID)
+	return newVal == 1, err
+}
+
+func (s *SubscribeStorage) IsReportsEnabled(guild int, channelID string) bool {
+	var enabled int
+	err := s.db.QueryRow("SELECT is_send FROM subscribe WHERE guild_id = ? AND channel_id = ?", guild, channelID).Scan(&enabled)
+	if err != nil {
+		return true
+	}
+	return enabled == 1
 }
 
 func (s *SubscribeStorage) Unsubscribe(guild int, channelID, discordID string) error {

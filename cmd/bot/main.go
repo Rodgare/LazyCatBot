@@ -72,8 +72,9 @@ func main() {
 		SubStore:       subStore,
 		PlayerSubStore: pSubStore,
 	}
+
 	dg.AddHandler(h.InteractionCreate)
-	dg.AddHandler(h.GuildCreate)
+	// dg.AddHandler(h.GuildCreate)
 
 	err = dg.Open()
 	if err != nil {
@@ -141,6 +142,10 @@ func main() {
 		{
 			Name:        "listcats",
 			Description: "Список отслеживаемых игроков в данном канале",
+		},
+		{
+			Name:        "menu",
+			Description: "Открыть панель управления ботом",
 		},
 	}
 

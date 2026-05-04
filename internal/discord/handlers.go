@@ -5,6 +5,7 @@ import (
 	"LazyCatBot/internal/storage"
 	"fmt"
 	"log"
+	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -15,22 +16,249 @@ type BotHandler struct {
 	PlayerSubStore *storage.PlayerSubscribeStorage
 }
 
-func (h *BotHandler) MessageCreate(s *discordgo.Session, m *discordgo.MessageCreate) {
+func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	switch i.Type {
+	case discordgo.InteractionApplicationCommand:
+		h.HandleSlashCommands(s, i)
+	case discordgo.InteractionMessageComponent:
+		h.HandleButtons(s, i)
+	case discordgo.InteractionModalSubmit:
+		h.HandleModalSubmit(s, i)
+	}
 }
 
-func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	if i.Type != discordgo.InteractionApplicationCommand {
+func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	data := i.ModalSubmitData()
+	switch data.CustomID {
+	case "modal_add_player":
+		playerName := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+		id, _ := sirus.FetchPlayerID(playerName)
+		err := h.PlayerSubStore.Subscribe(id, playerName, i.ChannelID, i.GuildID)
+
+		content := fmt.Sprintf("✅ Игрок **%s** успешно добавлен в список отслеживания!", playerName)
+		if err != nil {
+			content = "❌ Ошибка при добавлении игрока."
+		}
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: content,
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+	case "modal_add_guild":
+		guildIDStr := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
+		var guildNum int
+		fmt.Sscanf(guildIDStr, "%d", &guildNum)
+		err := h.SubStore.Subscribe(guildNum, i.ChannelID, i.GuildID)
+		content := fmt.Sprintf("✅ Гильдия **%d** успешно добавлена!", guildNum)
+		if err != nil {
+			content = "❌ Ошибка при добавлении гильдии."
+		}
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: content,
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+
+	}
+
+}
+
+func (h *BotHandler) HandleButtons(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	data := i.MessageComponentData()
+
+	if after, ok := strings.CutPrefix(data.CustomID, "toggle_reports_"); ok {
+		var gID int
+		fmt.Sscanf(after, "%d", &gID)
+		newState, _ := h.SubStore.ToggleReports(gID, i.ChannelID)
+		content := "🔔 Отчеты включены"
+		if !newState {
+			content = "🔕 Отчеты выключены"
+		}
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: content,
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
 		return
 	}
 
+	if after, ok := strings.CutPrefix(data.CustomID, "remove_player_"); ok {
+		playerIDStr := after
+		var pID int
+		fmt.Sscanf(playerIDStr, "%d", &pID)
+
+		h.PlayerSubStore.Unsubscribe(pID, i.ChannelID, i.GuildID)
+
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "✅ Игрок удален из отслеживания.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	if after, ok := strings.CutPrefix(data.CustomID, "remove_guild_"); ok {
+		guildIDStr := after
+		var gID int
+		fmt.Sscanf(guildIDStr, "%d", &gID)
+
+		h.SubStore.Unsubscribe(gID, i.ChannelID, i.GuildID)
+
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("✅ Гильдия %d удалена из отслеживания.", gID),
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	switch data.CustomID {
+	case "btn_add_player":
+		h.handleAddPlayerModal(s, i)
+	case "btn_add_guild":
+		h.handleAddGuildModal(s, i)
+	}
+}
+
+func (h *BotHandler) handleAddGuildModal(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseModal,
+		Data: &discordgo.InteractionResponseData{
+			CustomID: "modal_add_guild",
+			Title:    "Добавление гильдии",
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.TextInput{
+							CustomID:    "guild_id",
+							Label:       "ID гильдии на Сирусе",
+							Style:       discordgo.TextInputShort,
+							Placeholder: "Например: 12345",
+							Required:    true,
+						},
+					},
+				},
+			},
+		},
+	})
+}
+
+func (h *BotHandler) handleAddPlayerModal(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseModal,
+		Data: &discordgo.InteractionResponseData{
+			CustomID: "modal_add_player",
+			Title:    "Добавление игрока для отслеживания",
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.TextInput{
+							CustomID:    "player_name",
+							Label:       "Никнейм персонажа",
+							Style:       discordgo.TextInputShort,
+							Placeholder: "Например: Васяпро",
+							Required:    true,
+						},
+					},
+				},
+			},
+		},
+	})
+	if err != nil {
+		log.Printf("Ошибка отправки модалки: %v\n", err)
+	}
+}
+
+func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	guilds, _ := h.SubStore.GetGuildsByChannel(i.ChannelID)
+	players, _ := h.PlayerSubStore.GetPlayersByChannel(i.ChannelID)
+
+	var rows []discordgo.MessageComponent
+
+	rows = append(rows, discordgo.ActionsRow{
+		Components: []discordgo.MessageComponent{
+			discordgo.Button{Label: "🏰 + Гильдию", Style: discordgo.PrimaryButton, CustomID: "btn_add_guild"},
+			discordgo.Button{Label: "👤 + Игрока", Style: discordgo.PrimaryButton, CustomID: "btn_add_player"},
+		},
+	})
+
+	if len(guilds) > 0 {
+		for _, gID := range guilds {
+			enabled := h.SubStore.IsReportsEnabled(gID, i.ChannelID)
+
+			guildRow := discordgo.ActionsRow{
+				Components: []discordgo.MessageComponent{
+					discordgo.Button{
+						Label:    fmt.Sprintf("🗑️ Гильдия ID: %d", gID),
+						Style:    discordgo.DangerButton,
+						CustomID: fmt.Sprintf("remove_guild_%d", gID),
+					},
+					discordgo.Button{
+						Label:    map[bool]string{true: "🔔 Отчеты: ВКЛЮЧЕНЫ", false: "🔕 Отчеты: ВЫКЛЮЧЕНЫ"}[enabled],
+						Style:    map[bool]discordgo.ButtonStyle{true: discordgo.SuccessButton, false: discordgo.SecondaryButton}[enabled],
+						CustomID: fmt.Sprintf("toggle_reports_%d", gID),
+					},
+				},
+			}
+			rows = append(rows, guildRow)
+
+			if len(rows) >= 5 {
+				break
+			}
+		}
+	}
+
+	if len(players) > 0 {
+		var playerButtons []discordgo.MessageComponent
+		for pID, pName := range players {
+			playerButtons = append(playerButtons, discordgo.Button{
+				Label:    fmt.Sprintf("✖️ %s", pName),
+				Style:    discordgo.DangerButton,
+				CustomID: fmt.Sprintf("remove_player_%d", pID),
+			})
+			if len(playerButtons) == 5 {
+				rows = append(rows, discordgo.ActionsRow{Components: playerButtons})
+				playerButtons = []discordgo.MessageComponent{}
+			}
+			if len(rows) >= 5 {
+				break
+			}
+		}
+		if len(playerButtons) > 0 && len(rows) < 5 {
+			rows = append(rows, discordgo.ActionsRow{Components: playerButtons})
+		}
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content:    "⚙️ **Управление трекингом в этом канале**",
+			Components: rows,
+			Flags:      discordgo.MessageFlagsEphemeral,
+		},
+	})
+}
+
+func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ApplicationCommandData()
 	guildID := i.GuildID
 	channelID := i.ChannelID
-
 	switch data.Name {
+	case "menu":
+		h.HandleMenuCommand(s, i)
 	case "set":
-		guildNum := int(data.Options[0].IntValue())
-		err := h.SubStore.Subscribe(guildNum, channelID, guildID)
+		guildId := int(data.Options[0].IntValue())
+		err := h.SubStore.Subscribe(guildId, channelID, guildID)
 		if err != nil {
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -45,7 +273,7 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("✅ Теперь я слежу за гильдией %d в этом канале!", guildNum),
+				Content: fmt.Sprintf("✅ Теперь я слежу за гильдией %d в этом канале!", guildId),
 			},
 		})
 
