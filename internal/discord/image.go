@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"LazyCatBot/internal/models"
 	"bytes"
 	"embed"
 	"fmt"
@@ -118,8 +119,8 @@ func getRaidColor(raidID int) string {
 //go:embed assets/images
 var imagesFS embed.FS
 
-func RenderReportImage(report BossKillReport) ([]byte, error) {
-	var dds, healers []PlayerReport
+func RenderReportImage(report models.BossKillReport) ([]byte, error) {
+	var dds, healers []models.PlayerReport
 	for _, p := range report.Players {
 		if p.Role == 1 {
 			healers = append(healers, p)
@@ -128,8 +129,8 @@ func RenderReportImage(report BossKillReport) ([]byte, error) {
 		}
 	}
 
-	slices.SortFunc(dds, func(a, b PlayerReport) int { return b.Dps - a.Dps })
-	slices.SortFunc(healers, func(a, b PlayerReport) int { return b.Hps - a.Hps })
+	slices.SortFunc(dds, func(a, b models.PlayerReport) int { return b.Dps - a.Dps })
+	slices.SortFunc(healers, func(a, b models.PlayerReport) int { return b.Hps - a.Hps })
 
 	totalRows := len(dds) + len(healers)
 	height := headerH + footerH + (totalRows+2)*rowHeight + margin*2
@@ -228,7 +229,7 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 	return y + 35
 }
 
-func drawPlayerRow(dc *gg.Context, rank int, p PlayerReport, y float64, width int, rowHeight float64, isDD bool) float64 {
+func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, width int, rowHeight float64, isDD bool) float64 {
 	//rank
 	if rank%2 == 0 {
 		dc.SetRGBA(1, 1, 1, 0.03)

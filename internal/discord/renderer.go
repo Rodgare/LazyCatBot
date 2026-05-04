@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"LazyCatBot/internal/models"
 	"fmt"
 	"slices"
 	"strings"
@@ -60,8 +61,8 @@ var SpecEmojiSpecs = map[int]map[string]string{
 	},
 }
 
-func BuildReportText(report BossKillReport) (ddBlocks []string, healBlocks []string) {
-	var dds, healers []PlayerReport
+func BuildReportText(report models.BossKillReport) (ddBlocks []string, healBlocks []string) {
+	var dds, healers []models.PlayerReport
 	for _, p := range report.Players {
 		if p.Role == 1 {
 			healers = append(healers, p)
@@ -70,15 +71,15 @@ func BuildReportText(report BossKillReport) (ddBlocks []string, healBlocks []str
 		}
 	}
 
-	slices.SortFunc(dds, func(a, b PlayerReport) int { return b.Dps - a.Dps })
-	slices.SortFunc(healers, func(a, b PlayerReport) int { return b.Hps - a.Hps })
+	slices.SortFunc(dds, func(a, b models.PlayerReport) int { return b.Dps - a.Dps })
+	slices.SortFunc(healers, func(a, b models.PlayerReport) int { return b.Hps - a.Hps })
 
 	ddBlocks = buildBlocks(dds, true, report.TotalDps)
 	healBlocks = buildBlocks(healers, false, report.TotalHps)
 	return
 }
 
-func buildBlocks(players []PlayerReport, isDD bool, total int) []string {
+func buildBlocks(players []models.PlayerReport, isDD bool, total int) []string {
 	if len(players) == 0 {
 		return nil
 	}

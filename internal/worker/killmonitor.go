@@ -2,6 +2,7 @@ package worker
 
 import (
 	"LazyCatBot/internal/discord"
+	"LazyCatBot/internal/models"
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"encoding/json"
@@ -90,7 +91,7 @@ func (w *Worker) PlayerKillMonitor() {
 
 func (w *Worker) StartProcessor() {
 	for job := range w.killQueue {
-		var report *discord.BossKillReport
+		var report *models.BossKillReport
 
 		for ch := range job.Channels {
 			if w.subStore.IsKillProcessed(job.KillID, ch) {
@@ -181,7 +182,7 @@ func (w *Worker) getKills(data map[int][]string, isGuild bool) map[int]map[strin
 	return kills
 }
 
-func (w *Worker) createReport(fight *sirus.BossFight, killID int) discord.BossKillReport {
+func (w *Worker) createReport(fight *models.BossFight, killID int) models.BossKillReport {
 	totalDps := 0
 	totalHps := 0
 	for _, p := range fight.Data.Players {
@@ -189,7 +190,7 @@ func (w *Worker) createReport(fight *sirus.BossFight, killID int) discord.BossKi
 		totalHps += p.Hps
 	}
 
-	report := discord.BossKillReport{
+	report := models.BossKillReport{
 		MapName:   fight.Data.MapName,
 		BossName:  fight.Data.BossName,
 		RaidOrder: fight.Order,
@@ -204,7 +205,7 @@ func (w *Worker) createReport(fight *sirus.BossFight, killID int) discord.BossKi
 	}
 
 	for _, loot := range fight.Data.Loots {
-		lootReport := discord.LootReport{
+		lootReport := models.LootReport{
 			ID:    loot.Entry,
 			Name:  loot.Item.Name,
 			Count: loot.Count,
@@ -223,37 +224,28 @@ func (w *Worker) createReport(fight *sirus.BossFight, killID int) discord.BossKi
 			log.Printf("Upsert player in db error %v\n", err)
 		}
 
-		var specRank, specPrcnt, classRank, classPrcnt, ilvlRank, ilvlPrcnt, overallRank, overallPrcnt int
-		if role == "dps" {
-			specRank, specPrcnt, classRank, classPrcnt, ilvlRank, ilvlPrcnt, overallRank, overallPrcnt, err = w.lbStore.GetDpsRank(fight.Order, fight.Encounter, p)
-		} else {
-			specRank, specPrcnt, classRank, classPrcnt, ilvlRank, ilvlPrcnt, overallRank, overallPrcnt, err = w.lbStore.GetHpsRank(fight.Order, fight.Encounter, p)
-		}
-		if err != nil {
-			log.Printf("Get player rank error %v\n", err)
-			continue
+		playerReport := models.PlayerReport{
+			Name:     p.Name,
+			Dps:      p.Dps,
+			Hps:      p.Hps,
+			Ilvl:     p.Ilvl,
+			SpecID:   p.Spec,
+			ClassID:  p.ClassID,
+			SpecName: specName,
+			T4:       t4Count,
+			Role:     sirus.GetRole(p.ClassID, p.Spec),
+			Zodiac:   p.Zodiac.ID,
+			Category: p.Category,
 		}
 
-		playerReport := discord.PlayerReport{
-			Name:              p.Name,
-			Dps:               p.Dps,
-			Hps:               p.Hps,
-			Ilvl:              p.Ilvl,
-			ClassID:           p.ClassID,
-			Role:              sirus.GetRole(p.ClassID, p.Spec),
-			SpecName:          specName,
-			SpecID:            p.Spec,
-			T4:                t4Count,
-			SpecRank:          specRank,
-			SpecPercentile:    specPrcnt,
-			ClassRank:         classRank,
-			ClassPercentile:   classPrcnt,
-			IlvlRank:          ilvlRank,
-			IlvlPercentile:    ilvlPrcnt,
-			OverallRank:       overallRank,
-			OverallPercentile: overallPrcnt,
-			Zodiac:            p.Zodiac.ID,
-			Category:          p.Category,
+		pRole := "dps"
+		if role == "hps" {
+			pRole = "hps"
+		}
+
+		playerReport, err = w.lbStore.GetPlayerRank(fight.Order, fight.Encounter, playerReport, pRole)
+		if err != nil {
+			log.Printf("Get player rank error %v\n", err)
 		}
 		report.Players = append(report.Players, playerReport)
 	}
@@ -261,8 +253,8 @@ func (w *Worker) createReport(fight *sirus.BossFight, killID int) discord.BossKi
 	return report
 }
 
-func makeMockReport() discord.BossKillReport {
-	var report discord.BossKillReport
+func makeMockReport() models.BossKillReport {
+	var report models.BossKillReport
 
 	data, _ := os.ReadFile("internal/sirus/testdata/mock_sirus_boss_fight.json")
 	json.Unmarshal(data, &report)

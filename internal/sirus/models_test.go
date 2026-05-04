@@ -1,6 +1,7 @@
 package sirus
 
 import (
+	"LazyCatBot/internal/models"
 	"encoding/json"
 	"os"
 	"testing"
@@ -11,7 +12,7 @@ func TestLeaderboard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("File reading error %v", err)
 	}
-	var lb Leaderboard
+	var lb models.Leaderboard
 	if err := json.Unmarshal(data, &lb); err != nil {
 		t.Errorf("Json parsing error %v", err)
 	}
@@ -28,7 +29,7 @@ func TestLatestBossKills(t *testing.T) {
 	if err != nil {
 		t.Fatalf("File reading error %v", err)
 	}
-	var gk LatestBossKills
+	var gk models.LatestBossKills
 	if err := json.Unmarshal(data, &gk); err != nil {
 		t.Errorf("Json parsing error %v", err)
 	}

@@ -122,6 +122,20 @@ func (h *BotHandler) HandleButtons(s *discordgo.Session, i *discordgo.Interactio
 		return
 	}
 
+	if after, ok := strings.CutPrefix(data.CustomID, "top_dps_"); ok {
+		var raidID, bossID int
+		fmt.Sscanf(after, "%d_%d", &raidID, &bossID)
+		h.SendBossRanking(s, i, raidID, bossID, "dps")
+		return
+	}
+
+	if after, ok := strings.CutPrefix(data.CustomID, "top_hps_"); ok {
+		var raidID, bossID int
+		fmt.Sscanf(after, "%d_%d", &raidID, &bossID)
+		h.SendBossRanking(s, i, raidID, bossID, "hps")
+		return
+	}
+
 	switch data.CustomID {
 	case "btn_add_player":
 		h.handleAddPlayerModal(s, i)
@@ -245,6 +259,42 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 			Content:    "⚙️ **Управление трекингом в этом канале**",
 			Components: rows,
 			Flags:      discordgo.MessageFlagsEphemeral,
+		},
+	})
+}
+
+func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	raids := sirus.GetCheckBosses(22)
+
+	var dpsButtons []discordgo.MessageComponent
+	var hpsButtons []discordgo.MessageComponent
+
+	for raidID, bosses := range raids {
+		for _, boss := range bosses {
+			dpsButtons = append(dpsButtons, discordgo.Button{
+				Label:    boss.Name,
+				Style:    discordgo.PrimaryButton,
+				CustomID: fmt.Sprintf("top_dps_%d_%d", raidID, boss.ID),
+				Emoji:    &discordgo.ComponentEmoji{Name: "⚔️"},
+			})
+
+			hpsButtons = append(hpsButtons, discordgo.Button{
+				Label:    boss.Name,
+				Style:    discordgo.SuccessButton,
+				CustomID: fmt.Sprintf("top_hps_%d_%d", raidID, boss.ID),
+				Emoji:    &discordgo.ComponentEmoji{Name: "🌿"},
+			})
+		}
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: "🏆 **Рейтинг за 2 кд:**",
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{Components: dpsButtons},
+				discordgo.ActionsRow{Components: hpsButtons},
+			},
 		},
 	})
 }
@@ -373,17 +423,20 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 			return
 		}
 
-		content := "📊 **Отслеживаемые гильдии в этом канале:**\n"
+		var content strings.Builder
+		content.WriteString("📊 **Отслеживаемые гильдии в этом канале:**\n")
 		for _, id := range guilds {
-			content += fmt.Sprintf("— Гильдия ID `%d`\n", id)
+			fmt.Fprintf(&content, "— Гильдия ID `%d`\n", id)
 		}
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: content,
+				Content: content.String(),
 			},
 		})
+	case "topm":
+		h.HandleTopMCommand(s, i)
 
 	case "listcats":
 		characters, err := h.PlayerSubStore.GetPlayersByChannel(channelID)
@@ -400,14 +453,15 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 			})
 			return
 		}
-		content := "📊 **Отслеживаемые игроки в этом канале:**\n"
+		var content strings.Builder
+		content.WriteString("📊 **Отслеживаемые игроки в этом канале:**\n")
 		for id, name := range characters {
-			content += fmt.Sprintf("— Игрок ID `%d`, Имя `%s`\n", id, name)
+			fmt.Fprintf(&content, "— Игрок ID `%d`, Имя `%s`\n", id, name)
 		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: content,
+				Content: content.String(),
 			},
 		})
 

@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"LazyCatBot/internal/models"
 	"bytes"
 	"fmt"
 	"math/rand"
@@ -33,7 +34,7 @@ var ansiColors = map[string]string{
 	"reset": "\033[0m",
 }
 
-func SendKillReport(s *discordgo.Session, channelID string, report BossKillReport) {
+func SendKillReport(s *discordgo.Session, channelID string, report models.BossKillReport) {
 	ddBlocks, healBlocks := BuildReportText(report)
 
 	embed := &discordgo.MessageEmbed{
@@ -78,7 +79,7 @@ func SendKillReport(s *discordgo.Session, channelID string, report BossKillRepor
 	}
 }
 
-func buildFields(report BossKillReport, ddBlocks, healBlocks []string, lootsBlock []LootReport) []*discordgo.MessageEmbedField {
+func buildFields(report models.BossKillReport, ddBlocks, healBlocks []string, lootsBlock []models.LootReport) []*discordgo.MessageEmbedField {
 	var fields []*discordgo.MessageEmbedField
 
 	fields = append(fields, &discordgo.MessageEmbedField{

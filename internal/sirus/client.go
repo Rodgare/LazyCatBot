@@ -1,6 +1,7 @@
 package sirus
 
 import (
+	"LazyCatBot/internal/models"
 	"encoding/json"
 	"fmt"
 	"log"
@@ -14,13 +15,13 @@ import (
 	"github.com/chromedp/chromedp"
 )
 
-func GetPage(raidID, bossID, classID, specID int, role string, page int) (*Leaderboard, error) {
+func GetPage(raidID, bossID, classID, specID int, role string, page int) (*models.Leaderboard, error) {
 	fmt.Printf("[Worker] Pasing page %d R: %d B: %d classID: %d, specID: %d\n", page, raidID, bossID, classID, specID)
 	weekFrom, weekTo := GetSirusDates()
 	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=100&ilvl_to=300&page=%d&i=%d&boss=%d&specs=%d:%d",
 		role, weekFrom, weekTo, page, raidID, bossID, classID, specID)
 
-	var res Leaderboard
+	var res models.Leaderboard
 	if err := makeRequest(url, &res); err != nil {
 		return nil, err
 	}
@@ -28,8 +29,8 @@ func GetPage(raidID, bossID, classID, specID int, role string, page int) (*Leade
 	return &res, nil
 }
 
-func FetchLeaderboard(raidID, bossID, classID, specID int, role string) ([]LeaderboardPlayer, error) {
-	var allPlayers []LeaderboardPlayer
+func FetchLeaderboard(raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error) {
+	var allPlayers []models.LeaderboardPlayer
 
 	firstPage, err := GetPage(raidID, bossID, classID, specID, role, 1)
 	if err != nil {
@@ -54,8 +55,8 @@ func FetchLeaderboard(raidID, bossID, classID, specID int, role string) ([]Leade
 	return allPlayers, nil
 }
 
-func FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]MetasirusLeaderboardPlayer, error) {
-	var allPlayers []MetasirusLeaderboardPlayer
+func FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error) {
+	var allPlayers []models.MetasirusLeaderboardPlayer
 
 	fmt.Println("Парсинг первой страницы")
 	firstPage, err := GetMetasirusLbPage(mapID, bossID, difficulty, 1)
@@ -83,12 +84,12 @@ func FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]MetasirusLeader
 	return allPlayers, nil
 }
 
-func GetMetasirusLbPage(mapID, bossID, difficulty, page int) (*MetasirusLeaderboard, error) {
+func GetMetasirusLbPage(mapID, bossID, difficulty, page int) (*models.MetasirusLeaderboard, error) {
 	fmt.Printf("GetMetasirusLbPage  mapID:%d, bossID:%d, difficulty:%d page:%d\n", mapID, bossID, difficulty, page)
 	url := fmt.Sprintf("https://metasirus.su/api/realm/22/map/%d/boss/%d/aggregation/character?difficulty=%d&type=&spec=&specs=&date=current&ilvl_from=&ilvl_to=&page=%d",
 		mapID, bossID, difficulty, page)
 
-	var res MetasirusLeaderboard
+	var res models.MetasirusLeaderboard
 	if err := makeMetasirusRequest(url, &res); err != nil {
 		return nil, err
 	}
@@ -96,9 +97,9 @@ func GetMetasirusLbPage(mapID, bossID, difficulty, page int) (*MetasirusLeaderbo
 	return &res, nil
 }
 
-func FetchActualRaids() (ActualRaids, error) {
+func FetchActualRaids() (models.ActualRaids, error) {
 	url := "https://sirus.su/api/base/22/progression/pve/realm-progress"
-	var res ActualRaids
+	var res models.ActualRaids
 
 	if err := makeRequest(url, &res); err != nil {
 		return nil, err
@@ -107,11 +108,11 @@ func FetchActualRaids() (ActualRaids, error) {
 	return res, nil
 }
 
-func FetchGuildLatestBossKills(guildID int) (*LatestBossKills, error) {
+func FetchGuildLatestBossKills(guildID int) (*models.LatestBossKills, error) {
 	page := 1
 	weekFrom, weekTo := GetLastWeek()
 	url := fmt.Sprintf("https://sirus.su/api/base/22/progression/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s&guild=%d", page, weekFrom, weekTo, guildID)
-	var res LatestBossKills
+	var res models.LatestBossKills
 
 	if err := makeRequest(url, &res); err != nil {
 		return nil, err
@@ -120,11 +121,11 @@ func FetchGuildLatestBossKills(guildID int) (*LatestBossKills, error) {
 	return &res, nil
 }
 
-func FetchPlayerLatestBossKills(playerID int) (*LatestPlayerBossKills, error) {
+func FetchPlayerLatestBossKills(playerID int) (*models.LatestPlayerBossKills, error) {
 	page := 1
 	weekFrom, weekTo := GetLastWeek()
 	url := fmt.Sprintf("https://sirus.su/api/base/22/statistics/%d/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s", playerID, page, weekFrom, weekTo)
-	var res LatestPlayerBossKills
+	var res models.LatestPlayerBossKills
 
 	if err := makeRequest(url, &res); err != nil {
 		return nil, err
@@ -133,10 +134,10 @@ func FetchPlayerLatestBossKills(playerID int) (*LatestPlayerBossKills, error) {
 	return &res, nil
 }
 
-func FetchPlayerLastActions(pID int) (*PlayerLastActions, error) {
+func FetchPlayerLastActions(pID int) (*models.PlayerLastActions, error) {
 	url := fmt.Sprintf("https://sirus.su/api/base/22/statistics/%d/latest-actions", pID)
 
-	var res PlayerLastActions
+	var res models.PlayerLastActions
 
 	if err := makeRequest(url, &res); err != nil {
 		return nil, err
@@ -145,9 +146,9 @@ func FetchPlayerLastActions(pID int) (*PlayerLastActions, error) {
 	return &res, nil
 }
 
-func FetchBossFightDetails(fightID int) (*BossFight, error) {
+func FetchBossFightDetails(fightID int) (*models.BossFight, error) {
 	url := fmt.Sprintf("https://sirus.su/api/base/22/details/bossfight/%v", fightID)
-	var fight BossFight
+	var fight models.BossFight
 
 	if err := makeRequest(url, &fight); err != nil {
 		return nil, err
@@ -158,7 +159,7 @@ func FetchBossFightDetails(fightID int) (*BossFight, error) {
 
 func FetchPlayerID(name string) (int, error) {
 	url := fmt.Sprintf("https://sirus.su/api/base/22/character/%s", url.QueryEscape(name))
-	var res PlayerProfile
+	var res models.PlayerProfile
 
 	err := makeRequest(url, &res)
 	if err != nil {
