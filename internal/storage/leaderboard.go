@@ -59,7 +59,7 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter, clas
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, guild_id, zodiac, category, t4, role, dps, hps) 
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, guild_id, zodiac, category, t4, role, dps, hps) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
