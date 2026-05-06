@@ -555,6 +555,9 @@ func GetCheckBosses(server int) map[int][]struct {
 			16: {
 				{Name: "Магик", ID: 0},
 			},
+			11: {
+				{Name: "Смотритель", ID: 4},
+			},
 		}
 	default:
 		raids = make(map[int][]struct {
