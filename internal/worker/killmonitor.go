@@ -45,7 +45,7 @@ func (w *Worker) GuildKillMonitor() {
 		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
 		guilds, err := w.subStore.GetTrackedGuilds()
 		if err != nil {
-			log.Printf("[KillMonitor] Getting tracked guilds err: %v", err)
+			log.Printf("[KillMonitor] Getting tracked guilds err: %v\n", err)
 			time.Sleep(1 * time.Minute)
 			continue
 		}

@@ -63,6 +63,8 @@ func main() {
 	go killWorker.StartProcessor()
 	go killWorker.GuildKillMonitor()
 	go killWorker.PlayerKillMonitor()
+
+	go worker.GuildMembersUpdater(subStore, gmStore)
 	// go worker.KillMonitor(lbStore, subStore, playerSubStore, dg)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds

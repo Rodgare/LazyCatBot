@@ -276,3 +276,14 @@ func makeMetasirusRequest(url string, target any) error {
 
 	return json.Unmarshal([]byte(body), target)
 }
+
+func FetchGuildMembers(guild_id int) (*[]models.GuildMembers, error) {
+	var gms models.Guild
+
+	url := fmt.Sprintf("https://sirus.su/api/base/22/guild/%d", guild_id)
+	if err := makeRequest(url, &gms); err != nil {
+		return nil, err
+	}
+
+	return &gms.Members, nil
+}

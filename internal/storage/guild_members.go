@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"LazyCatBot/internal/models"
 	"database/sql"
 
 	_ "modernc.org/sqlite"
@@ -18,12 +19,42 @@ func (s *GuildMembersStorage) InitDB() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS guild_members (
 	id INTEGER,
+	name TEXT,
+	ilvl INTEGER,
 	guild_id INTEGER,
-	PRIMARY KEY (id, guild_id)
+	PRIMARY KEY (name, guild_id)
 	);
-	CREATE INDEX IF NOT EXISTS idx_guild ON guild_members (guild_id);
+	CREATE INDEX IF NOT EXISTS idx_gm_name ON guild_members (name);
 	`
 
 	_, err := s.db.Exec(query)
 	return err
+}
+
+func (s *GuildMembersStorage) UpdateGuildMembers(guildID int, members []models.GuildMembers) error {
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	_, err = tx.Exec("DELETE FROM guild_members WHERE guild_id = ?", guildID)
+	if err != nil {
+		return err
+	}
+
+	stmt, err := tx.Prepare(`INSERT INTO guild_members (id, name, ilvl, guild_id) VALUES (?, ?, ?, ?)`)
+	if err != nil {
+		return err
+	}
+	defer stmt.Close()
+
+	for _, m := range members {
+		_, err = stmt.Exec(m.GUID, m.Name, m.Ilvl, guildID)
+		if err != nil {
+			return err
+		}
+	}
+
+	return tx.Commit()
 }
