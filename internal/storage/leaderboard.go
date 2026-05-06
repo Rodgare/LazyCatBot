@@ -173,13 +173,17 @@ func (s *LeaderboardStorage) GetBossTop(raidID, bossID, guildID int, role string
 	}
 
 	query := fmt.Sprintf(`
-		SELECT player_name, class_id, spec_id, ilvl, zodiac, category, t4, dps, hps
-		FROM leaderboard
-		WHERE raid_id = ? AND boss_id = ? AND guild_id = ? AND role = ?
-		ORDER BY %s DESC
+		SELECT l.player_name, l.class_id, l.spec_id, l.ilvl, l.zodiac, l.category, l.t4, l.dps, l.hps
+		FROM leaderboard l
+		JOIN guild_members gm ON l.player_name = gm.name
+		WHERE l.raid_id = ? 
+		  AND l.boss_id = ? 
+		  AND l.role = ? 
+		  AND gm.guild_id = ?
+		ORDER BY l.%s DESC
 		LIMIT 30`, orderBy)
 
-	rows, err := s.db.Query(query, raidID, bossID, guildID, role)
+	rows, err := s.db.Query(query, raidID, bossID, role, guildID)
 	if err != nil {
 		return nil, err
 	}
@@ -192,9 +196,12 @@ func (s *LeaderboardStorage) GetBossTop(raidID, bossID, guildID int, role string
 		if err != nil {
 			return nil, err
 		}
+
 		p.Role = sirus.GetRole(p.ClassID, p.SpecID)
 		p.SpecName = sirus.GetSpecName(p.ClassID, p.SpecID)
+
 		players = append(players, p)
 	}
+
 	return players, nil
 }

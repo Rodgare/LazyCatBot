@@ -14,6 +14,7 @@ type BotHandler struct {
 	LbStore        *storage.LeaderboardStorage
 	SubStore       *storage.SubscribeStorage
 	PlayerSubStore *storage.PlayerSubscribeStorage
+	GMStore        *storage.GuildMembersStorage
 }
 
 func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -48,13 +49,22 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 		})
 	case "modal_add_guild":
 		guildIDStr := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-		var guildNum int
-		fmt.Sscanf(guildIDStr, "%d", &guildNum)
-		err := h.SubStore.Subscribe(guildNum, i.ChannelID, i.GuildID)
-		content := fmt.Sprintf("✅ Гильдия **%d** успешно добавлена!", guildNum)
+		var guildID int
+		fmt.Sscanf(guildIDStr, "%d", &guildID)
+		err := h.SubStore.Subscribe(guildID, i.ChannelID, i.GuildID)
+		content := fmt.Sprintf("✅ Гильдия **%d** успешно добавлена!", guildID)
 		if err != nil {
 			content = "❌ Ошибка при добавлении гильдии."
 		}
+
+		go func(id int) {
+			members, err := sirus.FetchGuildMembers(id)
+			if err == nil && members != nil {
+				h.GMStore.UpdateGuildMembers(id, *members)
+				fmt.Printf("[Handler] Свежий состав гильдии %d загружен сразу после подписки", id)
+			}
+		}(guildID)
+
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -319,6 +329,14 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 			})
 			return
 		}
+
+		go func(id int) {
+			members, err := sirus.FetchGuildMembers(id)
+			if err == nil && members != nil {
+				h.GMStore.UpdateGuildMembers(id, *members)
+				fmt.Printf("[Handler] Свежий состав гильдии %d загружен сразу после подписки", id)
+			}
+		}(guildId)
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,

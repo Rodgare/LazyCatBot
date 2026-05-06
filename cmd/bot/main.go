@@ -73,6 +73,7 @@ func main() {
 		LbStore:        lbStore,
 		SubStore:       subStore,
 		PlayerSubStore: pSubStore,
+		GMStore:        gmStore,
 	}
 
 	dg.AddHandler(h.InteractionCreate)
