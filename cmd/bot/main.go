@@ -5,6 +5,7 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"LazyCatBot/internal/worker"
+	"context"
 	"database/sql"
 	"fmt"
 	"log"
@@ -13,25 +14,32 @@ import (
 	"os/signal"
 	"syscall"
 
+	slogadapter "github.com/axiomhq/axiom-go/adapters/slog"
+
 	"github.com/bwmarrin/discordgo"
 	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Println("No .env file found, using system environment variables")
+	}
 	file, err := os.OpenFile("bot.log", os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		log.Fatalf("Log read file error: %v", err)
 	}
 	defer file.Close()
 
-	handler := slog.NewJSONHandler(file, nil)
-	logger := slog.New(handler)
+	axiomHandler, err := slogadapter.New()
+	if err != nil {
+		log.Fatalf("Failed to create Axiom handler: %v", err)
+	}
+	defer axiomHandler.Close()
+
+	fileHandler := slog.NewJSONHandler(file, nil)
+	logger := slog.New(NewMultiHandler(fileHandler, axiomHandler))
 	slog.SetDefault(logger)
 
-	if err := godotenv.Load(); err != nil {
-		slog.Error("failed to load .env file", "error", err)
-		os.Exit(1)
-	}
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
 		slog.Error("DISCORD_TOKEN doesn`t set")
@@ -168,4 +176,35 @@ func main() {
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
+}
+
+type MultiHandler struct {
+	handlers []slog.Handler
+}
+
+func NewMultiHandler(handlers ...slog.Handler) slog.Handler {
+	return &MultiHandler{handlers: handlers}
+}
+func (m *MultiHandler) Enabled(ctx context.Context, level slog.Level) bool {
+	return true
+}
+func (m *MultiHandler) Handle(ctx context.Context, r slog.Record) error {
+	for _, h := range m.handlers {
+		_ = h.Handle(ctx, r)
+	}
+	return nil
+}
+func (m *MultiHandler) WithAttrs(attrs []slog.Attr) slog.Handler {
+	newHandlers := make([]slog.Handler, len(m.handlers))
+	for i, h := range m.handlers {
+		newHandlers[i] = h.WithAttrs(attrs)
+	}
+	return &MultiHandler{handlers: newHandlers}
+}
+func (m *MultiHandler) WithGroup(name string) slog.Handler {
+	newHandlers := make([]slog.Handler, len(m.handlers))
+	for i, h := range m.handlers {
+		newHandlers[i] = h.WithGroup(name)
+	}
+	return &MultiHandler{handlers: newHandlers}
 }
