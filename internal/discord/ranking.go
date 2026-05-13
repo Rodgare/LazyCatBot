@@ -11,6 +11,15 @@ import (
 )
 
 func (h *BotHandler) SendBossRanking(s *discordgo.Session, i *discordgo.InteractionCreate, raidID, bossID int, role string) {
+	l := h.Logger.With(
+		"raid_id", raidID,
+		"boss_id", bossID,
+		"role", role,
+		"guild_id", i.GuildID,
+	)
+
+	l.Info("generating boss ranking report")
+
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 	})
@@ -20,6 +29,7 @@ func (h *BotHandler) SendBossRanking(s *discordgo.Session, i *discordgo.Interact
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: pointer("❌ В этом канале не настроено отслеживание гильдий."),
 		})
+		l.Error("empty guilds tracked list", "error", err)
 		return
 	}
 
@@ -30,6 +40,7 @@ func (h *BotHandler) SendBossRanking(s *discordgo.Session, i *discordgo.Interact
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: pointer("❌ Ошибка при получении данных из базы."),
 		})
+		l.Error("Getting data from db error", "error", err)
 		return
 	}
 
@@ -37,6 +48,7 @@ func (h *BotHandler) SendBossRanking(s *discordgo.Session, i *discordgo.Interact
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: pointer("📭 Данных по этому боссу пока нет."),
 		})
+		l.Info("Empty boss kil data")
 		return
 	}
 
@@ -58,6 +70,7 @@ func (h *BotHandler) SendBossRanking(s *discordgo.Session, i *discordgo.Interact
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: pointer("❌ Ошибка при генерации изображения."),
 		})
+		l.Error("Image geenration error", "error", err)
 		return
 	}
 	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{

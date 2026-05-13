@@ -1,17 +1,14 @@
 package worker
 
 import (
-	"LazyCatBot/internal/sirus"
-	"LazyCatBot/internal/storage"
-	"log"
 	"time"
 )
 
-func GuildMembersUpdater(subStore *storage.SubscribeStorage, gmStore *storage.GuildMembersStorage) {
+func (w *Worker) GuildMembersUpdater() {
 	for {
-		guildsToUpdate, err := subStore.GetTrackedGuilds()
+		guildsToUpdate, err := w.subStore.GetTrackedGuilds()
 		if err != nil {
-			log.Printf("[GuildMembersUpdater] Getting tracked guilds err: %v\n", err)
+			w.logger.Error("Getting tracked guilds err", "error", err)
 		}
 
 		gIDs := make([]int, 0, len(guildsToUpdate))
@@ -20,16 +17,16 @@ func GuildMembersUpdater(subStore *storage.SubscribeStorage, gmStore *storage.Gu
 		}
 
 		for _, gID := range gIDs {
-			gms, err := sirus.FetchGuildMembers(gID)
+			gms, err := w.sirusClient.FetchGuildMembers(gID)
 			if err != nil {
-				log.Printf("[GuildMembersUpdater] FetchGuildMembers error, guild ID: %d | err: %v\n", gID, err)
+				w.logger.Error("FetchGuildMembers error", "error", err, "guild_id", gID)
 				time.Sleep(1 * time.Minute)
 			}
 
 			if gms != nil {
-				err = gmStore.UpdateGuildMembers(gID, *gms)
+				err = w.gmStore.UpdateGuildMembers(gID, *gms)
 				if err != nil {
-					log.Printf("[GuildMembersUpdater] Update Guild Members error, guild ID: %d | err: %v\n", gID, err)
+					w.logger.Error("Update Guild Members error", "error", err, "guild_id", gID)
 				}
 			}
 

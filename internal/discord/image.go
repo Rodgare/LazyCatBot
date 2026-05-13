@@ -8,6 +8,7 @@ import (
 	"image"
 	"image/color"
 	_ "image/png"
+	"log/slog"
 	"os"
 	"slices"
 
@@ -113,7 +114,7 @@ func getRaidColor(raidID int) string {
 	if col, ok := raidColors[raidID]; ok {
 		return col
 	}
-	return "#151618" // Дефолтный фон
+	return "#151618"
 }
 
 //go:embed assets/images
@@ -137,17 +138,16 @@ func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 
 	dc := gg.NewContext(width, int(height))
 
-	// Фон
+	// background
 	bgColor := getRaidColor(report.RaidOrder)
 	dc.SetHexColor(bgColor + "ff")
 	dc.Clear()
 
-	// Картинка рейда (800px)
 	drawRaidBackground(dc, report.RaidOrder, bgColor)
 
 	fontLoaded := false
 	fontPaths := []string{
-		"internal/discord/assets/fonts/Roboto-Regular.ttf",             // Локальный шрифт из репозитория!
+		"internal/discord/assets/fonts/Roboto-Regular.ttf",             // Local font
 		"C:\\Windows\\Fonts\\arialbd.ttf",                              // Windows Arial Bold
 		"C:\\Windows\\Fonts\\arial.ttf",                                // Windows Arial
 		"C:\\Windows\\Fonts\\seguiemj.ttf",                             // Windows Segoe UI
@@ -168,14 +168,13 @@ func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 	}
 
 	if !fontLoaded {
-		fmt.Println("WARNING: No suitable font found for Cyrillic support!")
+		slog.Warn("No suitable font found for Cyrillic support")
 	}
 
 	y := float64(margin)
 
 	// Title
 	dc.SetRGB(1, 1, 1)
-	// Добавим небольшую тень для заголовка, чтобы он читался на фоне картинки
 	dc.SetRGBA(0, 0, 0, 0.8)
 	dc.DrawStringAnchored(fmt.Sprintf("%s — %s", report.MapName, report.BossName), width/2+1, y+21, 0.5, 0.5)
 	dc.SetRGB(1, 1, 1)
@@ -404,19 +403,19 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 func getColorByPercentile(p int) (float64, float64, float64) {
 	switch {
 	case p >= 100:
-		return 0.90, 0.80, 0.50 //золото/песочный (#e5cc80)
+		return 0.90, 0.80, 0.50 //gold (#e5cc80)
 	case p >= 99:
-		return 0.89, 0.41, 0.66 // розовый (#e268a8)
+		return 0.89, 0.41, 0.66 // pink (#e268a8)
 	case p >= 95:
-		return 1.00, 0.50, 0.00 // оранжевый (#ff8000)
+		return 1.00, 0.50, 0.00 // orange (#ff8000)
 	case p >= 75:
-		return 0.64, 0.21, 0.93 // фиолетовый (#a335ee)
+		return 0.64, 0.21, 0.93 // purple (#a335ee)
 	case p >= 50:
-		return 0.00, 0.44, 1.00 // синий (#0070ff)
+		return 0.00, 0.44, 1.00 // blue (#0070ff)
 	case p >= 25:
-		return 0.12, 1.00, 0.00 // зелёный (#1eff00)
+		return 0.12, 1.00, 0.00 // green (#1eff00)
 	default:
-		return 0.40, 0.40, 0.40 // серый (#666666)
+		return 0.40, 0.40, 0.40 // gray (#666666)
 	}
 }
 
@@ -445,7 +444,7 @@ func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
 	filePath := fmt.Sprintf("assets/images/raid/%d.png", raidID)
 	fileData, err := imagesFS.ReadFile(filePath)
 	if err != nil {
-		return // Если картинки нет в embed, просто выходим
+		return
 	}
 
 	img, _, errDecode := image.Decode(bytes.NewReader(fileData))
@@ -454,31 +453,24 @@ func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
 		return
 	}
 
-	// 1. Рисуем картинку в шапке (она 400px высотой)
 	dc.DrawImage(img, 0, 0)
 
-	// 2. --- ЕДИНЫЙ БЕСШОВНЫЙ ГРАДИЕНТ (Затемнение + Переход) ---
-	// Этот градиент до середины просто затемняет, а потом плавно уводит в фон
 	grad := gg.NewLinearGradient(0, 0, 0, 400)
 
-	// Парсим HEX в RGBA для градиента
 	var r, g, b int
 	fmt.Sscanf(bgColor, "#%02x%02x%02x", &r, &g, &b)
 	bgR, bgG, bgB := uint8(r), uint8(g), uint8(b)
 
-	// От 0 до 200px: Держим стабильное затемнение (оверлей)
-	grad.AddColorStop(0, color.RGBA{0, 0, 0, 200})   // 80% черного вверху
-	grad.AddColorStop(0.5, color.RGBA{0, 0, 0, 200}) // Держим ту же темноту до 200px
+	grad.AddColorStop(0, color.RGBA{0, 0, 0, 200})
+	grad.AddColorStop(0.5, color.RGBA{0, 0, 0, 200})
 
-	// От 200px до 400px: Плавно переходим из темноты в цвет фона
 	grad.AddColorStop(1.0, color.RGBA{bgR, bgG, bgB, 255})
 
 	dc.SetFillStyle(grad)
 	dc.DrawRectangle(0, 0, float64(width), 400)
 	dc.Fill()
 
-	// 3. --- ЗАГЛУШКА (Закрашиваем всё, что ниже 400px) ---
 	dc.SetHexColor(bgColor + "ff")
-	dc.DrawRectangle(0, 400, float64(width), 5000) // С большим запасом вниз
+	dc.DrawRectangle(0, 400, float64(width), 5000)
 	dc.Fill()
 }

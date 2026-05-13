@@ -4,23 +4,22 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"fmt"
-	"log"
 	"time"
 )
 
-func StartMetasirusLbSync(store *storage.LeaderboardStorage) {
+func (w *Worker) StartMetasirusLbSync(store *storage.LeaderboardStorage) {
 	fmt.Println("[Worker] Starting metasirus sync system...")
 
 	for {
-		raids, err := sirus.FetchActualRaids()
+		raids, err := w.sirusClient.FetchActualRaids()
 		if err != nil {
-			log.Printf("[Worker] Error fetching actual raids: %v", err)
+			w.logger.Error("Error fetching actual raids", "error", err)
 			time.Sleep(1 * time.Minute)
 			continue
 		}
 
 		for _, raid := range raids {
-			fmt.Printf("[Worker] === Processing raid: %s (ID: %d) ===\n", raid.MapName, raid.Order)
+			w.logger.Info("Processing raid", "raid_name", raid.MapName, "raid_id", raid.Order)
 
 			for sirusBossID := range raid.Encounters {
 				metasirusBossID := sirus.GetMetasirusBossID(raid.Order, sirusBossID)
@@ -28,15 +27,15 @@ func StartMetasirusLbSync(store *storage.LeaderboardStorage) {
 					continue
 				}
 
-				players, err := sirus.FetchMetasirusLeaderboard(raid.MapID, metasirusBossID, raid.Difficulty)
+				players, err := w.sirusClient.FetchMetasirusLeaderboard(raid.MapID, metasirusBossID, raid.Difficulty)
 				if err != nil {
-					log.Printf("[Worker] Error (Raid:%d Boss:%d): %v", raid.Order, sirusBossID, err)
+					w.logger.Error("Get metasirus data error", "error", err, "raid_id", raid.Order, "boss_id", sirusBossID)
 					time.Sleep(1 * time.Hour)
 					continue
 				}
 
 				if len(players) == 0 {
-					fmt.Printf("[Worker] No player data for Raid:%d SirusBossID:%d metasirusBossID%d, \n", raid.Order, sirusBossID, metasirusBossID)
+					w.logger.Error("No player data", "raid_id", raid.Order, "boss_id", sirusBossID, "metasirus_boss_id", metasirusBossID)
 					time.Sleep(10 * time.Second)
 					continue
 				}
@@ -51,7 +50,7 @@ func StartMetasirusLbSync(store *storage.LeaderboardStorage) {
 			}
 		}
 
-		fmt.Println("[Worker] All actual data updated. Sleeping 24 hours...")
+		w.logger.Info("All actual data updated. Sleeping 24 hours...")
 		time.Sleep(24 * time.Hour)
 	}
 }

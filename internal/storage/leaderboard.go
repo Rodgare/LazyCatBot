@@ -5,16 +5,21 @@ import (
 	"LazyCatBot/internal/sirus"
 	"database/sql"
 	"fmt"
+	"log/slog"
 
 	_ "modernc.org/sqlite"
 )
 
 type LeaderboardStorage struct {
-	db *sql.DB
+	db     *sql.DB
+	logger *slog.Logger
 }
 
-func NewLeaderboardStorage(db *sql.DB) *LeaderboardStorage {
-	return &LeaderboardStorage{db: db}
+func NewLeaderboardStorage(db *sql.DB, logger *slog.Logger) *LeaderboardStorage {
+	return &LeaderboardStorage{
+		db:     db,
+		logger: logger,
+	}
 }
 
 func (s *LeaderboardStorage) InitDB() error {
@@ -79,7 +84,7 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter, clas
 
 	err = tx.Commit()
 	if err == nil {
-		fmt.Printf("[DB] Successfully saved %d players R: %d B: %d classID: %d, specID: %d\n", len(players), raidOrder, encounter, classID, specID)
+		s.logger.Info("[DB] Successfully saved", "players_count", len(players), "raid_id", raidOrder, "boss_id", encounter, "class_id", classID, "spec_id", specID)
 	}
 	return err
 }

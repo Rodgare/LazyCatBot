@@ -6,7 +6,7 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"encoding/json"
-	"log"
+	"log/slog"
 	"os"
 	"sort"
 	"time"
@@ -20,23 +20,34 @@ type KillJob struct {
 }
 
 type Worker struct {
-	lbStore   *storage.LeaderboardStorage
-	subStore  *storage.SubscribeStorage
-	pSubStore *storage.PlayerSubscribeStorage
-	dg        *discordgo.Session
-	killQueue chan KillJob
+	sirusClient *sirus.Client
+	lbStore     *storage.LeaderboardStorage
+	subStore    *storage.SubscribeStorage
+	pSubStore   *storage.PlayerSubscribeStorage
+	gmStore     *storage.GuildMembersStorage
+	dg          *discordgo.Session
+	killQueue   chan KillJob
+	logger      *slog.Logger
 }
 
-func NewWorker(lb *storage.LeaderboardStorage,
+func NewWorker(
+	sc *sirus.Client,
+	lb *storage.LeaderboardStorage,
 	sub *storage.SubscribeStorage,
+	gm *storage.GuildMembersStorage,
 	ps *storage.PlayerSubscribeStorage,
-	dg *discordgo.Session) *Worker {
+	dg *discordgo.Session,
+	logger *slog.Logger,
+) *Worker {
 	return &Worker{
-		lbStore:   lb,
-		subStore:  sub,
-		pSubStore: ps,
-		dg:        dg,
-		killQueue: make(chan KillJob, 100),
+		sirusClient: sc,
+		lbStore:     lb,
+		subStore:    sub,
+		pSubStore:   ps,
+		gmStore:     gm,
+		dg:          dg,
+		killQueue:   make(chan KillJob, 100),
+		logger:      logger,
 	}
 }
 
@@ -45,13 +56,13 @@ func (w *Worker) GuildKillMonitor() {
 		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
 		guilds, err := w.subStore.GetTrackedGuilds()
 		if err != nil {
-			log.Printf("[KillMonitor] Getting tracked guilds err: %v\n", err)
+			w.logger.Error("[KillMonitor] Getting tracked guilds err", "error", err)
 			time.Sleep(1 * time.Minute)
 			continue
 		}
 
 		kills := w.getKills(guilds, true)
-		sortedKillsIDs := sortKills(kills)
+		sortedKillsIDs := w.sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
 			w.killQueue <- KillJob{
@@ -70,13 +81,13 @@ func (w *Worker) PlayerKillMonitor() {
 		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
 		players, err := w.pSubStore.GetTrackedPlayers()
 		if err != nil {
-			log.Printf("[KillMonitor] Getting tracked players err: %v", err)
+			w.logger.Error("[KillMonitor] Getting tracked players err", "error", err)
 			time.Sleep(1 * time.Minute)
 			continue
 		}
 
 		kills := w.getKills(players, false)
-		sortedKillsIDs := sortKills(kills)
+		sortedKillsIDs := w.sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
 			w.killQueue <- KillJob{
@@ -99,9 +110,9 @@ func (w *Worker) StartProcessor() {
 			}
 
 			if report == nil {
-				enrichedKill, err := sirus.FetchBossFightDetails(job.KillID)
+				enrichedKill, err := w.sirusClient.FetchBossFightDetails(job.KillID)
 				if err != nil {
-					log.Printf("[Processor] Fetch Boss Fight Details err: %v", err)
+					w.logger.Error("[Processor] Fetch Boss Fight Details err", "error", err)
 					break
 				}
 
@@ -124,9 +135,9 @@ func (w *Worker) getKills(data map[int][]string, isGuild bool) map[int]map[strin
 
 	if isGuild {
 		for gID, channels := range data {
-			gKills, err := sirus.FetchGuildLatestBossKills(gID)
+			gKills, err := w.sirusClient.FetchGuildLatestBossKills(gID)
 			if err != nil {
-				log.Printf("[KillMonitor] Fetch Guild %d Latest BossKills err: %v", gID, err)
+				w.logger.Error("[KillMonitor] Fetch Guild Latest BossKills err", "error", err, "guild_id", gID)
 				continue
 			}
 
@@ -148,9 +159,9 @@ func (w *Worker) getKills(data map[int][]string, isGuild bool) map[int]map[strin
 		}
 	} else {
 		for pID, channels := range data {
-			pKills, err := sirus.FetchPlayerLastActions(pID)
+			pKills, err := w.sirusClient.FetchPlayerLastActions(pID)
 			if err != nil || pKills == nil {
-				log.Printf("[KillMonitor] pKills is nil or Fetch Player %d Latest BossKills err: %v", pID, err)
+				w.logger.Error("[KillMonitor] pKills is nil or Fetch Player Latest BossKills err", "error", err, "player_id", pID)
 				continue
 			}
 			lastKills := *pKills
@@ -221,7 +232,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int) models.BossKi
 
 		err := w.lbStore.UpsertPlayer(fight.Order, fight.Encounter, p)
 		if err != nil {
-			log.Printf("Upsert player in db error %v\n", err)
+			w.logger.Error("Upsert player in db error", "error", err)
 		}
 
 		playerReport := models.PlayerReport{
@@ -245,7 +256,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int) models.BossKi
 
 		playerReport, err = w.lbStore.GetPlayerRank(fight.Order, fight.Encounter, playerReport, pRole)
 		if err != nil {
-			log.Printf("Get player rank error %v\n", err)
+			w.logger.Error("Getting player rank error", "error", err)
 		}
 		report.Players = append(report.Players, playerReport)
 	}
@@ -253,16 +264,19 @@ func (w *Worker) createReport(fight *models.BossFight, killID int) models.BossKi
 	return report
 }
 
-func makeMockReport() models.BossKillReport {
+func (w *Worker) makeMockReport() models.BossKillReport {
 	var report models.BossKillReport
 
-	data, _ := os.ReadFile("internal/sirus/testdata/mock_sirus_boss_fight.json")
+	data, err := os.ReadFile("internal/sirus/testdata/mock_sirus_boss_fight.json")
+	if err != nil {
+		w.logger.Error("Mock json read error", "error", err)
+	}
 	json.Unmarshal(data, &report)
 
 	return report
 }
 
-func sortKills(kills map[int]map[string]bool) []int {
+func (w *Worker) sortKills(kills map[int]map[string]bool) []int {
 	ids := make([]int, 0, len(kills))
 
 	for id := range kills {

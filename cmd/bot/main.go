@@ -2,11 +2,13 @@ package main
 
 import (
 	"LazyCatBot/internal/discord"
+	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"LazyCatBot/internal/worker"
 	"database/sql"
 	"fmt"
 	"log"
+	"log/slog"
 	"os"
 	"os/signal"
 	"syscall"
@@ -21,32 +23,37 @@ func main() {
 		log.Fatalf("Log read file error: %v", err)
 	}
 	defer file.Close()
-	log.SetOutput(file)
-	log.SetFlags(log.Ldate | log.Ltime)
+
+	handler := slog.NewJSONHandler(file, nil)
+	logger := slog.New(handler)
+	slog.SetDefault(logger)
 
 	if err := godotenv.Load(); err != nil {
-		log.Fatal("Error load .env file")
+		slog.Error("failed to load .env file", "error", err)
+		os.Exit(1)
 	}
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
-		log.Fatal("DISCORD_TOKEN doesn`t set")
+		slog.Error("DISCORD_TOKEN doesn`t set")
+		os.Exit(1)
 	}
 
 	dg, err := discordgo.New("Bot " + token)
 	if err != nil {
-		log.Fatalf("DiscordGo session create error: %v", err)
-		return
+		slog.Error("DiscordGo session create error", "error", err)
+		os.Exit(1)
 	}
 
 	db, err := sql.Open("sqlite", "bot.db")
 	if err != nil {
-		log.Fatal(err)
+		slog.Error("Failed to init db", "error", err)
+		os.Exit(1)
 	}
 	db.Exec("PRAGMA journal_mode=WAL;")
 	db.Exec("PRAGMA busy_timeout=5000;")
 	defer db.Close()
 
-	lbStore := storage.NewLeaderboardStorage(db)
+	lbStore := storage.NewLeaderboardStorage(db, logger)
 	subStore := storage.NewSubscribeStorage(db)
 	gmStore := storage.NewGuildMembersStorage(db)
 	pSubStore := storage.NewPlayerSubscribeStorage(db)
@@ -55,33 +62,27 @@ func main() {
 	gmStore.InitDB()
 	pSubStore.InitDB()
 
-	// go worker.StartLeaderboardSync(lbStore)
-	// go worker.StartMetasirusLbSync(lbStore)
-	worker.StartCronScheduler(lbStore)
+	sirusClient := sirus.NewClient(logger)
 
-	killWorker := worker.NewWorker(lbStore, subStore, pSubStore, dg)
+	killWorker := worker.NewWorker(sirusClient, lbStore, subStore, gmStore, pSubStore, dg, logger)
+	killWorker.StartCronScheduler()
 	go killWorker.StartProcessor()
 	go killWorker.GuildKillMonitor()
 	go killWorker.PlayerKillMonitor()
 
-	go worker.GuildMembersUpdater(subStore, gmStore)
-	// go worker.KillMonitor(lbStore, subStore, playerSubStore, dg)
+	go killWorker.GuildMembersUpdater()
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
-	h := &discord.BotHandler{
-		LbStore:        lbStore,
-		SubStore:       subStore,
-		PlayerSubStore: pSubStore,
-		GMStore:        gmStore,
-	}
+	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, logger)
 
 	dg.AddHandler(h.InteractionCreate)
 	dg.AddHandler(h.GuildCreate)
 
 	err = dg.Open()
 	if err != nil {
-		log.Fatalf("Discord connection error: %v", err)
+		slog.Error("Discord connection error", "error", err)
+		os.Exit(1)
 	}
 	defer dg.Close()
 
@@ -158,7 +159,8 @@ func main() {
 
 	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)
 	if err != nil {
-		log.Fatalf("Error registering commands: %v", err)
+		slog.Error("Error registering commands", "error", err)
+		os.Exit(1)
 	}
 
 	fmt.Println("Bot is running. Slash Commands registered. Ctrl+C exit")

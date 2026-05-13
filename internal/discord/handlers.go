@@ -4,17 +4,37 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"fmt"
-	"log"
+	"log/slog"
 	"strings"
 
 	"github.com/bwmarrin/discordgo"
 )
 
 type BotHandler struct {
+	sirusClient    *sirus.Client
 	LbStore        *storage.LeaderboardStorage
 	SubStore       *storage.SubscribeStorage
 	PlayerSubStore *storage.PlayerSubscribeStorage
 	GMStore        *storage.GuildMembersStorage
+	Logger         *slog.Logger
+}
+
+func NewHandler(
+	sc *sirus.Client,
+	lb *storage.LeaderboardStorage,
+	sub *storage.SubscribeStorage,
+	pSub *storage.PlayerSubscribeStorage,
+	gm *storage.GuildMembersStorage,
+	logger *slog.Logger,
+) *BotHandler {
+	return &BotHandler{
+		sirusClient:    sc,
+		LbStore:        lb,
+		SubStore:       sub,
+		PlayerSubStore: pSub,
+		GMStore:        gm,
+		Logger:         logger,
+	}
 }
 
 func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
@@ -30,15 +50,23 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 
 func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ModalSubmitData()
+
+	l := h.Logger.With(
+		"command_modal", data.CustomID,
+		"guild_id", i.GuildID,
+		"user", i.Member.User.Username,
+	)
+
 	switch data.CustomID {
 	case "modal_add_player":
 		playerName := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-		id, _ := sirus.FetchPlayerID(playerName)
+		id, _ := h.sirusClient.FetchPlayerID(playerName)
 		err := h.PlayerSubStore.Subscribe(id, playerName, i.ChannelID, i.GuildID)
 
 		content := fmt.Sprintf("✅ Игрок **%s** успешно добавлен в список отслеживания!", playerName)
 		if err != nil {
 			content = "❌ Ошибка при добавлении игрока."
+			l.Error("Add player in modal window error", "error", err)
 		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -55,13 +83,14 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 		content := fmt.Sprintf("✅ Гильдия **%d** успешно добавлена!", guildID)
 		if err != nil {
 			content = "❌ Ошибка при добавлении гильдии."
+			l.Error("Add guild in modal window error", "error", err)
 		}
 
 		go func(id int) {
-			members, err := sirus.FetchGuildMembers(id)
+			members, err := h.sirusClient.FetchGuildMembers(id)
 			if err == nil && members != nil {
 				h.GMStore.UpdateGuildMembers(id, *members)
-				fmt.Printf("[Handler] Свежий состав гильдии %d загружен сразу после подписки", id)
+				l.Info("Guild members are saved")
 			}
 		}(guildID)
 
@@ -199,7 +228,7 @@ func (h *BotHandler) handleAddPlayerModal(s *discordgo.Session, i *discordgo.Int
 		},
 	})
 	if err != nil {
-		log.Printf("Ошибка отправки модалки: %v\n", err)
+		h.Logger.Error("sending modal error", "error", err)
 	}
 }
 
@@ -311,6 +340,15 @@ func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.Intera
 
 func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ApplicationCommandData()
+
+	l := h.Logger.With(
+		"command", data.Name,
+		"guild_id", i.GuildID,
+		"user", i.Member.User.Username,
+	)
+
+	l.Info("slash command received")
+
 	guildID := i.GuildID
 	channelID := i.ChannelID
 	switch data.Name {
@@ -327,14 +365,15 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
+			l.Error("Subscription saving error", "error", err)
 			return
 		}
 
 		go func(id int) {
-			members, err := sirus.FetchGuildMembers(id)
+			members, err := h.sirusClient.FetchGuildMembers(id)
 			if err == nil && members != nil {
 				h.GMStore.UpdateGuildMembers(id, *members)
-				fmt.Printf("[Handler] Свежий состав гильдии %d загружен сразу после подписки", id)
+				l.Info("fresh guild members loaded", "sirus_guild_id", id)
 			}
 		}(guildId)
 
@@ -356,6 +395,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
+			l.Error("Subscription deleting error", "error", err)
 			return
 		}
 
@@ -368,7 +408,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 
 	case "setcat":
 		name := data.Options[0].StringValue()
-		id, err := sirus.FetchPlayerID(name)
+		id, err := h.sirusClient.FetchPlayerID(name)
 		if err != nil {
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -377,6 +417,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
+			l.Error("Search character error", "error", err)
 			return
 		}
 		err = h.PlayerSubStore.Subscribe(id, name, channelID, guildID)
@@ -388,6 +429,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
+			l.Error("Saving subscription to db error", "error", err)
 			return
 		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -408,6 +450,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
+			l.Error("Deleting subsription error", "error", err)
 			return
 		}
 
@@ -428,6 +471,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
+			l.Error("Getting guilds list error", "error", err)
 			return
 		}
 
@@ -459,7 +503,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 	case "listcats":
 		characters, err := h.PlayerSubStore.GetPlayersByChannel(channelID)
 		if err != nil {
-			log.Printf("listcats err: %v", err)
+			l.Error("listcats error", "error", err)
 			return
 		}
 		if len(characters) == 0 {
@@ -510,6 +554,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 
 func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
 	if h.SubStore.IsDiscordGuildSubscribed(g.ID) {
+		h.Logger.Info("guild already subscribed", "discord_guild_id", g.ID)
 		return
 	}
 
@@ -526,6 +571,7 @@ func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate)
 	}
 
 	if channelID == "" {
+		h.Logger.Info("empty channel ID")
 		return
 	}
 
