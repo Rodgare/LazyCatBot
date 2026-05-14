@@ -545,9 +545,9 @@ func GetCheckBosses(server int) map[int][]struct {
 			Name string
 			ID   int
 		}{
-			15: {
-				{Name: "Джараксус", ID: 1},
-				{Name: "Вальки", ID: 3},
+			19: {
+				{Name: "Джараксус гер", ID: 1},
+				{Name: "Вальки гер", ID: 3},
 			},
 			17: {
 				{Name: "Груль", ID: 1},
