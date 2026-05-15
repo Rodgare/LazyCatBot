@@ -80,7 +80,7 @@ func main() {
 
 	go killWorker.GuildMembersUpdater()
 
-	go killWorker.StartLeaderboardSync()
+	// go killWorker.StartLeaderboardSync()
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
