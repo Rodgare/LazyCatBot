@@ -80,6 +80,8 @@ func main() {
 
 	go killWorker.GuildMembersUpdater()
 
+	go killWorker.StartLeaderboardSync()
+
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
 	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, logger)
