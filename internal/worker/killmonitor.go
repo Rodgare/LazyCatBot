@@ -203,7 +203,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int) models.BossKi
 
 	report := models.BossKillReport{
 		MapName:   fight.Data.MapName,
-		BossName:  fight.Data.BossName,
+		BossName:  sirus.GetBossName(fight.Order, fight.Encounter),
 		RaidOrder: fight.Order,
 		KillID:    killID,
 		Duration:  fight.Data.FightLength,
