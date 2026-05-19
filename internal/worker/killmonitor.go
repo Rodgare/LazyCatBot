@@ -25,6 +25,7 @@ type Worker struct {
 	subStore    *storage.SubscribeStorage
 	pSubStore   *storage.PlayerSubscribeStorage
 	gmStore     *storage.GuildMembersStorage
+	arStore     *storage.ActualRaidsStorage
 	dg          *discordgo.Session
 	killQueue   chan KillJob
 	logger      *slog.Logger
@@ -36,6 +37,7 @@ func NewWorker(
 	sub *storage.SubscribeStorage,
 	gm *storage.GuildMembersStorage,
 	ps *storage.PlayerSubscribeStorage,
+	ar *storage.ActualRaidsStorage,
 	dg *discordgo.Session,
 	logger *slog.Logger,
 ) *Worker {
@@ -45,6 +47,7 @@ func NewWorker(
 		subStore:    sub,
 		pSubStore:   ps,
 		gmStore:     gm,
+		arStore:     ar,
 		dg:          dg,
 		killQueue:   make(chan KillJob, 100),
 		logger:      logger,

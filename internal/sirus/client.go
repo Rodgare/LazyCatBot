@@ -100,9 +100,9 @@ func (c *Client) GetMetasirusLbPage(mapID, bossID, difficulty, page int) (*model
 	return &res, nil
 }
 
-func (c *Client) FetchActualRaids() (models.ActualRaids, error) {
+func (c *Client) FetchActualRaids() (models.ActualSirusRaids, error) {
 	url := "https://sirus.su/api/base/22/progression/pve/realm-progress"
-	var res models.ActualRaids
+	var res models.ActualSirusRaids
 
 	if err := c.makeRequest(url, &res); err != nil {
 		return nil, err

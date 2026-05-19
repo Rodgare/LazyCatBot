@@ -1,6 +1,6 @@
 module LazyCatBot
 
-go 1.26.2
+go 1.26.0
 
 require (
 	github.com/axiomhq/axiom-go v0.32.0

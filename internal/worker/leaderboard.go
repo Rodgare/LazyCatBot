@@ -16,9 +16,15 @@ func (w *Worker) StartLeaderboardSync() {
 		time.Sleep(10 * time.Minute)
 		return
 	}
+	serverID := 22
+
+	w.arStore.ResetActualRaids(serverID)
 
 	for _, raid := range actualRaids {
 		for bossID, encounter := range raid.Encounters {
+			if raid.Actual {
+				w.arStore.UpdateActualRaids(raid.Order, bossID, serverID)
+			}
 			classes := sirus.GetSpecs()
 
 			for classID, specs := range classes {

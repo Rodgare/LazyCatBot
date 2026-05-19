@@ -1,6 +1,6 @@
 package models
 
-type ActualRaid struct {
+type ActualSirusRaid struct {
 	Order      int    `json:"order"`
 	MapID      int    `json:"map_id"`
 	MapName    string `json:"map_name"`
@@ -13,4 +13,9 @@ type ActualRaid struct {
 	} `json:"encounters"`
 }
 
-type ActualRaids []ActualRaid
+type ActualSirusRaids []ActualSirusRaid
+
+type ActualRaid struct {
+	RaidID int
+	BossID int
+}

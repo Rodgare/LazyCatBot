@@ -65,14 +65,16 @@ func main() {
 	subStore := storage.NewSubscribeStorage(db)
 	gmStore := storage.NewGuildMembersStorage(db)
 	pSubStore := storage.NewPlayerSubscribeStorage(db)
+	arStore := storage.NewActualRaidsStorage(db)
 	lbStore.InitDB()
 	subStore.InitDB()
 	gmStore.InitDB()
 	pSubStore.InitDB()
+	arStore.InitDB()
 
 	sirusClient := sirus.NewClient(logger)
 
-	killWorker := worker.NewWorker(sirusClient, lbStore, subStore, gmStore, pSubStore, dg, logger)
+	killWorker := worker.NewWorker(sirusClient, lbStore, subStore, gmStore, pSubStore, arStore, dg, logger)
 	killWorker.StartCronScheduler()
 	go killWorker.StartProcessor()
 	go killWorker.GuildKillMonitor()
@@ -84,7 +86,7 @@ func main() {
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
-	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, logger)
+	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, arStore, logger)
 
 	dg.AddHandler(h.InteractionCreate)
 	dg.AddHandler(h.GuildCreate)

@@ -16,6 +16,7 @@ type BotHandler struct {
 	SubStore       *storage.SubscribeStorage
 	PlayerSubStore *storage.PlayerSubscribeStorage
 	GMStore        *storage.GuildMembersStorage
+	arStore        *storage.ActualRaidsStorage
 	Logger         *slog.Logger
 }
 
@@ -25,6 +26,7 @@ func NewHandler(
 	sub *storage.SubscribeStorage,
 	pSub *storage.PlayerSubscribeStorage,
 	gm *storage.GuildMembersStorage,
+	ar *storage.ActualRaidsStorage,
 	logger *slog.Logger,
 ) *BotHandler {
 	return &BotHandler{
@@ -33,6 +35,7 @@ func NewHandler(
 		SubStore:       sub,
 		PlayerSubStore: pSub,
 		GMStore:        gm,
+		arStore:        ar,
 		Logger:         logger,
 	}
 }
@@ -108,6 +111,25 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 
 func (h *BotHandler) HandleButtons(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.MessageComponentData()
+
+	if strings.HasPrefix(data.CustomID, "select_raid_") {
+		if len(data.Values) > 0 {
+			selectedValue := data.Values[0]
+			if after, ok := strings.CutPrefix(selectedValue, "top_dps_"); ok {
+				var raidID, bossID int
+				fmt.Sscanf(after, "%d_%d", &raidID, &bossID)
+				h.SendBossRanking(s, i, raidID, bossID, "dps")
+				return
+			}
+			if after, ok := strings.CutPrefix(selectedValue, "top_hps_"); ok {
+				var raidID, bossID int
+				fmt.Sscanf(after, "%d_%d", &raidID, &bossID)
+				h.SendBossRanking(s, i, raidID, bossID, "hps")
+				return
+			}
+		}
+		return
+	}
 
 	if after, ok := strings.CutPrefix(data.CustomID, "toggle_reports_"); ok {
 		var gID int
@@ -303,37 +325,107 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 }
 
 func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	raids := sirus.GetCheckBosses(22)
-
-	var dpsButtons []discordgo.MessageComponent
-	var hpsButtons []discordgo.MessageComponent
-
-	for raidID, bosses := range raids {
-		for _, boss := range bosses {
-			dpsButtons = append(dpsButtons, discordgo.Button{
-				Label:    boss.Name,
-				Style:    discordgo.PrimaryButton,
-				CustomID: fmt.Sprintf("top_dps_%d_%d", raidID, boss.ID),
-				Emoji:    &discordgo.ComponentEmoji{Name: "⚔️"},
-			})
-
-			hpsButtons = append(hpsButtons, discordgo.Button{
-				Label:    boss.Name,
-				Style:    discordgo.SuccessButton,
-				CustomID: fmt.Sprintf("top_hps_%d_%d", raidID, boss.ID),
-				Emoji:    &discordgo.ComponentEmoji{Name: "🌿"},
-			})
-		}
+	serverID := 22
+	actualRaids, err := h.arStore.GetActualRaids(serverID)
+	if err != nil {
+		h.Logger.Error("Error getting actual raids", "error", err)
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "❌ Ошибка при получении актуальных рейдов из базы данных.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
 	}
 
+	if len(actualRaids) == 0 {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "📭 Список актуальных рейдов пуст",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	// Группируем боссов по RaidID, сохраняя порядок рейдов из БД
+	var raidIDs []int
+	bossesByRaid := make(map[int][]int)
+	seenRaids := make(map[int]bool)
+
+	for _, ar := range actualRaids {
+		if !seenRaids[ar.RaidID] {
+			seenRaids[ar.RaidID] = true
+			raidIDs = append(raidIDs, ar.RaidID)
+		}
+		bossesByRaid[ar.RaidID] = append(bossesByRaid[ar.RaidID], ar.BossID)
+	}
+
+	var rows []discordgo.MessageComponent
+
+	for _, raidID := range raidIDs {
+		raidName := sirus.GetRaidNameByID(raidID)
+		if raidName == "" {
+			raidName = fmt.Sprintf("Рейд %d", raidID)
+		}
+
+		var options []discordgo.SelectMenuOption
+		bossIDs := bossesByRaid[raidID]
+
+		for _, bossID := range bossIDs {
+			bossName := sirus.GetBossName(raidID, bossID)
+			if bossName == "" {
+				bossName = fmt.Sprintf("Босс ID %d", bossID)
+			}
+
+			options = append(options, discordgo.SelectMenuOption{
+				Label:       fmt.Sprintf("%s (⚔️ DPS)", bossName),
+				Value:       fmt.Sprintf("top_dps_%d_%d", raidID, bossID),
+				Description: fmt.Sprintf("Показать топ DPS на боссе %s", bossName),
+				Emoji: &discordgo.ComponentEmoji{
+					Name: "⚔️",
+				},
+			})
+
+			options = append(options, discordgo.SelectMenuOption{
+				Label:       fmt.Sprintf("%s (🌿 HPS)", bossName),
+				Value:       fmt.Sprintf("top_hps_%d_%d", raidID, bossID),
+				Description: fmt.Sprintf("Показать топ HPS на боссе %s", bossName),
+				Emoji: &discordgo.ComponentEmoji{
+					Name: "🌿",
+				},
+			})
+		}
+
+		if len(options) > 25 {
+			options = options[:25]
+		}
+
+		if len(options) == 0 {
+			continue
+		}
+
+		menu := discordgo.SelectMenu{
+			CustomID:    fmt.Sprintf("select_raid_%d", raidID),
+			Placeholder: fmt.Sprintf("🏰 %s", raidName),
+			MenuType:    discordgo.StringSelectMenu,
+			Options:     options,
+		}
+		rows = append(rows, discordgo.ActionsRow{
+			Components: []discordgo.MessageComponent{menu},
+		})
+
+		if len(rows) >= 5 {
+			break
+		}
+	}
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: "🏆 **Рейтинг за 2 кд:**",
-			Components: []discordgo.MessageComponent{
-				discordgo.ActionsRow{Components: dpsButtons},
-				discordgo.ActionsRow{Components: hpsButtons},
-			},
+			Content:    "🏆 **Выберите босса и роль для отображения топа:**",
+			Components: rows,
 		},
 	})
 }
