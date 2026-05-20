@@ -350,7 +350,6 @@ func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.Intera
 		return
 	}
 
-	// Группируем боссов по RaidID, сохраняя порядок рейдов из БД
 	var raidIDs []int
 	bossesByRaid := make(map[int][]int)
 	seenRaids := make(map[int]bool)
@@ -383,7 +382,7 @@ func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.Intera
 			options = append(options, discordgo.SelectMenuOption{
 				Label:       fmt.Sprintf("%s (⚔️ DPS)", bossName),
 				Value:       fmt.Sprintf("top_dps_%d_%d", raidID, bossID),
-				Description: fmt.Sprintf("Показать топ DPS на боссе %s", bossName),
+				Description: fmt.Sprintf("Топ DPS на боссе %s", bossName),
 				Emoji: &discordgo.ComponentEmoji{
 					Name: "⚔️",
 				},
@@ -392,7 +391,7 @@ func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.Intera
 			options = append(options, discordgo.SelectMenuOption{
 				Label:       fmt.Sprintf("%s (🌿 HPS)", bossName),
 				Value:       fmt.Sprintf("top_hps_%d_%d", raidID, bossID),
-				Description: fmt.Sprintf("Показать топ HPS на боссе %s", bossName),
+				Description: fmt.Sprintf("Топ HPS на боссе %s", bossName),
 				Emoji: &discordgo.ComponentEmoji{
 					Name: "🌿",
 				},
@@ -424,7 +423,7 @@ func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.Intera
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content:    "🏆 **Выберите босса и роль для отображения топа:**",
+			Content:    "🏆 **Рейтинг за 2 кд:**",
 			Components: rows,
 		},
 	})
