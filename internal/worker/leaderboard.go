@@ -22,9 +22,10 @@ func (w *Worker) StartLeaderboardSync() {
 
 	for _, raid := range actualRaids {
 		for bossID, encounter := range raid.Encounters {
-			if raid.Actual {
+			if raid.Actual && !sirus.IsRaidBannedForDpsMeter(raid.Order) {
 				w.arStore.UpdateActualRaids(raid.Order, bossID, serverID)
 			}
+
 			classes := sirus.GetSpecs()
 
 			for classID, specs := range classes {

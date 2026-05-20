@@ -113,6 +113,19 @@ func GetRole(classID, specID int) int {
 	return 0
 }
 
+func IsRaidBannedForDpsMeter(raidID int) bool {
+	blackList := map[int]bool{
+		23: true,
+		24: true,
+		12: true,
+		13: true,
+		14: true,
+		18: true,
+	}
+
+	return blackList[raidID]
+}
+
 func GetRaidNameByID(raidID int) string {
 	raids := map[int]string{
 		46: "Черный храм",
