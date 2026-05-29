@@ -210,3 +210,14 @@ func generateJoke() string {
 
 	return jokes[rand.Intn(len(jokes))]
 }
+
+type DiscordReporter struct {
+	session *discordgo.Session
+}
+
+func NewDiscordReporter(s *discordgo.Session) *DiscordReporter {
+	return &DiscordReporter{session: s}
+}
+func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKillReport) {
+	SendKillReport(r.session, channelID, report)
+}

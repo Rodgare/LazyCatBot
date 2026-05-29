@@ -91,10 +91,11 @@ func main() {
 	arStore := storage.NewActualRaidsStorage(db)
 
 	sirusClient := sirus.NewClient(logger)
+	discordReporter := discord.NewDiscordReporter(dg)
 
-	killWorker := worker.NewWorker(sirusClient, lbStore, subStore, gmStore, pSubStore, arStore, dg, logger)
+	killWorker := worker.NewWorker(sirusClient, lbStore, subStore, gmStore, pSubStore, arStore, discordReporter, logger)
+
 	killWorker.StartCronScheduler()
-
 	go killWorker.StartProcessor(ctx)
 	go killWorker.GuildKillMonitor(ctx)
 	go killWorker.PlayerKillMonitor(ctx)

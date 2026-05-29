@@ -1,7 +1,6 @@
 package worker
 
 import (
-	"LazyCatBot/internal/discord"
 	"LazyCatBot/internal/models"
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
@@ -11,9 +10,11 @@ import (
 	"os"
 	"sort"
 	"time"
-
-	"github.com/bwmarrin/discordgo"
 )
+
+type Reporter interface {
+	SendKillReport(channelID string, report models.BossKillReport)
+}
 
 type KillJob struct {
 	KillID   int
@@ -27,7 +28,7 @@ type Worker struct {
 	pSubStore   *storage.PlayerSubscribeStorage
 	gmStore     *storage.GuildMembersStorage
 	arStore     *storage.ActualRaidsStorage
-	dg          *discordgo.Session
+	reporter    Reporter
 	killQueue   chan KillJob
 	logger      *slog.Logger
 }
@@ -39,7 +40,7 @@ func NewWorker(
 	gm *storage.GuildMembersStorage,
 	ps *storage.PlayerSubscribeStorage,
 	ar *storage.ActualRaidsStorage,
-	dg *discordgo.Session,
+	reporter Reporter,
 	logger *slog.Logger,
 ) *Worker {
 	return &Worker{
@@ -49,7 +50,7 @@ func NewWorker(
 		pSubStore:   ps,
 		gmStore:     gm,
 		arStore:     ar,
-		dg:          dg,
+		reporter:    reporter,
 		killQueue:   make(chan KillJob, 100),
 		logger:      logger,
 	}
@@ -166,7 +167,7 @@ func (w *Worker) StartProcessor(ctx context.Context) {
 			}
 
 			if w.subStore.IsReportsEnabled(report.GuildID, ch) {
-				discord.SendKillReport(w.dg, ch, *report)
+				w.reporter.SendKillReport(ch, *report)
 			}
 			w.subStore.MarkKillProcessed(job.KillID, ch)
 
