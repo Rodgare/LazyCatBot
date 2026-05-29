@@ -16,15 +16,32 @@ type Reporter interface {
 	SendKillReport(channelID string, report models.BossKillReport)
 }
 
+type SubscribeStore interface {
+	IsKillProcessed(id int, ch string) bool
+	MarkKillProcessed(id int, ch string) error
+	IsReportsEnabled(guild int, channelID string) bool
+	GetTrackedGuilds() (map[int][]string, error)
+}
+
+type SirusAPI interface {
+	FetchBossFightDetails(fightID int) (*models.BossFight, error)
+	FetchGuildLatestBossKills(guildID int) (*models.LatestBossKills, error)
+	FetchPlayerLastActions(playerID int) (*models.PlayerLastActions, error)
+	FetchGuildMembers(guildID int) (*[]models.GuildMembers, error)
+	FetchActualRaids() (models.ActualSirusRaids, error)
+	FetchLeaderboard(raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
+	FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error)
+}
+
 type KillJob struct {
 	KillID   int
 	Channels map[string]bool
 }
 
 type Worker struct {
-	sirusClient *sirus.Client
+	sirusClient SirusAPI
 	lbStore     *storage.LeaderboardStorage
-	subStore    *storage.SubscribeStorage
+	subStore    SubscribeStore
 	pSubStore   *storage.PlayerSubscribeStorage
 	gmStore     *storage.GuildMembersStorage
 	arStore     *storage.ActualRaidsStorage
@@ -34,9 +51,9 @@ type Worker struct {
 }
 
 func NewWorker(
-	sc *sirus.Client,
+	sc SirusAPI,
 	lb *storage.LeaderboardStorage,
-	sub *storage.SubscribeStorage,
+	sub SubscribeStore,
 	gm *storage.GuildMembersStorage,
 	ps *storage.PlayerSubscribeStorage,
 	ar *storage.ActualRaidsStorage,
