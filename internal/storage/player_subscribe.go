@@ -14,20 +14,6 @@ func NewPlayerSubscribeStorage(db *sql.DB) *PlayerSubscribeStorage {
 	return &PlayerSubscribeStorage{db: db}
 }
 
-func (s *PlayerSubscribeStorage) InitDB() error {
-	query := `
-    CREATE TABLE IF NOT EXISTS player_subscribe (
-        id INTEGER,
-		name TEXT,
-        channel_id TEXT,
-        discord_id TEXT,
-        PRIMARY KEY (id, channel_id)
-    );`
-
-	_, err := s.db.Exec(query)
-	return err
-}
-
 func (s *PlayerSubscribeStorage) Subscribe(id int, name string, channelID, discordID string) error {
 	query := `INSERT OR REPLACE INTO player_subscribe (id, name, channel_id, discord_id) VALUES (?, ?, ?, ?)`
 	_, err := s.db.Exec(query, id, name, channelID, discordID)

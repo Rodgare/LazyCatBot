@@ -15,22 +15,6 @@ func NewGuildMembersStorage(db *sql.DB) *GuildMembersStorage {
 	return &GuildMembersStorage{db: db}
 }
 
-func (s *GuildMembersStorage) InitDB() error {
-	query := `
-	CREATE TABLE IF NOT EXISTS guild_members (
-	id INTEGER,
-	name TEXT,
-	ilvl INTEGER,
-	guild_id INTEGER,
-	PRIMARY KEY (name, guild_id)
-	);
-	CREATE INDEX IF NOT EXISTS idx_gm_name ON guild_members (name);
-	`
-
-	_, err := s.db.Exec(query)
-	return err
-}
-
 func (s *GuildMembersStorage) UpdateGuildMembers(guildID int, members []models.GuildMembers) error {
 	tx, err := s.db.Begin()
 	if err != nil {

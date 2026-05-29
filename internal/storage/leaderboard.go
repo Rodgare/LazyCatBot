@@ -22,32 +22,6 @@ func NewLeaderboardStorage(db *sql.DB, logger *slog.Logger) *LeaderboardStorage 
 	}
 }
 
-func (s *LeaderboardStorage) InitDB() error {
-	query := `
-    CREATE TABLE IF NOT EXISTS leaderboard (
-        raid_id INTEGER,
-        boss_id INTEGER,
-        class_id INTEGER,
-        spec_id INTEGER,
-        player_name TEXT,
-        ilvl INTEGER,
-		guild_id INTEGER,
-		zodiac INTEGER,
-		category INTEGER,
-		t4 INTEGER,
-		role TEXT,
-        dps INTEGER,
-		hps INTEGER,
-        PRIMARY KEY (raid_id, boss_id, class_id, spec_id, player_name)
-    );
-    CREATE INDEX IF NOT EXISTS idx_rank_lookup ON leaderboard (raid_id, boss_id, class_id, spec_id, dps DESC);
-	CREATE INDEX IF NOT EXISTS idx_hps_rank_lookup ON leaderboard (raid_id, boss_id, class_id, spec_id, hps DESC);
-    `
-
-	_, err := s.db.Exec(query)
-	return err
-}
-
 func (s *LeaderboardStorage) UpdateLeaderboardStorage(raidOrder, encounter, classID, specID int, players []models.LeaderboardPlayer) error {
 	if len(players) < 2 {
 		return fmt.Errorf("Less then 2 players for Raid: %d, Encounter: %d", raidOrder, encounter)

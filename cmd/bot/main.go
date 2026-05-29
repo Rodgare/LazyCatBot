@@ -4,6 +4,7 @@ import (
 	"LazyCatBot/internal/discord"
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
+	"LazyCatBot/internal/storage/migrations"
 	"LazyCatBot/internal/worker"
 	"context"
 	"database/sql"
@@ -14,6 +15,8 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/pressly/goose/v3"
 
 	slogadapter "github.com/axiomhq/axiom-go/adapters/slog"
 
@@ -60,6 +63,17 @@ func main() {
 	}
 	db.Exec("PRAGMA journal_mode=WAL;")
 	db.Exec("PRAGMA busy_timeout=5000;")
+	goose.SetBaseFS(migrations.EmbedFS)
+	if err := goose.SetDialect("sqlite3"); err != nil {
+		slog.Error("Failed to set goose dialect", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("Running database migrations...")
+	if err := goose.Up(db, "."); err != nil {
+		slog.Error("Database migrations failed", "error", err)
+		os.Exit(1)
+	}
+	slog.Info("Database migrations applied successfully!")
 	defer db.Close()
 
 	lbStore := storage.NewLeaderboardStorage(db, logger)
@@ -67,11 +81,6 @@ func main() {
 	gmStore := storage.NewGuildMembersStorage(db)
 	pSubStore := storage.NewPlayerSubscribeStorage(db)
 	arStore := storage.NewActualRaidsStorage(db)
-	lbStore.InitDB()
-	subStore.InitDB()
-	gmStore.InitDB()
-	pSubStore.InitDB()
-	arStore.InitDB()
 
 	sirusClient := sirus.NewClient(logger)
 
