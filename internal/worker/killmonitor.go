@@ -5,6 +5,7 @@ import (
 	"LazyCatBot/internal/models"
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
+	"context"
 	"encoding/json"
 	"log/slog"
 	"os"
@@ -54,13 +55,24 @@ func NewWorker(
 	}
 }
 
-func (w *Worker) GuildKillMonitor() {
+func (w *Worker) GuildKillMonitor(ctx context.Context) {
 	for {
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[KillMonitor] Guild monitor stopped")
+			return
+		default:
+		}
+
 		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
 		guilds, err := w.subStore.GetTrackedGuilds()
 		if err != nil {
 			w.logger.Error("[KillMonitor] Getting tracked guilds err", "error", err)
-			time.Sleep(1 * time.Minute)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(1 * time.Minute):
+			}
 			continue
 		}
 
@@ -68,24 +80,41 @@ func (w *Worker) GuildKillMonitor() {
 		sortedKillsIDs := w.sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
-			w.killQueue <- KillJob{
-				KillID:   killID,
-				Channels: kills[killID],
+			select {
+			case <-ctx.Done():
+				return
+			case w.killQueue <- KillJob{KillID: killID, Channels: kills[killID]}:
 			}
 		}
 
-		time.Sleep(1 * time.Minute)
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[KillMonitor] Guild monitor stopped")
+			return
+		case <-time.After(1 * time.Minute):
+		}
 	}
 
 }
 
-func (w *Worker) PlayerKillMonitor() {
+func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 	for {
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[KillMonitor] Player monitor stopped")
+			return
+		default:
+		}
+
 		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
 		players, err := w.pSubStore.GetTrackedPlayers()
 		if err != nil {
 			w.logger.Error("[KillMonitor] Getting tracked players err", "error", err)
-			time.Sleep(1 * time.Minute)
+			select {
+			case <-ctx.Done():
+				return
+			case <-time.After(1 * time.Minute):
+			}
 			continue
 		}
 
@@ -93,18 +122,31 @@ func (w *Worker) PlayerKillMonitor() {
 		sortedKillsIDs := w.sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
-			w.killQueue <- KillJob{
-				KillID:   killID,
-				Channels: kills[killID],
+			select {
+			case <-ctx.Done():
+				return
+			case w.killQueue <- KillJob{KillID: killID, Channels: kills[killID]}:
 			}
 		}
 
-		time.Sleep(1 * time.Minute)
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[KillMonitor] Player monitor stopped")
+			return
+		case <-time.After(1 * time.Minute):
+		}
 	}
 }
 
-func (w *Worker) StartProcessor() {
+func (w *Worker) StartProcessor(ctx context.Context) {
 	for job := range w.killQueue {
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[KillMonitor] Processor stopped")
+			return
+		default:
+		}
+
 		var report *models.BossKillReport
 
 		for ch := range job.Channels {
@@ -128,7 +170,12 @@ func (w *Worker) StartProcessor() {
 			}
 			w.subStore.MarkKillProcessed(job.KillID, ch)
 
-			time.Sleep(300 * time.Millisecond)
+			select {
+			case <-ctx.Done():
+				w.logger.Info("[KillMonitor] Processor stopped")
+				return
+			case <-time.After(300 * time.Millisecond):
+			}
 		}
 	}
 }

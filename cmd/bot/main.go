@@ -13,6 +13,7 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
+	"time"
 
 	slogadapter "github.com/axiomhq/axiom-go/adapters/slog"
 
@@ -76,13 +77,14 @@ func main() {
 
 	killWorker := worker.NewWorker(sirusClient, lbStore, subStore, gmStore, pSubStore, arStore, dg, logger)
 	killWorker.StartCronScheduler()
-	go killWorker.StartProcessor()
-	go killWorker.GuildKillMonitor()
-	go killWorker.PlayerKillMonitor()
 
-	go killWorker.GuildMembersUpdater()
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
 
-	// go killWorker.StartLeaderboardSync()
+	go killWorker.StartProcessor(ctx)
+	go killWorker.GuildKillMonitor(ctx)
+	go killWorker.PlayerKillMonitor(ctx)
+	go killWorker.GuildMembersUpdater(ctx)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
@@ -180,6 +182,12 @@ func main() {
 	sc := make(chan os.Signal, 1)
 	signal.Notify(sc, syscall.SIGINT, syscall.SIGTERM, os.Interrupt)
 	<-sc
+
+	slog.Info("Shutting down gracefully...")
+	cancel()
+
+	time.Sleep(5 * time.Second)
+	slog.Info("Bot has been stopped")
 }
 
 type MultiHandler struct {

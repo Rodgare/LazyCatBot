@@ -1,11 +1,19 @@
 package worker
 
 import (
+	"context"
 	"time"
 )
 
-func (w *Worker) GuildMembersUpdater() {
+func (w *Worker) GuildMembersUpdater(ctx context.Context) {
 	for {
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[GuildMembersUpdater] Processor stopped")
+			return
+		default:
+		}
+
 		guildsToUpdate, err := w.subStore.GetTrackedGuilds()
 		if err != nil {
 			w.logger.Error("Getting tracked guilds err", "error", err)
@@ -20,7 +28,12 @@ func (w *Worker) GuildMembersUpdater() {
 			gms, err := w.sirusClient.FetchGuildMembers(gID)
 			if err != nil {
 				w.logger.Error("FetchGuildMembers error", "error", err, "guild_id", gID)
-				time.Sleep(1 * time.Minute)
+				select {
+				case <-ctx.Done():
+					w.logger.Info("[GuildMembersUpdater] Processor stopped")
+					return
+				case <-time.After(1 * time.Minute):
+				}
 			}
 
 			if gms != nil {
@@ -30,9 +43,19 @@ func (w *Worker) GuildMembersUpdater() {
 				}
 			}
 
-			time.Sleep(5 * time.Second)
+			select {
+			case <-ctx.Done():
+				w.logger.Info("[GuildMembersUpdater] Processor stopped")
+				return
+			case <-time.After(5 * time.Second):
+			}
 		}
 
-		time.Sleep(1 * time.Hour)
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[GuildMembersUpdater] Processor stopped")
+			return
+		case <-time.After(1 * time.Hour):
+		}
 	}
 }
