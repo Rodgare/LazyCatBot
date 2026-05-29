@@ -25,6 +25,7 @@ import (
 )
 
 func main() {
+	//env, Axiom logs
 	if err := godotenv.Load(); err != nil {
 		log.Println("No .env file found, using system environment variables")
 	}
@@ -44,6 +45,11 @@ func main() {
 	logger := slog.New(NewMultiHandler(fileHandler, axiomHandler))
 	slog.SetDefault(logger)
 
+	//Context
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	//Discord token and session
 	token := os.Getenv("DISCORD_TOKEN")
 	if token == "" {
 		slog.Error("DISCORD_TOKEN doesn`t set")
@@ -56,11 +62,13 @@ func main() {
 		os.Exit(1)
 	}
 
+	//DB
 	db, err := sql.Open("sqlite", "bot.db")
 	if err != nil {
 		slog.Error("Failed to init db", "error", err)
 		os.Exit(1)
 	}
+	defer db.Close()
 	db.Exec("PRAGMA journal_mode=WAL;")
 	db.Exec("PRAGMA busy_timeout=5000;")
 	goose.SetBaseFS(migrations.EmbedFS)
@@ -74,8 +82,8 @@ func main() {
 		os.Exit(1)
 	}
 	slog.Info("Database migrations applied successfully!")
-	defer db.Close()
 
+	//Storage
 	lbStore := storage.NewLeaderboardStorage(db, logger)
 	subStore := storage.NewSubscribeStorage(db)
 	gmStore := storage.NewGuildMembersStorage(db)
@@ -86,9 +94,6 @@ func main() {
 
 	killWorker := worker.NewWorker(sirusClient, lbStore, subStore, gmStore, pSubStore, arStore, dg, logger)
 	killWorker.StartCronScheduler()
-
-	ctx, cancel := context.WithCancel(context.Background())
-	defer cancel()
 
 	go killWorker.StartProcessor(ctx)
 	go killWorker.GuildKillMonitor(ctx)
