@@ -121,10 +121,13 @@ func main() {
 	}
 	defer dg.Close()
 
+	manageChannelsPerm := int64(discordgo.PermissionManageChannels)
+
 	commands := []*discordgo.ApplicationCommand{
 		{
-			Name:        "set",
-			Description: "Подписаться на отчеты гильдии в этом канале",
+			Name:                     "set",
+			Description:              "Подписаться на отчеты гильдии в этом канале",
+			DefaultMemberPermissions: &manageChannelsPerm,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionInteger,
@@ -135,8 +138,9 @@ func main() {
 			},
 		},
 		{
-			Name:        "unset",
-			Description: "Отписаться от отчетов гильдии в этом канале",
+			Name:                     "unset",
+			Description:              "Отписаться от отчетов гильдии в этом канале",
+			DefaultMemberPermissions: &manageChannelsPerm,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionInteger,
@@ -147,8 +151,9 @@ func main() {
 			},
 		},
 		{
-			Name:        "setcat",
-			Description: "Добавить трекинг игрока в этом канале",
+			Name:                     "setcat",
+			Description:              "Добавить трекинг игрока в этом канале",
+			DefaultMemberPermissions: &manageChannelsPerm,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
@@ -159,8 +164,9 @@ func main() {
 			},
 		},
 		{
-			Name:        "unsetcat",
-			Description: "Отписаться от отчетов игроков в этом канале",
+			Name:                     "unsetcat",
+			Description:              "Отписаться от отчетов игроков в этом канале",
+			DefaultMemberPermissions: &manageChannelsPerm,
 			Options: []*discordgo.ApplicationCommandOption{
 				{
 					Type:        discordgo.ApplicationCommandOptionInteger,
@@ -183,8 +189,9 @@ func main() {
 			Description: "Список отслеживаемых игроков в данном канале",
 		},
 		{
-			Name:        "menu",
-			Description: "Открыть меню настройки трекинга и отправки автоматических отчетов",
+			Name:                     "menu",
+			Description:              "Открыть меню настройки трекинга и отправки автоматических отчетов",
+			DefaultMemberPermissions: &manageChannelsPerm,
 		},
 		{
 			Name:        "topm",
