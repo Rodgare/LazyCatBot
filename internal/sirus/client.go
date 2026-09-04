@@ -25,7 +25,7 @@ func NewClient(logger *slog.Logger) *Client {
 
 func (c *Client) GetPage(raidID, bossID, classID, specID int, role string, page int) (*models.Leaderboard, error) {
 	weekFrom, weekTo := c.GetSirusDates()
-	url := fmt.Sprintf("https://sirus.su/api/base/x3/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=100&ilvl_to=300&page=%d&i=%d&boss=%d&specs=%d:%d",
+	url := fmt.Sprintf("https://sirus.org/api/base/x3/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=100&ilvl_to=300&page=%d&i=%d&boss=%d&specs=%d:%d",
 		role, weekFrom, weekTo, page, raidID, bossID, classID, specID)
 
 	var res models.Leaderboard
@@ -90,7 +90,7 @@ func (c *Client) FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]mod
 }
 
 func (c *Client) GetMetasirusLbPage(mapID, bossID, difficulty, page int) (*models.MetasirusLeaderboard, error) {
-	url := fmt.Sprintf("https://metasirus.su/api/realm/22/map/%d/boss/%d/aggregation/character?difficulty=%d&type=&spec=&specs=&date=current&ilvl_from=&ilvl_to=&page=%d",
+	url := fmt.Sprintf("https://metasirus.org/api/realm/22/map/%d/boss/%d/aggregation/character?difficulty=%d&type=&spec=&specs=&date=current&ilvl_from=&ilvl_to=&page=%d",
 		mapID, bossID, difficulty, page)
 
 	var res models.MetasirusLeaderboard
@@ -101,7 +101,7 @@ func (c *Client) GetMetasirusLbPage(mapID, bossID, difficulty, page int) (*model
 }
 
 func (c *Client) FetchActualRaids() (models.ActualSirusRaids, error) {
-	url := "https://sirus.su/api/base/22/progression/pve/realm-progress"
+	url := "https://sirus.org/api/base/22/progression/pve/realm-progress"
 	var res models.ActualSirusRaids
 
 	if err := c.makeRequest(url, &res); err != nil {
@@ -114,7 +114,7 @@ func (c *Client) FetchActualRaids() (models.ActualSirusRaids, error) {
 func (c *Client) FetchGuildLatestBossKills(guildID int) (*models.LatestBossKills, error) {
 	page := 1
 	weekFrom, weekTo := c.GetLastWeek()
-	url := fmt.Sprintf("https://sirus.su/api/base/22/progression/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s&guild=%d", page, weekFrom, weekTo, guildID)
+	url := fmt.Sprintf("https://sirus.org/api/base/22/progression/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s&guild=%d", page, weekFrom, weekTo, guildID)
 	var res models.LatestBossKills
 
 	if err := c.makeRequest(url, &res); err != nil {
@@ -127,7 +127,7 @@ func (c *Client) FetchGuildLatestBossKills(guildID int) (*models.LatestBossKills
 func (c *Client) FetchPlayerLatestBossKills(playerID int) (*models.LatestPlayerBossKills, error) {
 	page := 1
 	weekFrom, weekTo := c.GetLastWeek()
-	url := fmt.Sprintf("https://sirus.su/api/base/22/statistics/%d/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s", playerID, page, weekFrom, weekTo)
+	url := fmt.Sprintf("https://sirus.org/api/base/22/statistics/%d/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s", playerID, page, weekFrom, weekTo)
 	var res models.LatestPlayerBossKills
 
 	if err := c.makeRequest(url, &res); err != nil {
@@ -138,7 +138,7 @@ func (c *Client) FetchPlayerLatestBossKills(playerID int) (*models.LatestPlayerB
 }
 
 func (c *Client) FetchPlayerLastActions(pID int) (*models.PlayerLastActions, error) {
-	url := fmt.Sprintf("https://sirus.su/api/base/22/statistics/%d/latest-actions", pID)
+	url := fmt.Sprintf("https://sirus.org/api/base/22/statistics/%d/latest-actions", pID)
 
 	var res models.PlayerLastActions
 
@@ -150,7 +150,7 @@ func (c *Client) FetchPlayerLastActions(pID int) (*models.PlayerLastActions, err
 }
 
 func (c *Client) FetchBossFightDetails(fightID int) (*models.BossFight, error) {
-	url := fmt.Sprintf("https://sirus.su/api/base/22/details/bossfight/%v", fightID)
+	url := fmt.Sprintf("https://sirus.org/api/base/22/details/bossfight/%v", fightID)
 	var fight models.BossFight
 
 	if err := c.makeRequest(url, &fight); err != nil {
@@ -161,7 +161,7 @@ func (c *Client) FetchBossFightDetails(fightID int) (*models.BossFight, error) {
 }
 
 func (c *Client) FetchPlayerID(name string) (int, error) {
-	url := fmt.Sprintf("https://sirus.su/api/base/22/character/%s", url.QueryEscape(name))
+	url := fmt.Sprintf("https://sirus.org/api/base/22/character/%s", url.QueryEscape(name))
 	var res models.PlayerProfile
 
 	err := c.makeRequest(url, &res)
@@ -282,7 +282,7 @@ func (c *Client) makeMetasirusRequest(url string, target any) error {
 func (c *Client) FetchGuildMembers(guild_id int) (*[]models.GuildMembers, error) {
 	var gms models.Guild
 
-	url := fmt.Sprintf("https://sirus.su/api/base/22/guild/%d", guild_id)
+	url := fmt.Sprintf("https://sirus.org/api/base/22/guild/%d", guild_id)
 	if err := c.makeRequest(url, &gms); err != nil {
 		return nil, err
 	}
