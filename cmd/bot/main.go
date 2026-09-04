@@ -1,6 +1,7 @@
 package main
 
 import (
+	"LazyCatBot/internal/config"
 	"LazyCatBot/internal/discord"
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
@@ -90,7 +91,12 @@ func main() {
 	pSubStore := storage.NewPlayerSubscribeStorage(db)
 	arStore := storage.NewActualRaidsStorage(db)
 
-	sirusClient := sirus.NewClient(logger)
+	appCfg, err := config.LoadConfig("config.json")
+	if err != nil {
+		slog.Warn("Failed to load config.json, using defaults", "error", err)
+	}
+
+	sirusClient := sirus.NewClient(logger, appCfg.GetSirusURLs())
 	discordReporter := discord.NewDiscordReporter(dg)
 
 	killWorker := worker.NewWorker(sirusClient, lbStore, subStore, gmStore, pSubStore, arStore, discordReporter, logger)
