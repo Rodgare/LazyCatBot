@@ -4,8 +4,7 @@
 CREATE TABLE IF NOT EXISTS actual_raids (
     raid_id INTEGER,
     boss_id INTEGER,
-    server_id INTEGER,
-    PRIMARY KEY (raid_id, boss_id, server_id)
+    PRIMARY KEY (raid_id, boss_id)
 );
 
 CREATE TABLE IF NOT EXISTS subscribe (
