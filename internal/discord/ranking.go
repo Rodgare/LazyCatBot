@@ -64,6 +64,7 @@ func (h *BotHandler) SendBossRanking(s *discordgo.Session, i *discordgo.Interact
 		BossName:  fmt.Sprintf("%s (%s)", sirus.GetBossName(raidID, bossID), strings.ToUpper(role)),
 		RaidOrder: raidID,
 		Players:   players,
+		Realm:     targetSub.Realm,
 	}
 	img, err := RenderReportImage(report)
 	if err != nil {
