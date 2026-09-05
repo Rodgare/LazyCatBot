@@ -288,6 +288,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int, realm string)
 		GuildName: fight.Data.Guild.Name,
 		TotalDps:  totalDps,
 		TotalHps:  totalHps,
+		Realm:     realm,
 	}
 
 	for _, loot := range fight.Data.Loots {
