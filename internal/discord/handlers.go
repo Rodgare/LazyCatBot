@@ -313,8 +313,8 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 
 	rows = append(rows, discordgo.ActionsRow{
 		Components: []discordgo.MessageComponent{
-			discordgo.Button{Label: "🏰 + Гильдию", Style: discordgo.PrimaryButton, CustomID: "btn_add_guild"},
-			discordgo.Button{Label: "👤 + Игрока", Style: discordgo.PrimaryButton, CustomID: "btn_add_player"},
+			discordgo.Button{Label: "🏰 Добавить гильдию", Style: discordgo.PrimaryButton, CustomID: "btn_add_guild"},
+			discordgo.Button{Label: "👤 Добавить игрока", Style: discordgo.PrimaryButton, CustomID: "btn_add_player"},
 		},
 	})
 
@@ -325,7 +325,7 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 			guildRow := discordgo.ActionsRow{
 				Components: []discordgo.MessageComponent{
 					discordgo.Button{
-						Label:    fmt.Sprintf("🗑️ Гильдия ID: %d", gID),
+						Label:    fmt.Sprintf("Удалить Гильдия ID: %d", gID),
 						Style:    discordgo.DangerButton,
 						CustomID: fmt.Sprintf("remove_guild_%d", gID),
 					},
@@ -348,7 +348,7 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 		var playerButtons []discordgo.MessageComponent
 		for pID, pName := range players {
 			playerButtons = append(playerButtons, discordgo.Button{
-				Label:    fmt.Sprintf("✖️ %s", pName),
+				Label:    fmt.Sprintf("✖️Удалить %s", pName),
 				Style:    discordgo.DangerButton,
 				CustomID: fmt.Sprintf("remove_player_%d", pID),
 			})
