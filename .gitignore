@@ -8,3 +8,5 @@ internal/sirus/testdata/mock_sirus_boss_fight.json
 bot.db-shm
 bot.db-wal
 bot_test.exe
+.vscode/justybase-favorites.json
+.gitignore
