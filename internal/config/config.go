@@ -28,7 +28,7 @@ func LoadConfig(path string) (*Config, error) {
 
 func defaultConfig() *Config {
 	return &Config{
-		SirusBaseURLs: []string{"https://sirus.org", "https://sirus.su"},
+		SirusBaseURLs: []string{"https://sirus.su", "https://sirus.org"},
 	}
 }
 
@@ -42,7 +42,7 @@ func (c *Config) GetSirusURLs() []string {
 	}
 
 	if len(urls) == 0 {
-		urls = []string{"https://sirus.org", "https://sirus.su"}
+		urls = []string{"https://sirus.su", "https://sirus.org"}
 	}
 
 	var cleaned []string

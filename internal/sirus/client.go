@@ -114,7 +114,7 @@ func (c *Client) FetchMetasirusLeaderboard(realm string, mapID, bossID, difficul
 
 func (c *Client) GetMetasirusLbPage(realm string, mapID, bossID, difficulty, page int) (*models.MetasirusLeaderboard, error) {
 	realm = normalizeRealm(realm)
-	url := fmt.Sprintf("https://metasirus.org/api/realm/%s/map/%d/boss/%d/aggregation/character?difficulty=%d&type=&spec=&specs=&date=current&ilvl_from=&ilvl_to=&page=%d",
+	url := fmt.Sprintf("https://metasirus.su/api/realm/%s/map/%d/boss/%d/aggregation/character?difficulty=%d&type=&spec=&specs=&date=current&ilvl_from=&ilvl_to=&page=%d",
 		realm, mapID, bossID, difficulty, page)
 
 	var res models.MetasirusLeaderboard
