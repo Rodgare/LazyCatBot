@@ -38,10 +38,18 @@ func NewClient(logger *slog.Logger, sirusBaseURLs []string) *Client {
 	}
 }
 
-func (c *Client) GetPage(raidID, bossID, classID, specID int, role string, page int) (*models.Leaderboard, error) {
+func normalizeRealm(realm string) string {
+	if realm == "" {
+		return "x3"
+	}
+	return realm
+}
+
+func (c *Client) GetPage(realm string, raidID, bossID, classID, specID int, role string, page int) (*models.Leaderboard, error) {
+	realm = normalizeRealm(realm)
 	weekFrom, weekTo := c.GetSirusDates()
-	endpoint := fmt.Sprintf("/api/base/x3/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=100&ilvl_to=300&page=%d&i=%d&boss=%d&specs=%d:%d",
-		role, weekFrom, weekTo, page, raidID, bossID, classID, specID)
+	endpoint := fmt.Sprintf("/api/base/%s/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=100&ilvl_to=300&page=%d&i=%d&boss=%d&specs=%d:%d",
+		realm, role, weekFrom, weekTo, page, raidID, bossID, classID, specID)
 
 	var res models.Leaderboard
 	if err := c.makeRequest(endpoint, &res); err != nil {
@@ -51,10 +59,10 @@ func (c *Client) GetPage(raidID, bossID, classID, specID int, role string, page 
 	return &res, nil
 }
 
-func (c *Client) FetchLeaderboard(raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error) {
+func (c *Client) FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error) {
 	var allPlayers []models.LeaderboardPlayer
 
-	firstPage, err := c.GetPage(raidID, bossID, classID, specID, role, 1)
+	firstPage, err := c.GetPage(realm, raidID, bossID, classID, specID, role, 1)
 	if err != nil {
 		time.Sleep(15 * time.Second)
 		return nil, err
@@ -64,7 +72,7 @@ func (c *Client) FetchLeaderboard(raidID, bossID, classID, specID int, role stri
 	totalPages := firstPage.Meta.LastPage
 
 	for p := 2; p <= totalPages; p++ {
-		nextPage, err := c.GetPage(raidID, bossID, classID, specID, role, p)
+		nextPage, err := c.GetPage(realm, raidID, bossID, classID, specID, role, p)
 
 		if err != nil {
 			c.logger.Error("Error fetch leaderboard", "error", err, "page", p)
@@ -77,10 +85,10 @@ func (c *Client) FetchLeaderboard(raidID, bossID, classID, specID int, role stri
 	return allPlayers, nil
 }
 
-func (c *Client) FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error) {
+func (c *Client) FetchMetasirusLeaderboard(realm string, mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error) {
 	var allPlayers []models.MetasirusLeaderboardPlayer
 
-	firstPage, err := c.GetMetasirusLbPage(mapID, bossID, difficulty, 1)
+	firstPage, err := c.GetMetasirusLbPage(realm, mapID, bossID, difficulty, 1)
 	if err != nil {
 		time.Sleep(15 * time.Second)
 		return nil, err
@@ -90,7 +98,7 @@ func (c *Client) FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]mod
 	totalPages := firstPage.Meta.LastPage
 
 	for p := 2; p <= totalPages; p++ {
-		nextPage, err := c.GetMetasirusLbPage(mapID, bossID, difficulty, p)
+		nextPage, err := c.GetMetasirusLbPage(realm, mapID, bossID, difficulty, p)
 		if err != nil {
 			c.logger.Error("GetMetasirusLbPage Error loading", "error", err, "page", p)
 			time.Sleep(15 * time.Second)
@@ -104,9 +112,10 @@ func (c *Client) FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]mod
 	return allPlayers, nil
 }
 
-func (c *Client) GetMetasirusLbPage(mapID, bossID, difficulty, page int) (*models.MetasirusLeaderboard, error) {
-	url := fmt.Sprintf("https://metasirus.org/api/realm/22/map/%d/boss/%d/aggregation/character?difficulty=%d&type=&spec=&specs=&date=current&ilvl_from=&ilvl_to=&page=%d",
-		mapID, bossID, difficulty, page)
+func (c *Client) GetMetasirusLbPage(realm string, mapID, bossID, difficulty, page int) (*models.MetasirusLeaderboard, error) {
+	realm = normalizeRealm(realm)
+	url := fmt.Sprintf("https://metasirus.org/api/realm/%s/map/%d/boss/%d/aggregation/character?difficulty=%d&type=&spec=&specs=&date=current&ilvl_from=&ilvl_to=&page=%d",
+		realm, mapID, bossID, difficulty, page)
 
 	var res models.MetasirusLeaderboard
 	if err := c.makeMetasirusRequest(url, &res); err != nil {
@@ -115,8 +124,9 @@ func (c *Client) GetMetasirusLbPage(mapID, bossID, difficulty, page int) (*model
 	return &res, nil
 }
 
-func (c *Client) FetchActualRaids() (models.ActualSirusRaids, error) {
-	endpoint := "/api/base/22/progression/pve/realm-progress"
+func (c *Client) FetchActualRaids(realm string) (models.ActualSirusRaids, error) {
+	realm = normalizeRealm(realm)
+	endpoint := fmt.Sprintf("/api/base/%s/progression/pve/realm-progress", realm)
 	var res models.ActualSirusRaids
 
 	if err := c.makeRequest(endpoint, &res); err != nil {
@@ -126,10 +136,11 @@ func (c *Client) FetchActualRaids() (models.ActualSirusRaids, error) {
 	return res, nil
 }
 
-func (c *Client) FetchGuildLatestBossKills(guildID int) (*models.LatestBossKills, error) {
+func (c *Client) FetchGuildLatestBossKills(realm string, guildID int) (*models.LatestBossKills, error) {
+	realm = normalizeRealm(realm)
 	page := 1
 	weekFrom, weekTo := c.GetLastWeek()
-	endpoint := fmt.Sprintf("/api/base/22/progression/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s&guild=%d", page, weekFrom, weekTo, guildID)
+	endpoint := fmt.Sprintf("/api/base/%s/progression/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s&guild=%d", realm, page, weekFrom, weekTo, guildID)
 	var res models.LatestBossKills
 
 	if err := c.makeRequest(endpoint, &res); err != nil {
@@ -139,10 +150,11 @@ func (c *Client) FetchGuildLatestBossKills(guildID int) (*models.LatestBossKills
 	return &res, nil
 }
 
-func (c *Client) FetchPlayerLatestBossKills(playerID int) (*models.LatestPlayerBossKills, error) {
+func (c *Client) FetchPlayerLatestBossKills(realm string, playerID int) (*models.LatestPlayerBossKills, error) {
+	realm = normalizeRealm(realm)
 	page := 1
 	weekFrom, weekTo := c.GetLastWeek()
-	endpoint := fmt.Sprintf("/api/base/22/statistics/%d/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s", playerID, page, weekFrom, weekTo)
+	endpoint := fmt.Sprintf("/api/base/%s/statistics/%d/pve/latest-boss-kills?page=%d&week_from=%s&week_to=%s", realm, playerID, page, weekFrom, weekTo)
 	var res models.LatestPlayerBossKills
 
 	if err := c.makeRequest(endpoint, &res); err != nil {
@@ -152,8 +164,9 @@ func (c *Client) FetchPlayerLatestBossKills(playerID int) (*models.LatestPlayerB
 	return &res, nil
 }
 
-func (c *Client) FetchPlayerLastActions(pID int) (*models.PlayerLastActions, error) {
-	endpoint := fmt.Sprintf("/api/base/22/statistics/%d/latest-actions", pID)
+func (c *Client) FetchPlayerLastActions(realm string, pID int) (*models.PlayerLastActions, error) {
+	realm = normalizeRealm(realm)
+	endpoint := fmt.Sprintf("/api/base/%s/statistics/%d/latest-actions", realm, pID)
 
 	var res models.PlayerLastActions
 
@@ -164,8 +177,9 @@ func (c *Client) FetchPlayerLastActions(pID int) (*models.PlayerLastActions, err
 	return &res, nil
 }
 
-func (c *Client) FetchBossFightDetails(fightID int) (*models.BossFight, error) {
-	endpoint := fmt.Sprintf("/api/base/22/details/bossfight/%v", fightID)
+func (c *Client) FetchBossFightDetails(realm string, fightID int) (*models.BossFight, error) {
+	realm = normalizeRealm(realm)
+	endpoint := fmt.Sprintf("/api/base/%s/details/bossfight/%v", realm, fightID)
 	var fight models.BossFight
 
 	if err := c.makeRequest(endpoint, &fight); err != nil {
@@ -175,8 +189,9 @@ func (c *Client) FetchBossFightDetails(fightID int) (*models.BossFight, error) {
 	return &fight, nil
 }
 
-func (c *Client) FetchPlayerID(name string) (int, error) {
-	endpoint := fmt.Sprintf("/api/base/22/character/%s", url.QueryEscape(name))
+func (c *Client) FetchPlayerID(realm string, name string) (int, error) {
+	realm = normalizeRealm(realm)
+	endpoint := fmt.Sprintf("/api/base/%s/character/%s", realm, url.QueryEscape(name))
 	var res models.PlayerProfile
 
 	err := c.makeRequest(endpoint, &res)
@@ -297,10 +312,11 @@ func (c *Client) makeMetasirusRequest(url string, target any) error {
 	return json.Unmarshal([]byte(body), target)
 }
 
-func (c *Client) FetchGuildMembers(guild_id int) (*[]models.GuildMembers, error) {
+func (c *Client) FetchGuildMembers(realm string, guild_id int) (*[]models.GuildMembers, error) {
+	realm = normalizeRealm(realm)
 	var gms models.Guild
 
-	endpoint := fmt.Sprintf("/api/base/22/guild/%d", guild_id)
+	endpoint := fmt.Sprintf("/api/base/%s/guild/%d", realm, guild_id)
 	if err := c.makeRequest(endpoint, &gms); err != nil {
 		return nil, err
 	}

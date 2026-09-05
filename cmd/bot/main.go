@@ -123,6 +123,13 @@ func main() {
 
 	manageChannelsPerm := int64(discordgo.PermissionManageChannels)
 
+	realmChoices := []*discordgo.ApplicationCommandOptionChoice{
+		{Name: "Nevermine x3 (По умолчанию)", Value: "x3"},
+		{Name: "Soulseeker x1", Value: "x1"},
+		{Name: "Scourge x2", Value: "x2"},
+		{Name: "Sirus x5", Value: "x5"},
+	}
+
 	commands := []*discordgo.ApplicationCommand{
 		{
 			Name:                     "set",
@@ -134,6 +141,13 @@ func main() {
 					Name:        "id",
 					Description: "ID гильдии на Сирусе",
 					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "realm",
+					Description: "Игровой сервер (по умолчанию х3)",
+					Required:    false,
+					Choices:     realmChoices,
 				},
 			},
 		},
@@ -158,8 +172,15 @@ func main() {
 				{
 					Type:        discordgo.ApplicationCommandOptionString,
 					Name:        "name",
-					Description: "Имя игрока на Сервере х3",
+					Description: "Имя игрока",
 					Required:    true,
+				},
+				{
+					Type:        discordgo.ApplicationCommandOptionString,
+					Name:        "realm",
+					Description: "Игровой сервер (по умолчанию х3)",
+					Required:    false,
+					Choices:     realmChoices,
 				},
 			},
 		},

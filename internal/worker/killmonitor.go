@@ -20,21 +20,22 @@ type SubscribeStore interface {
 	IsKillProcessed(id int, ch string) bool
 	MarkKillProcessed(id int, ch string) error
 	IsReportsEnabled(guild int, channelID string) bool
-	GetTrackedGuilds() (map[int][]string, error)
+	GetTrackedGuilds() (map[storage.TrackedGuildKey][]string, error)
 }
 
 type SirusAPI interface {
-	FetchBossFightDetails(fightID int) (*models.BossFight, error)
-	FetchGuildLatestBossKills(guildID int) (*models.LatestBossKills, error)
-	FetchPlayerLastActions(playerID int) (*models.PlayerLastActions, error)
-	FetchGuildMembers(guildID int) (*[]models.GuildMembers, error)
-	FetchActualRaids() (models.ActualSirusRaids, error)
-	FetchLeaderboard(raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
-	FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error)
+	FetchBossFightDetails(realm string, fightID int) (*models.BossFight, error)
+	FetchGuildLatestBossKills(realm string, guildID int) (*models.LatestBossKills, error)
+	FetchPlayerLastActions(realm string, playerID int) (*models.PlayerLastActions, error)
+	FetchGuildMembers(realm string, guildID int) (*[]models.GuildMembers, error)
+	FetchActualRaids(realm string) (models.ActualSirusRaids, error)
+	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
+	FetchMetasirusLeaderboard(realm string, mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error)
 }
 
 type KillJob struct {
 	KillID   int
+	Realm    string
 	Channels map[string]bool
 }
 
@@ -82,7 +83,6 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 		default:
 		}
 
-		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
 		guilds, err := w.subStore.GetTrackedGuilds()
 		if err != nil {
 			w.logger.Error("[KillMonitor] Getting tracked guilds err", "error", err)
@@ -94,14 +94,14 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 			continue
 		}
 
-		kills := w.getKills(guilds, true)
+		kills, killRealms := w.getGuildKills(guilds)
 		sortedKillsIDs := w.sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
 			select {
 			case <-ctx.Done():
 				return
-			case w.killQueue <- KillJob{KillID: killID, Channels: kills[killID]}:
+			case w.killQueue <- KillJob{KillID: killID, Realm: killRealms[killID], Channels: kills[killID]}:
 			}
 		}
 
@@ -112,7 +112,6 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 		case <-time.After(1 * time.Minute):
 		}
 	}
-
 }
 
 func (w *Worker) PlayerKillMonitor(ctx context.Context) {
@@ -124,7 +123,6 @@ func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 		default:
 		}
 
-		// discord.SendKillReport(dg, os.Getenv("DEBUG_CHANNEL_ID"), makeMockReport())
 		players, err := w.pSubStore.GetTrackedPlayers()
 		if err != nil {
 			w.logger.Error("[KillMonitor] Getting tracked players err", "error", err)
@@ -136,14 +134,14 @@ func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 			continue
 		}
 
-		kills := w.getKills(players, false)
+		kills, killRealms := w.getPlayerKills(players)
 		sortedKillsIDs := w.sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
 			select {
 			case <-ctx.Done():
 				return
-			case w.killQueue <- KillJob{KillID: killID, Channels: kills[killID]}:
+			case w.killQueue <- KillJob{KillID: killID, Realm: killRealms[killID], Channels: kills[killID]}:
 			}
 		}
 
@@ -173,7 +171,7 @@ func (w *Worker) StartProcessor(ctx context.Context) {
 			}
 
 			if report == nil {
-				enrichedKill, err := w.sirusClient.FetchBossFightDetails(job.KillID)
+				enrichedKill, err := w.sirusClient.FetchBossFightDetails(job.Realm, job.KillID)
 				if err != nil {
 					w.logger.Error("[Processor] Fetch Boss Fight Details err", "error", err)
 					break
@@ -198,67 +196,73 @@ func (w *Worker) StartProcessor(ctx context.Context) {
 	}
 }
 
-func (w *Worker) getKills(data map[int][]string, isGuild bool) map[int]map[string]bool {
+func (w *Worker) getGuildKills(data map[storage.TrackedGuildKey][]string) (map[int]map[string]bool, map[int]string) {
 	kills := make(map[int]map[string]bool)
+	killRealms := make(map[int]string)
 
-	if isGuild {
-		for gID, channels := range data {
-			gKills, err := w.sirusClient.FetchGuildLatestBossKills(gID)
-			if err != nil {
-				w.logger.Error("[KillMonitor] Fetch Guild Latest BossKills err", "error", err, "guild_id", gID)
-				continue
-			}
-
-			for _, kill := range gKills.Data {
-				for _, ch := range channels {
-					// fmt.Printf("for kills killID %d\n", kill.KillID)
-
-					id := kill.KillID
-					if !w.subStore.IsKillProcessed(id, ch) {
-						if _, ok := kills[id]; !ok {
-							kills[id] = make(map[string]bool)
-						}
-
-						kills[id][ch] = true
-					}
-				}
-			}
-			time.Sleep(300 * time.Millisecond)
+	for key, channels := range data {
+		gKills, err := w.sirusClient.FetchGuildLatestBossKills(key.Realm, key.GuildID)
+		if err != nil {
+			w.logger.Error("[KillMonitor] Fetch Guild Latest BossKills err", "error", err, "guild_id", key.GuildID, "realm", key.Realm)
+			continue
 		}
-	} else {
-		for pID, channels := range data {
-			pKills, err := w.sirusClient.FetchPlayerLastActions(pID)
-			if err != nil || pKills == nil {
-				w.logger.Error("[KillMonitor] pKills is nil or Fetch Player Latest BossKills err", "error", err, "player_id", pID)
-				continue
-			}
-			lastKills := *pKills
 
-			if len(lastKills) >= 10 {
-				lastKills = lastKills[:10]
-			}
-
-			for _, kill := range lastKills {
-				if kill.Type != "bosskill" || !sirus.IsPlayerKillToday(kill.Date) {
-					continue
-				}
-				for _, ch := range channels {
-					id := kill.FightID
-
-					if !w.subStore.IsKillProcessed(id, ch) {
-						if _, ok := kills[id]; !ok {
-							kills[id] = make(map[string]bool)
-						}
-
-						kills[id][ch] = true
+		for _, kill := range gKills.Data {
+			for _, ch := range channels {
+				id := kill.KillID
+				if !w.subStore.IsKillProcessed(id, ch) {
+					if _, ok := kills[id]; !ok {
+						kills[id] = make(map[string]bool)
 					}
+
+					kills[id][ch] = true
+					killRealms[id] = key.Realm
 				}
 			}
-			time.Sleep(300 * time.Millisecond)
 		}
+		time.Sleep(300 * time.Millisecond)
 	}
 
-	return kills
+	return kills, killRealms
+}
+
+func (w *Worker) getPlayerKills(data map[storage.TrackedPlayerKey][]string) (map[int]map[string]bool, map[int]string) {
+	kills := make(map[int]map[string]bool)
+	killRealms := make(map[int]string)
+
+	for key, channels := range data {
+		pKills, err := w.sirusClient.FetchPlayerLastActions(key.Realm, key.PlayerID)
+		if err != nil || pKills == nil {
+			w.logger.Error("[KillMonitor] pKills is nil or Fetch Player Latest BossKills err", "error", err, "player_id", key.PlayerID, "realm", key.Realm)
+			continue
+		}
+		lastKills := *pKills
+
+		if len(lastKills) >= 10 {
+			lastKills = lastKills[:10]
+		}
+
+		for _, kill := range lastKills {
+			if kill.Type != "bosskill" || !sirus.IsPlayerKillToday(kill.Date) {
+				continue
+			}
+			for _, ch := range channels {
+				id := kill.FightID
+
+				if !w.subStore.IsKillProcessed(id, ch) {
+					if _, ok := kills[id]; !ok {
+						kills[id] = make(map[string]bool)
+					}
+
+					kills[id][ch] = true
+					killRealms[id] = key.Realm
+				}
+			}
+		}
+		time.Sleep(300 * time.Millisecond)
+	}
+
+	return kills, killRealms
 }
 
 func (w *Worker) createReport(fight *models.BossFight, killID int) models.BossKillReport {

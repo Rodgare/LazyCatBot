@@ -10,7 +10,7 @@ import (
 func (w *Worker) StartLeaderboardSync() {
 	w.logger.Info("Starting leaderboard sync system...")
 
-	actualRaids, err := w.sirusClient.FetchActualRaids()
+	actualRaids, err := w.sirusClient.FetchActualRaids("x3")
 	if err != nil {
 		w.logger.Error("Error fetching actual raids", "error", err)
 		time.Sleep(10 * time.Minute)
@@ -41,7 +41,7 @@ func (w *Worker) StartLeaderboardSync() {
 					l.Info("Start parsing boss leaderboard")
 
 					role := sirus.GetRoleString(classID, specID)
-					players, err := w.sirusClient.FetchLeaderboard(raid.Order, bossID, classID, specID, role)
+					players, err := w.sirusClient.FetchLeaderboard("x3", raid.Order, bossID, classID, specID, role)
 					if err != nil {
 						l.Error("Fetch leaderboard error", "error", err)
 						time.Sleep(2 * time.Second)

@@ -14,9 +14,17 @@ func NewSubscribeStorage(db *sql.DB) *SubscribeStorage {
 	return &SubscribeStorage{db: db}
 }
 
-func (s *SubscribeStorage) Subscribe(guild int, channelID, discordID string) error {
-	query := `INSERT OR REPLACE INTO subscribe (guild_id, channel_id, discord_id) VALUES (?, ?, ?)`
-	_, err := s.db.Exec(query, guild, channelID, discordID)
+type TrackedGuildKey struct {
+	GuildID int
+	Realm   string
+}
+
+func (s *SubscribeStorage) Subscribe(guild int, channelID, discordID, realm string) error {
+	if realm == "" {
+		realm = "x3"
+	}
+	query := `INSERT OR REPLACE INTO subscribe (guild_id, channel_id, discord_id, realm) VALUES (?, ?, ?, ?)`
+	_, err := s.db.Exec(query, guild, channelID, discordID, realm)
 	return err
 }
 
@@ -89,22 +97,24 @@ func (s *SubscribeStorage) GetGuildsByChannel(channelID string) ([]int, error) {
 	return guilds, nil
 }
 
-func (s *SubscribeStorage) GetTrackedGuilds() (map[int][]string, error) {
-	query := `SELECT guild_id, channel_id FROM subscribe`
+func (s *SubscribeStorage) GetTrackedGuilds() (map[TrackedGuildKey][]string, error) {
+	query := `SELECT guild_id, channel_id, COALESCE(realm, 'x3') FROM subscribe`
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	res := make(map[int][]string)
+	res := make(map[TrackedGuildKey][]string)
 	for rows.Next() {
 		var guild int
 		var channel string
-		if err := rows.Scan(&guild, &channel); err != nil {
+		var realm string
+		if err := rows.Scan(&guild, &channel, &realm); err != nil {
 			return nil, err
 		}
-		res[guild] = append(res[guild], channel)
+		key := TrackedGuildKey{GuildID: guild, Realm: realm}
+		res[key] = append(res[key], channel)
 	}
 
 	return res, nil

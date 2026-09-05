@@ -25,7 +25,7 @@ func (m *MockReporter) SendKillReport(channelID string, report models.BossKillRe
 
 type MockSirusAPI struct{}
 
-func (m *MockSirusAPI) FetchBossFightDetails(fightID int) (*models.BossFight, error) {
+func (m *MockSirusAPI) FetchBossFightDetails(realm string, fightID int) (*models.BossFight, error) {
 	bf := &models.BossFight{
 		Order:     1,
 		Encounter: 2,
@@ -50,22 +50,22 @@ func (m *MockSirusAPI) FetchBossFightDetails(fightID int) (*models.BossFight, er
 	return bf, nil
 }
 
-func (m *MockSirusAPI) FetchGuildLatestBossKills(guildID int) (*models.LatestBossKills, error) {
+func (m *MockSirusAPI) FetchGuildLatestBossKills(realm string, guildID int) (*models.LatestBossKills, error) {
 	return nil, nil
 }
-func (m *MockSirusAPI) FetchPlayerLastActions(playerID int) (*models.PlayerLastActions, error) {
+func (m *MockSirusAPI) FetchPlayerLastActions(realm string, playerID int) (*models.PlayerLastActions, error) {
 	return nil, nil
 }
-func (m *MockSirusAPI) FetchGuildMembers(guildID int) (*[]models.GuildMembers, error) {
+func (m *MockSirusAPI) FetchGuildMembers(realm string, guildID int) (*[]models.GuildMembers, error) {
 	return nil, nil
 }
-func (m *MockSirusAPI) FetchActualRaids() (models.ActualSirusRaids, error) {
+func (m *MockSirusAPI) FetchActualRaids(realm string) (models.ActualSirusRaids, error) {
 	return nil, nil
 }
-func (m *MockSirusAPI) FetchLeaderboard(raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error) {
+func (m *MockSirusAPI) FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error) {
 	return nil, nil
 }
-func (m *MockSirusAPI) FetchMetasirusLeaderboard(mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error) {
+func (m *MockSirusAPI) FetchMetasirusLeaderboard(realm string, mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error) {
 	return nil, nil
 }
 
@@ -92,7 +92,7 @@ func TestStartProcessor_WithMock(t *testing.T) {
 
 	_, err = db.Exec(`
 		CREATE TABLE processed_kills (kill_id INTEGER, channel_id TEXT, PRIMARY KEY (kill_id, channel_id));
-		CREATE TABLE subscribe (guild_id INTEGER, channel_id TEXT, discord_id TEXT, is_send INTEGER DEFAULT 1, PRIMARY KEY (guild_id, channel_id, discord_id));
+		CREATE TABLE subscribe (guild_id INTEGER, channel_id TEXT, discord_id TEXT, is_send INTEGER DEFAULT 1, realm TEXT DEFAULT 'x3', PRIMARY KEY (guild_id, channel_id, discord_id));
 		CREATE TABLE leaderboard (raid_id INTEGER, boss_id INTEGER, class_id INTEGER, spec_id INTEGER, player_name TEXT, ilvl INTEGER, guild_id INTEGER, zodiac INTEGER, category INTEGER, t4 INTEGER, role TEXT, dps INTEGER, hps INTEGER, PRIMARY KEY (raid_id, boss_id, class_id, spec_id, player_name));
 	`)
 	if err != nil {
@@ -103,7 +103,7 @@ func TestStartProcessor_WithMock(t *testing.T) {
 	realSubStore := storage.NewSubscribeStorage(db)
 	realLbStore := storage.NewLeaderboardStorage(db, logger)
 
-	err = realSubStore.Subscribe(777, "discord-channel-xyz", "some-guild-id")
+	err = realSubStore.Subscribe(777, "discord-channel-xyz", "some-guild-id", "x3")
 	if err != nil {
 		t.Fatalf("Failed to setup subscribe: %v", err)
 	}
@@ -127,6 +127,7 @@ func TestStartProcessor_WithMock(t *testing.T) {
 
 	job := KillJob{
 		KillID:   123,
+		Realm:    "x3",
 		Channels: map[string]bool{"discord-channel-xyz": true},
 	}
 	w.killQueue <- job

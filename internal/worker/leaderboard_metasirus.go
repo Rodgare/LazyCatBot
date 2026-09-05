@@ -11,7 +11,7 @@ func (w *Worker) StartMetasirusLbSync(store *storage.LeaderboardStorage) {
 	fmt.Println("[Worker] Starting metasirus sync system...")
 
 	for {
-		raids, err := w.sirusClient.FetchActualRaids()
+		raids, err := w.sirusClient.FetchActualRaids("x3")
 		if err != nil {
 			w.logger.Error("Error fetching actual raids", "error", err)
 			time.Sleep(1 * time.Minute)
@@ -27,7 +27,7 @@ func (w *Worker) StartMetasirusLbSync(store *storage.LeaderboardStorage) {
 					continue
 				}
 
-				players, err := w.sirusClient.FetchMetasirusLeaderboard(raid.MapID, metasirusBossID, raid.Difficulty)
+				players, err := w.sirusClient.FetchMetasirusLeaderboard("x3", raid.MapID, metasirusBossID, raid.Difficulty)
 				if err != nil {
 					w.logger.Error("Get metasirus data error", "error", err, "raid_id", raid.Order, "boss_id", sirusBossID)
 					time.Sleep(1 * time.Hour)

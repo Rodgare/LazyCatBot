@@ -63,8 +63,8 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 	switch data.CustomID {
 	case "modal_add_player":
 		playerName := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-		id, _ := h.sirusClient.FetchPlayerID(playerName)
-		err := h.PlayerSubStore.Subscribe(id, playerName, i.ChannelID, i.GuildID)
+		id, _ := h.sirusClient.FetchPlayerID("x3", playerName)
+		err := h.PlayerSubStore.Subscribe(id, playerName, i.ChannelID, i.GuildID, "x3")
 
 		content := fmt.Sprintf("✅ Игрок **%s** успешно добавлен в список отслеживания!", playerName)
 		if err != nil {
@@ -82,7 +82,7 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 		guildIDStr := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 		var guildID int
 		fmt.Sscanf(guildIDStr, "%d", &guildID)
-		err := h.SubStore.Subscribe(guildID, i.ChannelID, i.GuildID)
+		err := h.SubStore.Subscribe(guildID, i.ChannelID, i.GuildID, "x3")
 		content := fmt.Sprintf("✅ Гильдия **%d** успешно добавлена!", guildID)
 		if err != nil {
 			content = "❌ Ошибка при добавлении гильдии."
@@ -90,9 +90,9 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 		}
 
 		go func(id int) {
-			members, err := h.sirusClient.FetchGuildMembers(id)
+			members, err := h.sirusClient.FetchGuildMembers("x3", id)
 			if err == nil && members != nil {
-				h.GMStore.UpdateGuildMembers(id, *members)
+				h.GMStore.UpdateGuildMembers("x3", id, *members)
 				l.Info("Guild members are saved")
 			}
 		}(guildID)
@@ -447,7 +447,14 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 		h.HandleMenuCommand(s, i)
 	case "set":
 		guildId := int(data.Options[0].IntValue())
-		err := h.SubStore.Subscribe(guildId, channelID, guildID)
+		realm := "x3"
+		for _, opt := range data.Options {
+			if opt.Name == "realm" {
+				realm = opt.StringValue()
+			}
+		}
+
+		err := h.SubStore.Subscribe(guildId, channelID, guildID, realm)
 		if err != nil {
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -460,18 +467,18 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 			return
 		}
 
-		go func(id int) {
-			members, err := h.sirusClient.FetchGuildMembers(id)
+		go func(id int, r string) {
+			members, err := h.sirusClient.FetchGuildMembers(r, id)
 			if err == nil && members != nil {
-				h.GMStore.UpdateGuildMembers(id, *members)
-				l.Info("fresh guild members loaded", "sirus_guild_id", id)
+				h.GMStore.UpdateGuildMembers(r, id, *members)
+				l.Info("fresh guild members loaded", "sirus_guild_id", id, "realm", r)
 			}
-		}(guildId)
+		}(guildId, realm)
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("✅ Теперь я слежу за гильдией %d в этом канале!", guildId),
+				Content: fmt.Sprintf("✅ Теперь я слежу за гильдией %d [%s] в этом канале!", guildId, strings.ToUpper(realm)),
 			},
 		})
 
@@ -498,20 +505,29 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 		})
 
 	case "setcat":
-		name := data.Options[0].StringValue()
-		id, err := h.sirusClient.FetchPlayerID(name)
+		name := ""
+		realm := "x3"
+		for _, opt := range data.Options {
+			if opt.Name == "name" {
+				name = opt.StringValue()
+			} else if opt.Name == "realm" {
+				realm = opt.StringValue()
+			}
+		}
+
+		id, err := h.sirusClient.FetchPlayerID(realm, name)
 		if err != nil {
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf("❌ Не удалось найти персонажа «%s». Проверьте правильность написания.", name),
+					Content: fmt.Sprintf("❌ Не удалось найти персонажа «%s» на сервере %s. Проверьте правильность написания.", name, strings.ToUpper(realm)),
 					Flags:   discordgo.MessageFlagsEphemeral,
 				},
 			})
 			l.Error("Search character error", "error", err)
 			return
 		}
-		err = h.PlayerSubStore.Subscribe(id, name, channelID, guildID)
+		err = h.PlayerSubStore.Subscribe(id, name, channelID, guildID, realm)
 		if err != nil {
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -526,7 +542,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("✅ Теперь я слежу за игроком **%s** (ID: %d) в этом канале!", name, id),
+				Content: fmt.Sprintf("✅ Теперь я слежу за игроком **%s** (ID: %d) [%s] в этом канале!", name, id, strings.ToUpper(realm)),
 			},
 		})
 

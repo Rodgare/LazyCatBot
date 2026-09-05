@@ -19,27 +19,23 @@ func (w *Worker) GuildMembersUpdater(ctx context.Context) {
 			w.logger.Error("Getting tracked guilds err", "error", err)
 		}
 
-		gIDs := make([]int, 0, len(guildsToUpdate))
-		for k := range guildsToUpdate {
-			gIDs = append(gIDs, k)
-		}
-
-		for _, gID := range gIDs {
-			gms, err := w.sirusClient.FetchGuildMembers(gID)
+		for key := range guildsToUpdate {
+			gms, err := w.sirusClient.FetchGuildMembers(key.Realm, key.GuildID)
 			if err != nil {
-				w.logger.Error("FetchGuildMembers error", "error", err, "guild_id", gID)
+				w.logger.Error("FetchGuildMembers error", "error", err, "guild_id", key.GuildID, "realm", key.Realm)
 				select {
 				case <-ctx.Done():
 					w.logger.Info("[GuildMembersUpdater] Processor stopped")
 					return
 				case <-time.After(1 * time.Minute):
 				}
+				continue
 			}
 
 			if gms != nil {
-				err = w.gmStore.UpdateGuildMembers(gID, *gms)
+				err = w.gmStore.UpdateGuildMembers(key.Realm, key.GuildID, *gms)
 				if err != nil {
-					w.logger.Error("Update Guild Members error", "error", err, "guild_id", gID)
+					w.logger.Error("Update Guild Members error", "error", err, "guild_id", key.GuildID, "realm", key.Realm)
 				}
 			}
 

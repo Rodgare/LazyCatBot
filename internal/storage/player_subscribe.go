@@ -14,9 +14,17 @@ func NewPlayerSubscribeStorage(db *sql.DB) *PlayerSubscribeStorage {
 	return &PlayerSubscribeStorage{db: db}
 }
 
-func (s *PlayerSubscribeStorage) Subscribe(id int, name string, channelID, discordID string) error {
-	query := `INSERT OR REPLACE INTO player_subscribe (id, name, channel_id, discord_id) VALUES (?, ?, ?, ?)`
-	_, err := s.db.Exec(query, id, name, channelID, discordID)
+type TrackedPlayerKey struct {
+	PlayerID int
+	Realm    string
+}
+
+func (s *PlayerSubscribeStorage) Subscribe(id int, name string, channelID, discordID, realm string) error {
+	if realm == "" {
+		realm = "x3"
+	}
+	query := `INSERT OR REPLACE INTO player_subscribe (id, name, channel_id, discord_id, realm) VALUES (?, ?, ?, ?, ?)`
+	_, err := s.db.Exec(query, id, name, channelID, discordID, realm)
 	return err
 }
 
@@ -26,22 +34,24 @@ func (s *PlayerSubscribeStorage) Unsubscribe(player int, channelID, discordID st
 	return err
 }
 
-func (s *PlayerSubscribeStorage) GetTrackedPlayers() (map[int][]string, error) {
-	query := `SELECT id, channel_id FROM player_subscribe`
+func (s *PlayerSubscribeStorage) GetTrackedPlayers() (map[TrackedPlayerKey][]string, error) {
+	query := `SELECT id, channel_id, COALESCE(realm, 'x3') FROM player_subscribe`
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
 	}
 	defer rows.Close()
 
-	res := make(map[int][]string)
+	res := make(map[TrackedPlayerKey][]string)
 	for rows.Next() {
 		var player int
 		var channel string
-		if err := rows.Scan(&player, &channel); err != nil {
+		var realm string
+		if err := rows.Scan(&player, &channel, &realm); err != nil {
 			return nil, err
 		}
-		res[player] = append(res[player], channel)
+		key := TrackedPlayerKey{PlayerID: player, Realm: realm}
+		res[key] = append(res[key], channel)
 	}
 
 	return res, nil
