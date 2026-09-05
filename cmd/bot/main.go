@@ -123,79 +123,15 @@ func main() {
 
 	manageChannelsPerm := int64(discordgo.PermissionManageChannels)
 
-	realmChoices := []*discordgo.ApplicationCommandOptionChoice{
-		{Name: "Nevermine x3 (По умолчанию)", Value: "x3"},
-		{Name: "Soulseeker x1", Value: "x1"},
-		{Name: "Scourge x2", Value: "x2"},
-		{Name: "Sirus x5", Value: "x5"},
-	}
-
 	commands := []*discordgo.ApplicationCommand{
 		{
-			Name:                     "set",
-			Description:              "Подписаться на отчеты гильдии в этом канале",
+			Name:                     "menu",
+			Description:              "Открыть меню настройки трекинга и отправки автоматических отчетов",
 			DefaultMemberPermissions: &manageChannelsPerm,
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionInteger,
-					Name:        "id",
-					Description: "ID гильдии на Сирусе",
-					Required:    true,
-				},
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "realm",
-					Description: "Игровой сервер (по умолчанию х3)",
-					Required:    false,
-					Choices:     realmChoices,
-				},
-			},
 		},
 		{
-			Name:                     "unset",
-			Description:              "Отписаться от отчетов гильдии в этом канале",
-			DefaultMemberPermissions: &manageChannelsPerm,
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionInteger,
-					Name:        "id",
-					Description: "ID гильдии на Сирусе",
-					Required:    true,
-				},
-			},
-		},
-		{
-			Name:                     "setcat",
-			Description:              "Добавить трекинг игрока в этом канале",
-			DefaultMemberPermissions: &manageChannelsPerm,
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "name",
-					Description: "Имя игрока",
-					Required:    true,
-				},
-				{
-					Type:        discordgo.ApplicationCommandOptionString,
-					Name:        "realm",
-					Description: "Игровой сервер (по умолчанию х3)",
-					Required:    false,
-					Choices:     realmChoices,
-				},
-			},
-		},
-		{
-			Name:                     "unsetcat",
-			Description:              "Отписаться от отчетов игроков в этом канале",
-			DefaultMemberPermissions: &manageChannelsPerm,
-			Options: []*discordgo.ApplicationCommandOption{
-				{
-					Type:        discordgo.ApplicationCommandOptionInteger,
-					Name:        "id",
-					Description: "ID игрока на Сирусе",
-					Required:    true,
-				},
-			},
+			Name:        "topm",
+			Description: "Открыть меню отправки рейтингов по босам среди игроков гильдии",
 		},
 		{
 			Name:        "help",
@@ -208,15 +144,6 @@ func main() {
 		{
 			Name:        "listcats",
 			Description: "Список отслеживаемых игроков в данном канале",
-		},
-		{
-			Name:                     "menu",
-			Description:              "Открыть меню настройки трекинга и отправки автоматических отчетов",
-			DefaultMemberPermissions: &manageChannelsPerm,
-		},
-		{
-			Name:        "topm",
-			Description: "Открыть меню отправки рейтингов по босам среди игроков гильдии",
 		},
 	}
 
