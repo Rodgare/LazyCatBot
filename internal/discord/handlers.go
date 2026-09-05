@@ -60,13 +60,26 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 		"user", i.Member.User.Username,
 	)
 
-	switch data.CustomID {
-	case "modal_add_player":
+	if after, ok := strings.CutPrefix(data.CustomID, "modal_add_player_"); ok {
+		realm := after
 		playerName := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
-		id, _ := h.sirusClient.FetchPlayerID("x3", playerName)
-		err := h.PlayerSubStore.Subscribe(id, playerName, i.ChannelID, i.GuildID, "x3")
+		playerName = strings.TrimSpace(playerName)
 
-		content := fmt.Sprintf("✅ Игрок **%s** успешно добавлен в список отслеживания!", playerName)
+		id, err := h.sirusClient.FetchPlayerID(realm, playerName)
+		if err != nil {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: fmt.Sprintf("❌ Не удалось найти персонажа «%s» на сервере %s. Проверьте имя.", playerName, strings.ToUpper(realm)),
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			l.Error("Search character in modal error", "error", err)
+			return
+		}
+
+		err = h.PlayerSubStore.Subscribe(id, playerName, i.ChannelID, i.GuildID, realm)
+		content := fmt.Sprintf("✅ Игрок **%s** (ID: %d) [%s] успешно добавлен!", playerName, id, strings.ToUpper(realm))
 		if err != nil {
 			content = "❌ Ошибка при добавлении игрока."
 			l.Error("Add player in modal window error", "error", err)
@@ -78,24 +91,29 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
-	case "modal_add_guild":
+		return
+	}
+
+	if after, ok := strings.CutPrefix(data.CustomID, "modal_add_guild_"); ok {
+		realm := after
 		guildIDStr := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 		var guildID int
 		fmt.Sscanf(guildIDStr, "%d", &guildID)
-		err := h.SubStore.Subscribe(guildID, i.ChannelID, i.GuildID, "x3")
-		content := fmt.Sprintf("✅ Гильдия **%d** успешно добавлена!", guildID)
+
+		err := h.SubStore.Subscribe(guildID, i.ChannelID, i.GuildID, realm)
+		content := fmt.Sprintf("✅ Гильдия **%d** [%s] успешно добавлена!", guildID, strings.ToUpper(realm))
 		if err != nil {
 			content = "❌ Ошибка при добавлении гильдии."
 			l.Error("Add guild in modal window error", "error", err)
 		}
 
-		go func(id int) {
-			members, err := h.sirusClient.FetchGuildMembers("x3", id)
+		go func(id int, r string) {
+			members, err := h.sirusClient.FetchGuildMembers(r, id)
 			if err == nil && members != nil {
-				h.GMStore.UpdateGuildMembers("x3", id, *members)
+				h.GMStore.UpdateGuildMembers(r, id, *members)
 				l.Info("Guild members are saved")
 			}
-		}(guildID)
+		}(guildID, realm)
 
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -104,7 +122,7 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 				Flags:   discordgo.MessageFlagsEphemeral,
 			},
 		})
-
+		return
 	}
 
 }
@@ -197,20 +215,53 @@ func (h *BotHandler) HandleButtons(s *discordgo.Session, i *discordgo.Interactio
 		return
 	}
 
+	if after, ok := strings.CutPrefix(data.CustomID, "realm_select_guild_"); ok {
+		h.handleAddGuildModalWithRealm(s, i, after)
+		return
+	}
+
+	if after, ok := strings.CutPrefix(data.CustomID, "realm_select_player_"); ok {
+		h.handleAddPlayerModalWithRealm(s, i, after)
+		return
+	}
+
 	switch data.CustomID {
 	case "btn_add_player":
-		h.handleAddPlayerModal(s, i)
+		h.handlePromptSelectRealm(s, i, "player")
 	case "btn_add_guild":
-		h.handleAddGuildModal(s, i)
+		h.handlePromptSelectRealm(s, i, "guild")
 	}
 }
 
-func (h *BotHandler) handleAddGuildModal(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func (h *BotHandler) handlePromptSelectRealm(s *discordgo.Session, i *discordgo.InteractionCreate, targetType string) {
+	prefix := fmt.Sprintf("realm_select_%s_", targetType)
+	targetName := map[string]string{"guild": "гильдии", "player": "игрока"}[targetType]
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: fmt.Sprintf("🌐 **Выберите игровой сервер для добавления %s:**", targetName),
+			Flags:   discordgo.MessageFlagsEphemeral,
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{
+					Components: []discordgo.MessageComponent{
+						discordgo.Button{Label: "🔮 Nevermine x3", Style: discordgo.PrimaryButton, CustomID: prefix + "x3"},
+						discordgo.Button{Label: "⚔️ Soulseeker x1", Style: discordgo.PrimaryButton, CustomID: prefix + "x1"},
+						discordgo.Button{Label: "🛡️ Scourge x2", Style: discordgo.PrimaryButton, CustomID: prefix + "x2"},
+						discordgo.Button{Label: "⚡ Sirus x5", Style: discordgo.PrimaryButton, CustomID: prefix + "x5"},
+					},
+				},
+			},
+		},
+	})
+}
+
+func (h *BotHandler) handleAddGuildModalWithRealm(s *discordgo.Session, i *discordgo.InteractionCreate, realm string) {
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseModal,
 		Data: &discordgo.InteractionResponseData{
-			CustomID: "modal_add_guild",
-			Title:    "Добавление гильдии",
+			CustomID: fmt.Sprintf("modal_add_guild_%s", realm),
+			Title:    fmt.Sprintf("Добавление гильдии (%s)", strings.ToUpper(realm)),
 			Components: []discordgo.MessageComponent{
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
@@ -228,12 +279,12 @@ func (h *BotHandler) handleAddGuildModal(s *discordgo.Session, i *discordgo.Inte
 	})
 }
 
-func (h *BotHandler) handleAddPlayerModal(s *discordgo.Session, i *discordgo.InteractionCreate) {
+func (h *BotHandler) handleAddPlayerModalWithRealm(s *discordgo.Session, i *discordgo.InteractionCreate, realm string) {
 	err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseModal,
 		Data: &discordgo.InteractionResponseData{
-			CustomID: "modal_add_player",
-			Title:    "Добавление игрока для отслеживания",
+			CustomID: fmt.Sprintf("modal_add_player_%s", realm),
+			Title:    fmt.Sprintf("Добавление игрока (%s)", strings.ToUpper(realm)),
 			Components: []discordgo.MessageComponent{
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
