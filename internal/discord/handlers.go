@@ -245,10 +245,9 @@ func (h *BotHandler) handlePromptSelectRealm(s *discordgo.Session, i *discordgo.
 			Components: []discordgo.MessageComponent{
 				discordgo.ActionsRow{
 					Components: []discordgo.MessageComponent{
-						discordgo.Button{Label: "🔮 Nevermine x3", Style: discordgo.PrimaryButton, CustomID: prefix + "x3"},
-						discordgo.Button{Label: "⚔️ Soulseeker x1", Style: discordgo.PrimaryButton, CustomID: prefix + "x1"},
-						discordgo.Button{Label: "🛡️ Scourge x2", Style: discordgo.PrimaryButton, CustomID: prefix + "x2"},
+						discordgo.Button{Label: "🔮 Neverest x3", Style: discordgo.PrimaryButton, CustomID: prefix + "x3"},
 						discordgo.Button{Label: "⚡ Sirus x5", Style: discordgo.PrimaryButton, CustomID: prefix + "x5"},
+						discordgo.Button{Label: "⚔️ Soulseeker x1", Style: discordgo.PrimaryButton, CustomID: prefix + "x1"},
 					},
 				},
 			},
@@ -503,134 +502,10 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 
 	l.Info("slash command received")
 
-	guildID := i.GuildID
 	channelID := i.ChannelID
 	switch data.Name {
 	case "menu":
 		h.HandleMenuCommand(s, i)
-	case "set":
-		guildId := int(data.Options[0].IntValue())
-		realm := "x3"
-		for _, opt := range data.Options {
-			if opt.Name == "realm" {
-				realm = opt.StringValue()
-			}
-		}
-
-		err := h.SubStore.Subscribe(guildId, channelID, guildID, realm)
-		if err != nil {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "❌ Ошибка при сохранении подписки.",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-			l.Error("Subscription saving error", "error", err)
-			return
-		}
-
-		go func(id int, r string) {
-			members, err := h.sirusClient.FetchGuildMembers(r, id)
-			if err == nil && members != nil {
-				h.GMStore.UpdateGuildMembers(r, id, *members)
-				l.Info("fresh guild members loaded", "sirus_guild_id", id, "realm", r)
-			}
-		}(guildId, realm)
-
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("✅ Теперь я слежу за гильдией %d [%s] в этом канале!", guildId, strings.ToUpper(realm)),
-			},
-		})
-
-	case "unset":
-		guildNum := int(data.Options[0].IntValue())
-		err := h.SubStore.Unsubscribe(guildNum, channelID, guildID)
-		if err != nil {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "❌ Ошибка при удалении подписки.",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-			l.Error("Subscription deleting error", "error", err)
-			return
-		}
-
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("❌ Я больше не слежу за гильдией %d в этом канале.", guildNum),
-			},
-		})
-
-	case "setcat":
-		name := ""
-		realm := "x3"
-		for _, opt := range data.Options {
-			if opt.Name == "name" {
-				name = opt.StringValue()
-			} else if opt.Name == "realm" {
-				realm = opt.StringValue()
-			}
-		}
-
-		id, err := h.sirusClient.FetchPlayerID(realm, name)
-		if err != nil {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf("❌ Не удалось найти персонажа «%s» на сервере %s. Проверьте правильность написания.", name, strings.ToUpper(realm)),
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-			l.Error("Search character error", "error", err)
-			return
-		}
-		err = h.PlayerSubStore.Subscribe(id, name, channelID, guildID, realm)
-		if err != nil {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "❌ Ошибка при сохранении подписки в базу данных.",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-			l.Error("Saving subscription to db error", "error", err)
-			return
-		}
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("✅ Теперь я слежу за игроком **%s** (ID: %d) [%s] в этом канале!", name, id, strings.ToUpper(realm)),
-			},
-		})
-
-	case "unsetcat":
-		playerID := int(data.Options[0].IntValue())
-		err := h.PlayerSubStore.Unsubscribe(playerID, channelID, guildID)
-		if err != nil {
-			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-				Type: discordgo.InteractionResponseChannelMessageWithSource,
-				Data: &discordgo.InteractionResponseData{
-					Content: "❌ Ошибка при удалении подписки.",
-					Flags:   discordgo.MessageFlagsEphemeral,
-				},
-			})
-			l.Error("Deleting subsription error", "error", err)
-			return
-		}
-
-		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-			Type: discordgo.InteractionResponseChannelMessageWithSource,
-			Data: &discordgo.InteractionResponseData{
-				Content: fmt.Sprintf("❌ Я больше не слежу за игроком %d в этом канале.", playerID),
-			},
-		})
-
 	case "list":
 		guilds, err := h.SubStore.GetGuildsByChannel(channelID)
 		if err != nil {
@@ -705,10 +580,6 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 					{
 						Title: "🐈 Справка LazyCatBot",
 						Description: "Я помогаю отслеживать прогресс гильдий на Sirus!\n\n" +
-							"**/set id_гильдии** — Подписаться на отчеты гильдии в этом канале.\n" +
-							"**/setcat имя_игрока** - Подписаться на отчеты конкретного игрока\n" +
-							"**/unset id_гильдии** — Отписаться от отчетов гильдии.\n" +
-							"**/unsetcat имя_игрока** — Отписаться от отчетов игрока.\n" +
 							"**/menu Вызывает меню с настройкой подписок бота, трекинга и т.д.\n" +
 							"**/topm Команда вызывает меню с кнопками, который видят все, нажав на которые можно отправить рейтинги по чек босам среди игроков гильдии\n" +
 							"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
@@ -749,7 +620,8 @@ func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate)
 		Title: "🐈 Привет! Я LazyCatBot",
 		Description: "Я помогу вам отслеживать убийства боссов вашей гильдии!\n\n" +
 			"**Как меня настроить:**\n" +
-			"Создайте текстовый канал и введите в этом канале комманду /set id_гильдии (/set 1234)\n\n" +
+			"Создайте текстовый канал и введите в этом канале команду /menu\n\n" +
+			"Появится меню с возможностью добавить гильдию для отслеживания по ID гильдии.\n\n" +
 			"Список комманд /help\n\n" +
 			"*(ID гильдии можно найти в ссылке на вашу гильдию на сайте Sirus)*",
 		Color: 0xf1c40f,
