@@ -40,7 +40,7 @@ func SendKillReport(s *discordgo.Session, channelID string, report models.BossKi
 	embed := &discordgo.MessageEmbed{
 		Author: &discordgo.MessageEmbedAuthor{
 			Name:    report.GuildName,
-			IconURL: fmt.Sprintf("https://sirus.org/api/base/22/guild/%d/emblem.webp", report.GuildID),
+			IconURL: fmt.Sprintf("https://sirus.org/api/base/%s/guild/%d/emblem.webp", report.Realm, report.GuildID),
 			URL:     fmt.Sprintf("https://sirus.org/base/guilds/%s/%d", report.Realm, report.GuildID),
 		},
 		Title:  fmt.Sprintf("%s — %s", report.MapName, report.BossName),
