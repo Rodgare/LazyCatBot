@@ -41,10 +41,10 @@ func SendKillReport(s *discordgo.Session, channelID string, report models.BossKi
 		Author: &discordgo.MessageEmbedAuthor{
 			Name:    report.GuildName,
 			IconURL: fmt.Sprintf("https://sirus.org/api/base/22/guild/%d/emblem.webp", report.GuildID),
-			URL:     fmt.Sprintf("https://sirus.org/base/guilds/x3/%d", report.GuildID),
+			URL:     fmt.Sprintf("https://sirus.org/base/guilds/%s/%d", report.Realm, report.GuildID),
 		},
 		Title:  fmt.Sprintf("%s — %s", report.MapName, report.BossName),
-		URL:    fmt.Sprintf("https://sirus.org/base/pve-progression/boss-kill/x3/%d", report.KillID),
+		URL:    fmt.Sprintf("https://sirus.org/base/pve-progression/boss-kill/%s/%d", report.Realm, report.KillID),
 		Color:  0xf1c40f,
 		Fields: buildFields(report, ddBlocks, healBlocks, report.Loots),
 		Image: &discordgo.MessageEmbedImage{
@@ -165,8 +165,8 @@ func buildFields(report models.BossKillReport, ddBlocks, healBlocks []string, lo
 
 		for _, item := range lootsBlock {
 			if item.Name != "" {
-				fmt.Fprintf(&sb, "x%d [%s](https://sirus.org/base/item/%d/x3)\n",
-					item.Count, item.Name, item.ID)
+				fmt.Fprintf(&sb, "x%d [%s](https://sirus.org/base/item/%d/%s)\n",
+					item.Count, item.Name, item.ID, report.Realm)
 			}
 		}
 		if sb.Len() > 0 {

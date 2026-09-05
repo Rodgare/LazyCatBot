@@ -12,6 +12,7 @@ type BossKillReport struct {
 	KilledAt  string
 	GuildID   int
 	GuildName string
+	Realm     string
 	Loots     []LootReport
 	Players   []PlayerReport
 }
