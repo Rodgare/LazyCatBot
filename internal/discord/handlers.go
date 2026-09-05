@@ -704,7 +704,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 				Embeds: []*discordgo.MessageEmbed{
 					{
 						Title: "🐈 Справка LazyCatBot",
-						Description: "Я помогаю отслеживать прогресс гильдий на Sirus.su!\n\n" +
+						Description: "Я помогаю отслеживать прогресс гильдий на Sirus!\n\n" +
 							"**/set id_гильдии** — Подписаться на отчеты гильдии в этом канале.\n" +
 							"**/setcat имя_игрока** - Подписаться на отчеты конкретного игрока\n" +
 							"**/unset id_гильдии** — Отписаться от отчетов гильдии.\n" +
