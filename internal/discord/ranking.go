@@ -24,8 +24,8 @@ func (h *BotHandler) SendBossRanking(s *discordgo.Session, i *discordgo.Interact
 		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
 	})
 
-	guilds, err := h.SubStore.GetGuildsByChannel(i.ChannelID)
-	if err != nil || len(guilds) == 0 {
+	subs, err := h.SubStore.GetGuildSubsByChannel(i.ChannelID)
+	if err != nil || len(subs) == 0 {
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: pointer("❌ В этом канале не настроено отслеживание гильдий."),
 		})
@@ -33,9 +33,9 @@ func (h *BotHandler) SendBossRanking(s *discordgo.Session, i *discordgo.Interact
 		return
 	}
 
-	targetGuildID := guilds[0]
+	targetSub := subs[0]
 
-	players, err := h.LbStore.GetBossTop(raidID, bossID, targetGuildID, role)
+	players, err := h.LbStore.GetBossTop(targetSub.Realm, raidID, bossID, targetSub.GuildID, role)
 	if err != nil {
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
 			Content: pointer("❌ Ошибка при получении данных из базы."),

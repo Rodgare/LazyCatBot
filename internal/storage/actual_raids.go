@@ -13,34 +13,30 @@ func NewActualRaidsStorage(db *sql.DB) *ActualRaidsStorage {
 	return &ActualRaidsStorage{db: db}
 }
 
-func (s *ActualRaidsStorage) ResetActualRaids(serverID int) error {
-	query := `
-	DELETE FROM actual_raids
-	WHERE server_id = ?
-	`
-
-	_, err := s.db.Exec(query, serverID)
+func (s *ActualRaidsStorage) ResetActualRaids(realm string) error {
+	if realm == "" {
+		realm = "x3"
+	}
+	query := `DELETE FROM actual_raids WHERE realm = ?`
+	_, err := s.db.Exec(query, realm)
 	return err
 }
 
-func (s *ActualRaidsStorage) UpdateActualRaids(raidID, bossID, serverID int) error {
-	query := `
-	INSERT OR REPLACE INTO actual_raids (raid_id, boss_id, server_id)
-	VALUES (?, ?, ?)
-	`
-
-	_, err := s.db.Exec(query, raidID, bossID, serverID)
+func (s *ActualRaidsStorage) UpdateActualRaids(raidID, bossID int, realm string) error {
+	if realm == "" {
+		realm = "x3"
+	}
+	query := `INSERT OR REPLACE INTO actual_raids (raid_id, boss_id, realm) VALUES (?, ?, ?)`
+	_, err := s.db.Exec(query, raidID, bossID, realm)
 	return err
 }
 
-func (s *ActualRaidsStorage) GetActualRaids(serverID int) ([]models.ActualRaid, error) {
-	query := `
-	SELECT raid_id, boss_id
-	FROM actual_raids
-	WHERE server_id = ?
-	`
-
-	rows, err := s.db.Query(query, serverID)
+func (s *ActualRaidsStorage) GetActualRaids(realm string) ([]models.ActualRaid, error) {
+	if realm == "" {
+		realm = "x3"
+	}
+	query := `SELECT raid_id, boss_id FROM actual_raids WHERE realm = ?`
+	rows, err := s.db.Query(query, realm)
 	if err != nil {
 		return nil, err
 	}

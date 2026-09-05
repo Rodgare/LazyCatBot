@@ -177,7 +177,7 @@ func (w *Worker) StartProcessor(ctx context.Context) {
 					break
 				}
 
-				rep := w.createReport(enrichedKill, job.KillID)
+				rep := w.createReport(enrichedKill, job.KillID, job.Realm)
 				report = &rep
 			}
 
@@ -265,7 +265,10 @@ func (w *Worker) getPlayerKills(data map[storage.TrackedPlayerKey][]string) (map
 	return kills, killRealms
 }
 
-func (w *Worker) createReport(fight *models.BossFight, killID int) models.BossKillReport {
+func (w *Worker) createReport(fight *models.BossFight, killID int, realm string) models.BossKillReport {
+	if realm == "" {
+		realm = "x3"
+	}
 	totalDps := 0
 	totalHps := 0
 	for _, p := range fight.Data.Players {
@@ -302,7 +305,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int) models.BossKi
 		t4Count := sirus.GetT4Count(p.Itemset)
 		role := sirus.GetRoleString(p.ClassID, p.Spec)
 
-		err := w.lbStore.UpsertPlayer(fight.Order, fight.Encounter, p)
+		err := w.lbStore.UpsertPlayer(realm, fight.Order, fight.Encounter, p)
 		if err != nil {
 			w.logger.Error("Upsert player in db error", "error", err)
 		}

@@ -77,6 +77,31 @@ func (s *SubscribeStorage) GetChannels(guild int) ([]string, error) {
 	return channels, nil
 }
 
+type GuildSub struct {
+	GuildID int
+	Realm   string
+}
+
+func (s *SubscribeStorage) GetGuildSubsByChannel(channelID string) ([]GuildSub, error) {
+	query := `SELECT guild_id, COALESCE(realm, 'x3') FROM subscribe WHERE channel_id = ?`
+	rows, err := s.db.Query(query, channelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []GuildSub
+	for rows.Next() {
+		var sub GuildSub
+		if err := rows.Scan(&sub.GuildID, &sub.Realm); err != nil {
+			return nil, err
+		}
+		subs = append(subs, sub)
+	}
+
+	return subs, nil
+}
+
 func (s *SubscribeStorage) GetGuildsByChannel(channelID string) ([]int, error) {
 	query := `SELECT guild_id FROM subscribe WHERE channel_id = ?`
 	rows, err := s.db.Query(query, channelID)

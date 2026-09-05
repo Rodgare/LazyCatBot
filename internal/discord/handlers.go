@@ -376,8 +376,20 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 }
 
 func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
-	serverID := 22
-	actualRaids, err := h.arStore.GetActualRaids(serverID)
+	subs, err := h.SubStore.GetGuildSubsByChannel(i.ChannelID)
+	if err != nil || len(subs) == 0 {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "❌ В этом канале не настроено отслеживание гильдий.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	realm := subs[0].Realm
+	actualRaids, err := h.arStore.GetActualRaids(realm)
 	if err != nil {
 		h.Logger.Error("Error getting actual raids", "error", err)
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
