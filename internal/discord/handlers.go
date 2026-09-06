@@ -247,7 +247,6 @@ func (h *BotHandler) handlePromptSelectRealm(s *discordgo.Session, i *discordgo.
 					Components: []discordgo.MessageComponent{
 						discordgo.Button{Label: "🔮 Neverest x3", Style: discordgo.PrimaryButton, CustomID: prefix + "x3"},
 						discordgo.Button{Label: "⚡ Sirus x5", Style: discordgo.PrimaryButton, CustomID: prefix + "x5"},
-						discordgo.Button{Label: "⚔️ Soulseeker x1", Style: discordgo.PrimaryButton, CustomID: prefix + "x1"},
 					},
 				},
 			},

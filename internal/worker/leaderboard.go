@@ -9,7 +9,7 @@ import (
 
 func (w *Worker) StartLeaderboardSync() {
 	w.logger.Info("Starting leaderboard sync system...")
-	realms := []string{"x3", "x1", "x5"}
+	realms := []string{"x3", "x5"}
 
 	for _, r := range realms {
 		actualRaids, err := w.sirusClient.FetchActualRaids(r)
