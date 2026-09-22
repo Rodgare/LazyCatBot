@@ -121,6 +121,8 @@ func IsRaidBannedForDpsMeter(raidID int) bool {
 		13: true,
 		14: true,
 		18: true,
+		34: true,
+		35: true,
 	}
 
 	return blackList[raidID]
