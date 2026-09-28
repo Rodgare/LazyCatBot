@@ -65,9 +65,6 @@ func (m *MockSirusAPI) FetchActualRaids(realm string) (models.ActualSirusRaids, 
 func (m *MockSirusAPI) FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error) {
 	return nil, nil
 }
-func (m *MockSirusAPI) FetchMetasirusLeaderboard(realm string, mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error) {
-	return nil, nil
-}
 
 func TestSortKills(t *testing.T) {
 	w := &Worker{}
@@ -109,15 +106,13 @@ func TestStartProcessor_WithMock(t *testing.T) {
 	}
 
 	mockReporter := &MockReporter{}
-	mockSirus := &MockSirusAPI{}
 
 	w := &Worker{
-		reporter:    mockReporter,
-		subStore:    realSubStore,
-		lbStore:     realLbStore,
-		sirusClient: mockSirus,
-		killQueue:   make(chan KillJob, 10),
-		logger:      logger,
+		reporter:  mockReporter,
+		subStore:  realSubStore,
+		lbStore:   realLbStore,
+		killQueue: make(chan KillJob, 10),
+		logger:    logger,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

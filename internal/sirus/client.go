@@ -9,10 +9,6 @@ import (
 	"net/url"
 	"strings"
 	"time"
-
-	"context"
-
-	"github.com/chromedp/chromedp"
 )
 
 type Client struct {
@@ -83,45 +79,6 @@ func (c *Client) FetchLeaderboard(realm string, raidID, bossID, classID, specID 
 	}
 
 	return allPlayers, nil
-}
-
-func (c *Client) FetchMetasirusLeaderboard(realm string, mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error) {
-	var allPlayers []models.MetasirusLeaderboardPlayer
-
-	firstPage, err := c.GetMetasirusLbPage(realm, mapID, bossID, difficulty, 1)
-	if err != nil {
-		time.Sleep(15 * time.Second)
-		return nil, err
-	}
-	time.Sleep(1 * time.Second)
-	allPlayers = append(allPlayers, firstPage.Data...)
-	totalPages := firstPage.Meta.LastPage
-
-	for p := 2; p <= totalPages; p++ {
-		nextPage, err := c.GetMetasirusLbPage(realm, mapID, bossID, difficulty, p)
-		if err != nil {
-			c.logger.Error("GetMetasirusLbPage Error loading", "error", err, "page", p)
-			time.Sleep(15 * time.Second)
-			continue
-		}
-
-		allPlayers = append(allPlayers, nextPage.Data...)
-		time.Sleep(1 * time.Second)
-	}
-
-	return allPlayers, nil
-}
-
-func (c *Client) GetMetasirusLbPage(realm string, mapID, bossID, difficulty, page int) (*models.MetasirusLeaderboard, error) {
-	realm = normalizeRealm(realm)
-	url := fmt.Sprintf("https://metasirus.su/api/realm/%s/map/%d/boss/%d/aggregation/character?difficulty=%d&type=&spec=&specs=&date=current&ilvl_from=&ilvl_to=&page=%d",
-		realm, mapID, bossID, difficulty, page)
-
-	var res models.MetasirusLeaderboard
-	if err := c.makeMetasirusRequest(url, &res); err != nil {
-		return nil, err
-	}
-	return &res, nil
 }
 
 func (c *Client) FetchActualRaids(realm string) (models.ActualSirusRaids, error) {
@@ -275,41 +232,6 @@ func (c *Client) makeRequest(endpoint string, target any) error {
 	}
 
 	return fmt.Errorf("all request attempts across all base URLs failed: %w", lastErr)
-}
-
-func (c *Client) makeMetasirusRequest(url string, target any) error {
-	opts := append(chromedp.DefaultExecAllocatorOptions[:],
-		chromedp.NoSandbox,
-		chromedp.Flag("disable-setuid-sandbox", true),
-		chromedp.DisableGPU,
-		chromedp.Flag("single-process", true),
-		chromedp.Flag("headless", "new"),
-		chromedp.Flag("disable-dev-shm-usage", true),
-		chromedp.Flag("disk-cache-size", "1048576"),
-	)
-
-	allocCtx, cancel := chromedp.NewExecAllocator(context.Background(), opts...)
-	defer cancel()
-
-	ctx, cancel := chromedp.NewContext(allocCtx)
-	defer cancel()
-	pageCtx, cancel := context.WithTimeout(ctx, 40*time.Second)
-	defer cancel()
-	defer cancel()
-	var body string
-	err := chromedp.Run(pageCtx,
-		chromedp.Navigate(url),
-		chromedp.Sleep(10*time.Second),
-		chromedp.Text(`body`, &body, chromedp.ByQuery),
-	)
-
-	if err != nil {
-		return fmt.Errorf("chromedp error: %w", err)
-	}
-
-	body = strings.TrimSpace(body)
-
-	return json.Unmarshal([]byte(body), target)
 }
 
 func (c *Client) FetchGuildMembers(realm string, guild_id int) (*[]models.GuildMembers, error) {

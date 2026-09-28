@@ -30,7 +30,6 @@ type SirusAPI interface {
 	FetchGuildMembers(realm string, guildID int) (*[]models.GuildMembers, error)
 	FetchActualRaids(realm string) (models.ActualSirusRaids, error)
 	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
-	FetchMetasirusLeaderboard(realm string, mapID, bossID, difficulty int) ([]models.MetasirusLeaderboardPlayer, error)
 }
 
 type KillJob struct {
