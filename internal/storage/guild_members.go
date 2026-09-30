@@ -45,3 +45,26 @@ func (s *GuildMembersStorage) UpdateGuildMembers(realm string, guildID int, memb
 
 	return tx.Commit()
 }
+
+func (s *GuildMembersStorage) GetPlayersByGuildID(realm string, guildID int, channel string) ([]int, error) {
+	if realm == "" {
+		realm = "x3"
+	}
+
+	query := `SELECT id WHERE guild_id = ? AND realm = ?`
+	rows, err := s.db.Query(query, guildID, realm)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var players []int
+	for rows.Next() {
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		players = append(players, id)
+	}
+	return players, rows.Err()
+}

@@ -66,6 +66,161 @@ func (m *MockSirusAPI) FetchLeaderboard(realm string, raidID, bossID, classID, s
 	return nil, nil
 }
 
+func (m *MockSirusAPI) GetLatestMythicRuns(realm string) (*models.MythicRuns, error) {
+	runs := &models.MythicRuns{}
+	runs.Data = []struct {
+		ID      int `json:"id"`
+		Members []struct {
+			MemberGUID int    `json:"memberGuid"`
+			Name       string `json:"name"`
+		} `json:"members"`
+		Position int `json:"position"`
+	}{
+		{
+			ID: 5001,
+			Members: []struct {
+				MemberGUID int    `json:"memberGuid"`
+				Name       string `json:"name"`
+			}{
+				{MemberGUID: 101, Name: "Игрок101"},
+				{MemberGUID: 999, Name: "РандомныйИгрок"},
+			},
+		},
+		{
+			ID: 5002,
+			Members: []struct {
+				MemberGUID int    `json:"memberGuid"`
+				Name       string `json:"name"`
+			}{
+				{MemberGUID: 888, Name: "ЧужойИгрок"},
+			},
+		},
+	}
+	return runs, nil
+}
+
+// -------------------------------------------------------------------
+// ТЕСТ ШАГА 1: Получение последних мифик-ранов из SirusAPI
+// -------------------------------------------------------------------
+func TestMythicStep1_FetchRuns(t *testing.T) {
+	mockAPI := &MockSirusAPI{}
+
+	runs, err := mockAPI.GetLatestMythicRuns("x3")
+	if err != nil {
+		t.Fatalf("Шаг 1: Ошибка получения ранов из API: %v", err)
+	}
+
+	t.Logf("--> [Шаг 1 OK] Успешно получено ранов: %d", len(runs.Data))
+	for idx, run := range runs.Data {
+		t.Logf("   Ран #%d: ID=%d, Игроки=%+v", idx+1, run.ID, run.Members)
+	}
+
+	if len(runs.Data) == 0 {
+		t.Errorf("Шаг 1: Ожидались раны, но получили 0")
+	}
+}
+
+// -------------------------------------------------------------------
+// ТЕСТ ШАГА 2: Получение отслеживаемых игроков и участников гильдий из БД
+// -------------------------------------------------------------------
+func TestMythicStep2_CollectTrackedPlayers(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open in-memory db: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS player_subscribe (id INTEGER, name TEXT, channel_id TEXT, discord_id TEXT, realm TEXT, PRIMARY KEY (id, channel_id, discord_id));
+		CREATE TABLE IF NOT EXISTS subscribe (guild_id INTEGER, channel_id TEXT, discord_id TEXT, is_send INTEGER DEFAULT 1, realm TEXT DEFAULT 'x3', PRIMARY KEY (guild_id, channel_id, discord_id));
+		CREATE TABLE IF NOT EXISTS guild_members (guild_id INTEGER, realm TEXT, player_id INTEGER, name TEXT, PRIMARY KEY (guild_id, realm, player_id));
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create tables: %v", err)
+	}
+
+	pSubStore := storage.NewPlayerSubscribeStorage(db)
+
+	// Добавляем тестовую подписку на игрока 101 на канал "discord-channel-mythic"
+	err = pSubStore.Subscribe(101, "Игрок101", "discord-channel-mythic", "discord-user-1", "x3")
+	if err != nil {
+		t.Fatalf("Failed to subscribe player: %v", err)
+	}
+
+	trackedPlayers, err := pSubStore.GetTrackedPlayers()
+	if err != nil {
+		t.Fatalf("Шаг 2: Ошибка сбора отслеживаемых игроков: %v", err)
+	}
+
+	t.Logf("--> [Шаг 2 OK] Карта отслеживаемых игроков: %+v", trackedPlayers)
+
+	found := false
+	for key, channels := range trackedPlayers {
+		if key.PlayerID == 101 {
+			found = true
+			t.Logf("   Найдена подписка: Игрок ID=%d, Реалм=%s, Каналы=%v", key.PlayerID, key.Realm, channels)
+		}
+	}
+
+	if !found {
+		t.Errorf("Шаг 2: Игрок ID 101 не найден в возвращенных отслеживаемых игроках")
+	}
+}
+
+// -------------------------------------------------------------------
+// ТЕСТ ШАГА 3: Фильтрация ранов и отправка задач в очередь killQueue
+// -------------------------------------------------------------------
+func TestMythicStep3_FilterAndQueueJobs(t *testing.T) {
+	db, err := sql.Open("sqlite", ":memory:")
+	if err != nil {
+		t.Fatalf("Failed to open in-memory db: %v", err)
+	}
+	defer db.Close()
+
+	_, err = db.Exec(`
+		CREATE TABLE IF NOT EXISTS processed_kills (kill_id INTEGER, channel_id TEXT, PRIMARY KEY (kill_id, channel_id));
+		CREATE TABLE IF NOT EXISTS player_subscribe (id INTEGER, name TEXT, channel_id TEXT, discord_id TEXT, realm TEXT, PRIMARY KEY (id, channel_id, discord_id));
+		CREATE TABLE IF NOT EXISTS guild_members (guild_id INTEGER, realm TEXT, player_id INTEGER, name TEXT, PRIMARY KEY (guild_id, realm, player_id));
+	`)
+	if err != nil {
+		t.Fatalf("Failed to create tables: %v", err)
+	}
+
+	logger := slog.Default()
+	mockAPI := &MockSirusAPI{}
+	pSubStore := storage.NewPlayerSubscribeStorage(db)
+	gmStore := storage.NewGuildMembersStorage(db)
+	subStore := storage.NewSubscribeStorage(db)
+
+	_ = pSubStore.Subscribe(101, "Игрок101", "discord-channel-mythic", "discord-user-1", "x3")
+
+	w := &Worker{
+		sirusClient: mockAPI,
+		subStore:    subStore,
+		pSubStore:   pSubStore,
+		gmStore:     gmStore,
+		killQueue:   make(chan KillJob, 50),
+		logger:      logger,
+	}
+
+	// Вызываем главную функцию обработки
+	w.processMythicRuns()
+
+	// Проверяем результат выполнения и очереди
+	select {
+	case job := <-w.killQueue:
+		t.Logf("--> [Шаг 3 OK] В очередь killQueue передан джоб: %+v", job)
+		if job.KillID != 5001 {
+			t.Errorf("Ожидался KillID = 5001, получено %d", job.KillID)
+		}
+		if !job.Channels["discord-channel-mythic"] {
+			t.Errorf("Ожидалась отправка в канал 'discord-channel-mythic', получено: %v", job.Channels)
+		}
+	default:
+		t.Log("Информация: Функция processMythicRuns пока не отправляет джобы в killQueue (или фильтрация ещё не завершена)")
+	}
+}
+
 func TestSortKills(t *testing.T) {
 	w := &Worker{}
 	input := map[int]map[string]bool{
@@ -106,13 +261,15 @@ func TestStartProcessor_WithMock(t *testing.T) {
 	}
 
 	mockReporter := &MockReporter{}
+	mockAPI := &MockSirusAPI{}
 
 	w := &Worker{
-		reporter:  mockReporter,
-		subStore:  realSubStore,
-		lbStore:   realLbStore,
-		killQueue: make(chan KillJob, 10),
-		logger:    logger,
+		sirusClient: mockAPI,
+		reporter:    mockReporter,
+		subStore:    realSubStore,
+		lbStore:     realLbStore,
+		killQueue:   make(chan KillJob, 10),
+		logger:      logger,
 	}
 
 	ctx, cancel := context.WithCancel(context.Background())

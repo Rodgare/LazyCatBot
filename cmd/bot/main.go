@@ -105,6 +105,7 @@ func main() {
 	go killWorker.StartProcessor(ctx)
 	go killWorker.GuildKillMonitor(ctx)
 	go killWorker.PlayerKillMonitor(ctx)
+	go killWorker.MythicRunsMonitor(ctx)
 	go killWorker.GuildMembersUpdater(ctx)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds

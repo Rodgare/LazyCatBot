@@ -30,6 +30,7 @@ type SirusAPI interface {
 	FetchGuildMembers(realm string, guildID int) (*[]models.GuildMembers, error)
 	FetchActualRaids(realm string) (models.ActualSirusRaids, error)
 	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
+	GetLatestMythicRuns(realm string) (*models.MythicRuns, error)
 }
 
 type KillJob struct {
@@ -151,6 +152,38 @@ func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 		case <-time.After(1 * time.Minute):
 		}
 	}
+}
+
+func (w *Worker) MythicRunsMonitor(ctx context.Context) {
+	for {
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[KillMonitor] Mythic Runs Monitor stopped")
+			return
+		default:
+		}
+		w.processMythicRuns()
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[KillMonitor] Mythic Runs Monitor stopped")
+			return
+		case <-time.After(1 * time.Minute):
+		}
+	}
+}
+
+func (w *Worker) processMythicRuns() {
+	latestRuns, err := w.sirusClient.GetLatestMythicRuns("x3")
+	if err != nil {
+		w.logger.Error("[KillMonitor] processMythicRuns err", "error", err)
+		return
+	}
+	_ = latestRuns
+
+	// 1. Получить 50 последних ранов через SirusAPI
+	// 2. Получить список игроков из pSubStore и gmStore
+	// 3. Отфильтровать раны
+	// 4. Отправить в w.killQueue <- job
 }
 
 func (w *Worker) StartProcessor(ctx context.Context) {
