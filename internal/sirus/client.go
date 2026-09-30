@@ -93,6 +93,19 @@ func (c *Client) FetchActualRaids(realm string) (models.ActualSirusRaids, error)
 	return res, nil
 }
 
+func (c *Client) GetLatestMythicRuns(realm string) (*models.MythicRuns, error) {
+	realm = normalizeRealm(realm)
+	endpoint := fmt.Sprintf("/api/base/%s/leaderboard/challenge/latest-runs", realm)
+
+	var res models.MythicRuns
+
+	if err := c.makeRequest(endpoint, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+}
+
 func (c *Client) FetchGuildLatestBossKills(realm string, guildID int) (*models.LatestBossKills, error) {
 	realm = normalizeRealm(realm)
 	page := 1
