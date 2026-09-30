@@ -26,9 +26,7 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, e
 	if realm == "" {
 		realm = "x3"
 	}
-	if len(players) < 2 {
-		return fmt.Errorf("Less then 2 players for Raid: %d, Encounter: %d", raidOrder, encounter)
-	}
+
 	tx, err := s.db.Begin()
 	if err != nil {
 		return err
