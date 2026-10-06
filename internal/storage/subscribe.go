@@ -163,3 +163,29 @@ func (s *SubscribeStorage) MarkKillProcessed(id int, ch string) error {
 	_, err := s.db.Exec("INSERT OR IGNORE INTO processed_kills (kill_id, channel_id) VALUES (?, ?)", id, ch)
 	return err
 }
+
+func (s *SubscribeStorage) IsMythicReportsEnabled(ch string) bool {
+	var isEnabled bool
+	query := `SELECT COALESCE(MAX(is_myth_reps), 0) FROM subscribe WHERE channel_id = ?`
+	s.db.QueryRow(query, ch).Scan(&isEnabled)
+
+	return isEnabled
+}
+
+func (s *SubscribeStorage) ToggleMythicReports(ch string) (bool, error) {
+	current := s.IsMythicReportsEnabled(ch)
+
+	newState := !current
+	val := 0
+	if newState {
+		val = 1
+	}
+
+	query := `UPDATE subscribe SET is_myth_reps = ? WHERE channel_id = ?`
+	_, err := s.db.Exec(query, val, ch)
+	if err != nil {
+		return false, err
+	}
+
+	return newState, nil
+}

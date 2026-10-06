@@ -46,7 +46,7 @@ func (s *GuildMembersStorage) UpdateGuildMembers(realm string, guildID int, memb
 	return tx.Commit()
 }
 
-func (s *GuildMembersStorage) GetPlayersByGuildID(realm string, guildID int, channel string) ([]int, error) {
+func (s *GuildMembersStorage) GetPlayersByGuildID(realm string, guildID int) ([]int, error) {
 	if realm == "" {
 		realm = "x3"
 	}

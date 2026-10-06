@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"LazyCatBot/internal/config"
 	"LazyCatBot/internal/models"
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
@@ -14,6 +15,7 @@ import (
 
 type Reporter interface {
 	SendKillReport(channelID string, report models.BossKillReport)
+	SendMythicReport(channelID string, report *models.MythicReport)
 }
 
 type SubscribeStore interface {
@@ -21,6 +23,7 @@ type SubscribeStore interface {
 	MarkKillProcessed(id int, ch string) error
 	IsReportsEnabled(guild int, channelID string) bool
 	GetTrackedGuilds() (map[storage.TrackedGuildKey][]string, error)
+	IsMythicReportsEnabled(ch string) bool
 }
 
 type SirusAPI interface {
@@ -31,12 +34,15 @@ type SirusAPI interface {
 	FetchActualRaids(realm string) (models.ActualSirusRaids, error)
 	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
 	GetLatestMythicRuns(realm string) (*models.MythicRuns, error)
+	FetchMythicRunDetails(realm string, runID int) (*models.MythicRun, error)
 }
 
 type KillJob struct {
-	KillID   int
-	Realm    string
-	Channels map[string]bool
+	KillID       int
+	Realm        string
+	Channels     map[string]bool
+	Type         string
+	MythicReport *models.MythicReport
 }
 
 type Worker struct {
@@ -49,6 +55,7 @@ type Worker struct {
 	reporter    Reporter
 	killQueue   chan KillJob
 	logger      *slog.Logger
+	cfg         *config.Config
 }
 
 func NewWorker(
@@ -60,6 +67,7 @@ func NewWorker(
 	ar *storage.ActualRaidsStorage,
 	reporter Reporter,
 	logger *slog.Logger,
+	cfg *config.Config,
 ) *Worker {
 	return &Worker{
 		sirusClient: sc,
@@ -71,6 +79,7 @@ func NewWorker(
 		reporter:    reporter,
 		killQueue:   make(chan KillJob, 100),
 		logger:      logger,
+		cfg:         cfg,
 	}
 }
 
@@ -101,7 +110,12 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case w.killQueue <- KillJob{KillID: killID, Realm: killRealms[killID], Channels: kills[killID]}:
+			case w.killQueue <- KillJob{
+				KillID:   killID,
+				Realm:    killRealms[killID],
+				Channels: kills[killID],
+				Type:     "raid",
+			}:
 			}
 		}
 
@@ -141,7 +155,12 @@ func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case w.killQueue <- KillJob{KillID: killID, Realm: killRealms[killID], Channels: kills[killID]}:
+			case w.killQueue <- KillJob{
+				KillID:   killID,
+				Realm:    killRealms[killID],
+				Channels: kills[killID],
+				Type:     "raid",
+			}:
 			}
 		}
 
@@ -155,6 +174,11 @@ func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 }
 
 func (w *Worker) MythicRunsMonitor(ctx context.Context) {
+	if w.cfg.IsDebug {
+		w.logger.Info("[DEBUG] Pushing mock mythic run to killQueue...")
+		mockReport := w.makeMockMythicReport()
+		w.reporter.SendMythicReport(w.cfg.DebugChannelID, mockReport)
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -162,7 +186,111 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 			return
 		default:
 		}
-		w.processMythicRuns()
+
+		allTrackedPlayers := make(map[storage.TrackedPlayerKey]map[string]bool)
+
+		trackedPlayers, err := w.pSubStore.GetTrackedPlayers()
+		if err != nil {
+			w.logger.Error("[KillMonitor] GetTrackedPlayers err", "error", err)
+			continue
+		}
+
+		for key, channels := range trackedPlayers {
+			if _, exists := allTrackedPlayers[key]; !exists {
+				allTrackedPlayers[key] = make(map[string]bool)
+			}
+			for _, channelID := range channels {
+				allTrackedPlayers[key][channelID] = true
+			}
+		}
+
+		guilds, err := w.subStore.GetTrackedGuilds()
+		if err != nil {
+			w.logger.Error("[KillMonitor] GetTrackedGuilds err", "error", err)
+			continue
+		}
+
+		for key, channels := range guilds {
+			guildPlayers, err := w.gmStore.GetPlayersByGuildID(key.Realm, key.GuildID)
+			if err != nil {
+				w.logger.Error("[KillMonitor] GetPlayersByGuildID err", "error", err)
+				continue
+			}
+			for _, playerID := range guildPlayers {
+				playerKey := storage.TrackedPlayerKey{
+					PlayerID: playerID,
+					Realm:    key.Realm,
+				}
+
+				if _, exists := allTrackedPlayers[playerKey]; !exists {
+					allTrackedPlayers[playerKey] = make(map[string]bool)
+				}
+				for _, channel := range channels {
+					allTrackedPlayers[playerKey][channel] = true
+				}
+			}
+		}
+
+		realm := "x3"
+		latestRuns, err := w.sirusClient.GetLatestMythicRuns(realm)
+		if err != nil {
+			w.logger.Error("[KillMonitor] GetLatestMythicRuns err", "error", err)
+			continue
+		}
+
+		//[runID][channelID] = MythicReport
+		matchedRuns := make(map[int]map[string]models.MythicReport)
+
+		for _, run := range latestRuns.Data {
+			var (
+				report models.MythicReport
+				mapped bool
+			)
+			for _, player := range run.Members {
+				playerKey := storage.TrackedPlayerKey{
+					PlayerID: player.MemberGUID,
+					Realm:    realm,
+				}
+				channels, ok := allTrackedPlayers[playerKey]
+				if !ok {
+					continue
+				}
+				if !mapped {
+					report = run.ToReport()
+					report.Realm = realm
+					mapped = true
+				}
+				if matchedRuns[run.ID] == nil {
+					matchedRuns[run.ID] = make(map[string]models.MythicReport)
+				}
+				for channel := range channels {
+					matchedRuns[run.ID][channel] = report
+				}
+			}
+		}
+
+		for runID, channelReports := range matchedRuns {
+			channels := make(map[string]bool, len(channelReports))
+			var report models.MythicReport
+
+			for chID, rep := range channelReports {
+				channels[chID] = true
+				report = rep
+			}
+
+			select {
+			case <-ctx.Done():
+				return
+			case w.killQueue <- KillJob{
+				KillID:       runID,
+				Realm:        realm,
+				Channels:     channels,
+				MythicReport: &report,
+				Type:         "myth",
+			}:
+			}
+		}
+
 		select {
 		case <-ctx.Done():
 			w.logger.Info("[KillMonitor] Mythic Runs Monitor stopped")
@@ -170,20 +298,6 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 		case <-time.After(1 * time.Minute):
 		}
 	}
-}
-
-func (w *Worker) processMythicRuns() {
-	latestRuns, err := w.sirusClient.GetLatestMythicRuns("x3")
-	if err != nil {
-		w.logger.Error("[KillMonitor] processMythicRuns err", "error", err)
-		return
-	}
-	_ = latestRuns
-
-	// 1. Получить 50 последних ранов через SirusAPI
-	// 2. Получить список игроков из pSubStore и gmStore
-	// 3. Отфильтровать раны
-	// 4. Отправить в w.killQueue <- job
 }
 
 func (w *Worker) StartProcessor(ctx context.Context) {
@@ -195,37 +309,71 @@ func (w *Worker) StartProcessor(ctx context.Context) {
 		default:
 		}
 
-		var report *models.BossKillReport
+		switch job.Type {
+		case "myth":
+			w.processMythicRuns(job)
+		default:
+			w.processRaids(job)
+		}
 
-		for ch := range job.Channels {
-			if w.subStore.IsKillProcessed(job.KillID, ch) {
-				continue
-			}
-
-			if report == nil {
-				enrichedKill, err := w.sirusClient.FetchBossFightDetails(job.Realm, job.KillID)
-				if err != nil {
-					w.logger.Error("[Processor] Fetch Boss Fight Details err", "error", err)
-					break
-				}
-
-				rep := w.createReport(enrichedKill, job.KillID, job.Realm)
-				report = &rep
-			}
-
-			if w.subStore.IsReportsEnabled(report.GuildID, ch) {
-				w.reporter.SendKillReport(ch, *report)
-			}
-			w.subStore.MarkKillProcessed(job.KillID, ch)
-
-			select {
-			case <-ctx.Done():
-				w.logger.Info("[KillMonitor] Processor stopped")
-				return
-			case <-time.After(300 * time.Millisecond):
-			}
+		select {
+		case <-ctx.Done():
+			w.logger.Info("[KillMonitor] Processor stopped")
+			return
+		case <-time.After(300 * time.Millisecond):
 		}
 	}
+}
+
+func (w *Worker) processRaids(job KillJob) {
+	var report *models.BossKillReport
+
+	for ch := range job.Channels {
+		if w.subStore.IsKillProcessed(job.KillID, ch) {
+			continue
+		}
+
+		if report == nil {
+			enrichedKill, err := w.sirusClient.FetchBossFightDetails(job.Realm, job.KillID)
+			if err != nil {
+				w.logger.Error("[Processor] Fetch Boss Fight Details err", "error", err)
+				break
+			}
+
+			rep := w.createReport(enrichedKill, job.KillID, job.Realm)
+			report = &rep
+		}
+
+		if w.subStore.IsReportsEnabled(report.GuildID, ch) {
+			w.reporter.SendKillReport(ch, *report)
+		}
+		w.subStore.MarkKillProcessed(job.KillID, ch)
+
+	}
+}
+
+func (w *Worker) processMythicRuns(job KillJob) {
+	if job.MythicReport.HasRunLog {
+		runDetails, err := w.sirusClient.FetchMythicRunDetails(job.Realm, job.KillID)
+		if err != nil {
+			w.logger.Error("[Processor] Fetch Mythic Run Details err", "error", err)
+			return
+		}
+		job.MythicReport.Enrich(runDetails)
+
+	}
+	for ch := range job.Channels {
+		if w.subStore.IsKillProcessed(job.KillID, ch) {
+			continue
+		}
+
+		if w.subStore.IsMythicReportsEnabled(ch) {
+
+			w.reporter.SendMythicReport(ch, job.MythicReport)
+		}
+		w.subStore.MarkKillProcessed(job.KillID, ch)
+	}
+
 }
 
 func (w *Worker) getGuildKills(data map[storage.TrackedGuildKey][]string) (map[int]map[string]bool, map[int]string) {
@@ -382,6 +530,18 @@ func (w *Worker) makeMockReport() models.BossKillReport {
 	json.Unmarshal(data, &report)
 
 	return report
+}
+
+func (w *Worker) makeMockMythicReport() *models.MythicReport {
+	var report models.MythicReport
+
+	data, err := os.ReadFile("mock/mythic_run.json")
+	if err != nil {
+		w.logger.Error("Mock json read error", "error", err)
+	}
+	json.Unmarshal(data, &report)
+
+	return &report
 }
 
 func (w *Worker) sortKills(kills map[int]map[string]bool) []int {

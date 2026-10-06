@@ -5,6 +5,7 @@ import (
 	"bytes"
 	"fmt"
 	"math/rand"
+	"os"
 	"strings"
 	"time"
 
@@ -206,14 +207,10 @@ func generateJoke() string {
 		"LazyCatBot — Прогресс зафиксировал. Не благодарите. 🐾",
 		"LazyCatBot — Опять вы за свое? Я только прилег. 💤",
 		"LazyCatBot — Надеюсь, вы хоть не в луже стояли? 😒",
-		"LazyCatBot — Кто-то опять стоял в луже? Впрочем, ничего нового. 🌊",
-		"LazyCatBot — ДПС подрос, но до уровня нормального кота все еще не тянет. 🐈‍⬛",
-		"LazyCatBot — Кот посмотрел на ваш HPS и уснул. 💤",
 		"LazyCatBot — Вы закрыли рейд? Отлично, освободите моё кресло. 🪑",
 		"LazyCatBot — Опять весь рейд затащил один хил? Понятно. 💉",
 		"LazyCatBot — Босс упал, но моральный ущерб мне никто не возместит. 🐈‍⬛",
 		"LazyCatBot — Босс лежал, рейд стоял, кот спал. Все стабильно. 🐈",
-		"💰 Здесь могла бы быть ваша реклама. Охват 30+ дискордов гильдий на сервере х3💰",
 	}
 
 	return jokes[rand.Intn(len(jokes))]
@@ -226,6 +223,14 @@ type DiscordReporter struct {
 func NewDiscordReporter(s *discordgo.Session) *DiscordReporter {
 	return &DiscordReporter{session: s}
 }
+
 func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKillReport) {
+	if os.Getenv("DEBUG") == "true" {
+		debugChan := os.Getenv("DEBUG_CHANNEL_ID")
+		if debugChan != "" {
+			fmt.Printf("[DEBUG MODE] Перенаправление отчёта с канала %s в DEBUG_CHANNEL_ID %s\n", channelID, debugChan)
+			channelID = debugChan
+		}
+	}
 	SendKillReport(r.session, channelID, report)
 }

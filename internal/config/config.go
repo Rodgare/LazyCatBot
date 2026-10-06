@@ -1,50 +1,44 @@
 package config
 
 import (
-	"encoding/json"
 	"os"
 	"strings"
 )
 
 type Config struct {
-	SirusBaseURL  string   `json:"sirus_base_url"`
-	SirusBaseURLs []string `json:"sirus_base_urls"`
+	DiscordToken   string
+	DebugChannelID string
+	IsDebug        bool
+	SirusBaseURLs  []string
 }
 
-func LoadConfig(path string) (*Config, error) {
-	file, err := os.Open(path)
-	if err != nil {
-		return defaultConfig(), nil
+func LoadConfig() *Config {
+	debugStr := os.Getenv("DEBUG")
+	isDebug := debugStr == "true"
+
+	sirusURLsStr := os.Getenv("SIRUS_BASE_URLS")
+	var sirusURLs []string
+	if sirusURLsStr != "" {
+		sirusURLs = strings.Split(sirusURLsStr, ",")
+	} else {
+		sirusURLs = []string{"https://sirus.su", "https://sirus.org"}
 	}
-	defer file.Close()
 
-	var cfg Config
-	if err := json.NewDecoder(file).Decode(&cfg); err != nil {
-		return defaultConfig(), nil
-	}
+	cleanedURLs := cleanURLs(sirusURLs)
 
-	return &cfg, nil
-}
-
-func defaultConfig() *Config {
 	return &Config{
-		SirusBaseURLs: []string{"https://sirus.su", "https://sirus.org"},
+		DiscordToken:   os.Getenv("DISCORD_TOKEN"),
+		DebugChannelID: os.Getenv("DEBUG_CHANNEL_ID"),
+		IsDebug:        isDebug,
+		SirusBaseURLs:  cleanedURLs,
 	}
 }
 
 func (c *Config) GetSirusURLs() []string {
-	var urls []string
-	if len(c.SirusBaseURLs) > 0 {
-		urls = append(urls, c.SirusBaseURLs...)
-	}
-	if c.SirusBaseURL != "" {
-		urls = append(urls, c.SirusBaseURL)
-	}
+	return c.SirusBaseURLs
+}
 
-	if len(urls) == 0 {
-		urls = []string{"https://sirus.su", "https://sirus.org"}
-	}
-
+func cleanURLs(urls []string) []string {
 	var cleaned []string
 	seen := make(map[string]bool)
 	for _, u := range urls {

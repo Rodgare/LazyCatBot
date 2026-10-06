@@ -103,7 +103,7 @@ func buildBlocks(players []models.PlayerReport, isDD bool, total int) []string {
 		line := fmt.Sprintf("%d\u2800%s%s `%s`\n",
 			i+1, emojiSpec, p.Name, FormatNum(val))
 
-		// Discord limit 1024 characters per field value. Safely cut at 1000.
+		// Discord limit 1024 characters per field value!
 		if utf8.RuneCountInString(sb.String())+utf8.RuneCountInString(line) > 1024 {
 			blocks = append(blocks, sb.String())
 			sb.Reset()

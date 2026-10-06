@@ -42,8 +42,18 @@ func main() {
 	}
 	defer axiomHandler.Close()
 
+	appCfg := config.LoadConfig()
+
 	fileHandler := slog.NewJSONHandler(file, nil)
-	logger := slog.New(NewMultiHandler(fileHandler, axiomHandler))
+	handlers := []slog.Handler{fileHandler, axiomHandler}
+
+	if appCfg.IsDebug {
+		consoleHandler := slog.NewTextHandler(os.Stdout, &slog.HandlerOptions{Level: slog.LevelDebug})
+		handlers = append(handlers, consoleHandler)
+		log.Println("=== RUNNING IN DEBUG MODE ===")
+	}
+
+	logger := slog.New(NewMultiHandler(handlers...))
 	slog.SetDefault(logger)
 
 	//Context
@@ -51,13 +61,12 @@ func main() {
 	defer cancel()
 
 	//Discord token and session
-	token := os.Getenv("DISCORD_TOKEN")
-	if token == "" {
+	if appCfg.DiscordToken == "" {
 		slog.Error("DISCORD_TOKEN doesn`t set")
 		os.Exit(1)
 	}
 
-	dg, err := discordgo.New("Bot " + token)
+	dg, err := discordgo.New("Bot " + appCfg.DiscordToken)
 	if err != nil {
 		slog.Error("DiscordGo session create error", "error", err)
 		os.Exit(1)
@@ -71,7 +80,8 @@ func main() {
 	}
 	defer db.Close()
 	db.Exec("PRAGMA journal_mode=WAL;")
-	db.Exec("PRAGMA busy_timeout=5000;")
+	db.Exec("PRAGMA busy_timeout=10000;")
+	db.SetMaxOpenConns(1)
 	goose.SetBaseFS(migrations.EmbedFS)
 	if err := goose.SetDialect("sqlite3"); err != nil {
 		slog.Error("Failed to set goose dialect", "error", err)
@@ -91,15 +101,19 @@ func main() {
 	pSubStore := storage.NewPlayerSubscribeStorage(db)
 	arStore := storage.NewActualRaidsStorage(db)
 
-	appCfg, err := config.LoadConfig("config.json")
-	if err != nil {
-		slog.Warn("Failed to load config.json, using defaults", "error", err)
-	}
-
 	sirusClient := sirus.NewClient(logger, appCfg.GetSirusURLs())
 	discordReporter := discord.NewDiscordReporter(dg)
 
-	killWorker := worker.NewWorker(sirusClient, lbStore, subStore, gmStore, pSubStore, arStore, discordReporter, logger)
+	killWorker := worker.NewWorker(
+		sirusClient,
+		lbStore, subStore,
+		gmStore,
+		pSubStore,
+		arStore,
+		discordReporter,
+		logger,
+		appCfg,
+	)
 
 	killWorker.StartCronScheduler()
 	go killWorker.StartProcessor(ctx)
@@ -113,7 +127,11 @@ func main() {
 	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, arStore, logger)
 
 	dg.AddHandler(h.InteractionCreate)
-	dg.AddHandler(h.GuildCreate)
+	if !appCfg.IsDebug {
+		dg.AddHandler(h.GuildCreate)
+	} else {
+		slog.Info("[DEBUG MODE] Skip GuildCreate handler registration")
+	}
 
 	err = dg.Open()
 	if err != nil {

@@ -1,0 +1,88 @@
+{
+    "realm": "x3",
+    "id": 1106549,
+    "challengeId": 6,
+    "name": "Кривой Клык: Узилище",
+    "icon": "/images/ejbackgrounds/slavepens.webp",
+    "mapId": 547,
+    "keystoneLevel": 21,
+    "seasonId": 4,
+    "weekId": 12,
+    "timeStart": 1790807194,
+    "durationMs": 2130419,
+    "completed": true,
+    "version": 3,
+    "forcesTotal": 90.3,
+    "forcesMax": 90,
+    "forcesPercent": 100.33,
+    "timer": 2130,
+    "rewardLevel": 2,
+    "deathCounter": 5,
+    "score": 228.958,
+    "affixes": [
+        382468,
+        382482,
+        382494,
+        382472
+    ],
+    "dateTime": 1790809558,
+    "template": 8,
+    "hasRunLog": true,
+    "members": [
+        {
+            "memberGuid": 197857,
+            "name": "Psychxpath",
+            "classId": 6,
+            "specId": 2,
+            "roleId": 3,
+            "raceId": 10,
+            "genderId": 1,
+            "ilvl": 261,
+            "zodiac": 847
+        },
+        {
+            "memberGuid": 314866,
+            "name": "\u0411\u0430\u0431\u043b\u0430\u0434\u0435\u0442\u0440\u0430\u0431\u043b",
+            "classId": 2,
+            "specId": 1,
+            "roleId": 1,
+            "raceId": 6,
+            "genderId": 0,
+            "ilvl": 256,
+            "zodiac": 847
+        },
+        {
+            "memberGuid": 580423,
+            "name": "Choytutdelau",
+            "classId": 11,
+            "specId": 1,
+            "roleId": 3,
+            "raceId": 25,
+            "genderId": 0,
+            "ilvl": 259,
+            "zodiac": 851
+        },
+        {
+            "memberGuid": 600722,
+            "name": "Лунабель",
+            "classId": 5,
+            "specId": 0,
+            "roleId": 2,
+            "raceId": 17,
+            "genderId": 1,
+            "ilvl": 261,
+            "zodiac": 853
+        },
+        {
+            "memberGuid": 1029393,
+            "name": "Shellzi",
+            "classId": 7,
+            "specId": 1,
+            "roleId": 3,
+            "raceId": 17,
+            "genderId": 1,
+            "ilvl": 257,
+            "zodiac": 857
+        }
+    ]
+}
