@@ -9,7 +9,6 @@ import (
 	"image/color"
 	_ "image/png"
 	"log/slog"
-	"os"
 	"slices"
 
 	"github.com/fogleman/gg"
@@ -117,7 +116,7 @@ func getRaidColor(raidID int) string {
 	return "#151618"
 }
 
-//go:embed assets/images
+//go:embed assets/images assets/fonts
 var imagesFS embed.FS
 
 func RenderReportImage(report models.BossKillReport) ([]byte, error) {
@@ -145,29 +144,7 @@ func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 
 	drawRaidBackground(dc, report.RaidOrder, bgColor)
 
-	fontLoaded := false
-	fontPaths := []string{
-		"internal/discord/assets/fonts/Roboto-Regular.ttf",             // Local font
-		"C:\\Windows\\Fonts\\arialbd.ttf",                              // Windows Arial Bold
-		"C:\\Windows\\Fonts\\arial.ttf",                                // Windows Arial
-		"C:\\Windows\\Fonts\\seguiemj.ttf",                             // Windows Segoe UI
-		"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",         // Linux Ubuntu/Debian
-		"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",              // Linux Ubuntu/Debian
-		"/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",          // Linux FreeFont
-		"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf", // Linux CentOS/RHEL
-		"/usr/share/fonts/dejavu/DejaVuSans.ttf",                       // Alpine Linux
-	}
-
-	for _, path := range fontPaths {
-		if _, err := os.Stat(path); err == nil {
-			if err := dc.LoadFontFace(path, 16); err == nil {
-				fontLoaded = true
-				break
-			}
-		}
-	}
-
-	if !fontLoaded {
+	if !loadCyrillicFontFace(dc, 16) {
 		slog.Warn("No suitable font found for Cyrillic support")
 	}
 

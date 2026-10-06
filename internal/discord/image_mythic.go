@@ -8,7 +8,6 @@ import (
 	"image"
 	"image/color"
 	"log/slog"
-	"os"
 	"slices"
 	"strings"
 
@@ -44,11 +43,6 @@ var mythicColors = map[int]string{
 	13: "#0a0a0e",
 }
 
-var mythicFontPaths = []string{
-	"internal/discord/assets/fonts/DroidSans-Bold.ttf",
-	"internal/discord/assets/fonts/Roboto-Regular.ttf",
-}
-
 func getMythicColor(challengeID int) string {
 	if col, ok := mythicColors[challengeID]; ok {
 		return col
@@ -57,14 +51,9 @@ func getMythicColor(challengeID int) string {
 }
 
 func loadMythicFontFace(dc *gg.Context, size float64) {
-	for _, path := range mythicFontPaths {
-		if _, err := os.Stat(path); err == nil {
-			if err := dc.LoadFontFace(path, size); err == nil {
-				return
-			}
-		}
+	if !loadCyrillicFontFace(dc, size) {
+		slog.Warn("No suitable font found for Cyrillic support")
 	}
-	slog.Warn("No suitable font found for Cyrillic support")
 }
 
 func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) ([]byte, error) {
