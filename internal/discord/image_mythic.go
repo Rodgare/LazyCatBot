@@ -229,7 +229,7 @@ func drawMythicTableHeader(dc *gg.Context, y float64, combat bool) {
 	dc.DrawString("Роль", mColRoleX, y+20)
 	dc.DrawString("ILvl", mColIlvlX, y+20)
 	if combat {
-		dc.DrawString("Созв", mColZodiacX-15, y+20)
+		dc.DrawString("Зодиак", mColZodiacX-15, y+20)
 		dc.DrawString("Дпс", mColDpsX, y+20)
 		dc.DrawString("Хпс", mColHpsX, y+20)
 		dc.DrawString("Кики", mColIntX, y+20)
