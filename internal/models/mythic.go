@@ -177,7 +177,14 @@ func (r *MythicReport) Enrich(details *MythicRun) {
 }
 
 func (r *MythicReport) HasCombatDetails() bool {
-	return r.HasRunLog && r.Completed && r.Timer > 0 && r.KeystoneLevel >= 10
+	return r.HasRunLog && r.Completed && r.RewardLevel > 0 && r.KeystoneLevel >= 10
+}
+
+func (r *MythicReport) DurationSeconds() int {
+	if r.DurationMs > 0 {
+		return r.DurationMs / 1000
+	}
+	return r.Timer
 }
 
 func (r *MythicReport) ApplyCombat(details *MythicRun) {

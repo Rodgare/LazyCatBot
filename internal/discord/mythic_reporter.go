@@ -50,6 +50,13 @@ func (r *DiscordReporter) SendMythicReport(channelID string, report *models.Myth
 	return err
 }
 
+func formatMythicTime(totalSeconds int) string {
+	if totalSeconds < 0 {
+		totalSeconds = 0
+	}
+	return fmt.Sprintf("%02d:%02d", totalSeconds/60, totalSeconds%60)
+}
+
 func (r *DiscordReporter) buildMythicFields(report *models.MythicReport) []*discordgo.MessageEmbedField {
 	var fields []*discordgo.MessageEmbedField
 
@@ -60,8 +67,34 @@ func (r *DiscordReporter) buildMythicFields(report *models.MythicReport) []*disc
 	})
 
 	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Сезон",
+		Value:  fmt.Sprintf("%d", report.SeasonID),
+		Inline: true,
+	})
+
+	weekValue := "—"
+	if report.WeekID > 0 {
+		weekValue = fmt.Sprintf("%d", report.WeekID)
+	}
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Неделя",
+		Value:  weekValue,
+		Inline: true,
+	})
+
+	forcesValue := "—"
+	if report.ForcesPercent > 0 {
+		forcesValue = fmt.Sprintf("%.0f / 100 %%", report.ForcesPercent)
+	}
+	fields = append(fields, &discordgo.MessageEmbedField{
+		Name:   "Войска",
+		Value:  forcesValue,
+		Inline: true,
+	})
+
+	fields = append(fields, &discordgo.MessageEmbedField{
 		Name:   "Таймер",
-		Value:  fmt.Sprintf("%d", report.DurationMs),
+		Value:  formatMythicTime(report.DurationSeconds()),
 		Inline: true,
 	})
 
