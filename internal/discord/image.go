@@ -433,34 +433,30 @@ func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
 	canvasH := dc.Height()
 	imgH := img.Bounds().Dy()
 
+	// Photo is anchored to the top and fills the whole width.
 	dc.DrawImage(img, 0, 0)
 
-	grad := gg.NewLinearGradient(0, 0, 0, 400)
+	// If the report is taller than the photo, fill the rest with the solid colour.
+	if canvasH > imgH {
+		dc.SetHexColor(bgColor + "ff")
+		dc.DrawRectangle(0, float64(imgH), float64(width), float64(canvasH-imgH))
+		dc.Fill()
+	}
 
-	var r, g, b int
-	fmt.Sscanf(bgColor, "#%02x%02x%02x", &r, &g, &b)
-	bgR, bgG, bgB := uint8(r), uint8(g), uint8(b)
+	// Gradient at the bottom so the report fades into darkness.
+	// Tune bottomGradHeight / bottomAlpha to taste.
+	const bottomGradHeight = 180.0
+	const bottomAlpha = 190
+	startFrac := (float64(canvasH) - bottomGradHeight) / float64(canvasH)
+	if startFrac < 0 {
+		startFrac = 0
+	}
 
-	grad.AddColorStop(0, color.RGBA{0, 0, 0, 200})
-	grad.AddColorStop(0.5, color.RGBA{0, 0, 0, 200})
-
-	grad.AddColorStop(1.0, color.RGBA{bgR, bgG, bgB, 255})
-
+	grad := gg.NewLinearGradient(0, 0, 0, float64(canvasH))
+	grad.AddColorStop(0, color.RGBA{0, 0, 0, 0})
+	grad.AddColorStop(startFrac, color.RGBA{0, 0, 0, 0})
+	grad.AddColorStop(1, color.RGBA{0, 0, 0, bottomAlpha})
 	dc.SetFillStyle(grad)
-	dc.DrawRectangle(0, 0, float64(width), 400)
-	dc.Fill()
-
-	// Fill the area not covered by the background image with the solid color.
-	// A tall background (height >= canvas) covers the whole report; a short one
-	// only the top, so the rest is filled like before.
-	fillFrom := 400
-	if imgH > fillFrom {
-		fillFrom = imgH
-	}
-	if fillFrom > canvasH {
-		fillFrom = canvasH
-	}
-	dc.SetHexColor(bgColor + "ff")
-	dc.DrawRectangle(0, float64(fillFrom), float64(width), 5000)
+	dc.DrawRectangle(0, 0, float64(width), float64(canvasH))
 	dc.Fill()
 }
