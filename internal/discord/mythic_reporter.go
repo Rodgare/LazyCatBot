@@ -5,7 +5,6 @@ import (
 	"bytes"
 	"fmt"
 	"log/slog"
-	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -104,18 +103,18 @@ func (r *DiscordReporter) buildMythicFields(report *models.MythicReport) []*disc
 		Inline: true,
 	})
 
-	var affixes []string
-	for _, affixID := range report.Affixes {
-		if affix, ok := models.AffixMap[affixID]; ok {
-			affixes = append(affixes, fmt.Sprintf("%s %s", affix.Emoji, affix.Name))
-		}
-	}
+	// var affixes []string
+	// for _, affixID := range report.Affixes {
+	// 	if affix, ok := models.AffixMap[affixID]; ok {
+	// 		affixes = append(affixes, fmt.Sprintf("%s %s", affix.Emoji, affix.Name))
+	// 	}
+	// }
 
-	fields = append(fields, &discordgo.MessageEmbedField{
-		Name:   "Аффиксы",
-		Value:  strings.Join(affixes, "\n"),
-		Inline: false,
-	})
+	// fields = append(fields, &discordgo.MessageEmbedField{
+	// 	Name:   "Аффиксы",
+	// 	Value:  strings.Join(affixes, "\n"),
+	// 	Inline: false,
+	// })
 
 	if report.HasCombat {
 		var totalDPS, totalHPS, totalInterrupts int
