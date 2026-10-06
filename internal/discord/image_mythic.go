@@ -7,30 +7,33 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	_ "image/png"
+	"image/png"
 	"log/slog"
 	"os"
+	"slices"
 	"strings"
 
 	"github.com/fogleman/gg"
+	xdraw "golang.org/x/image/draw"
 )
 
 const (
 	mWidth       = 800
+	mScale       = 2
 	mRowHeight   = 40
 	mTableHeader = 30
 	mMargin      = 20
 
-	mColRankX    = 20
-	mColClassX   = 45
-	mColSpecX    = 75
-	mColNameX    = 105
-	mColRoleX    = 260
-	mColIlvlX    = 345
-	mColZodiacX  = 420
-	mColDpsX     = 505
-	mColHpsX     = 600
-	mColIntX     = 695
+	mColRankX   = 20
+	mColClassX  = 45
+	mColSpecX   = 75
+	mColNameX   = 105
+	mColRoleX   = 280
+	mColIlvlX   = 365
+	mColZodiacX = 440
+	mColDpsX    = 510
+	mColHpsX    = 620
+	mColIntX    = 720
 )
 
 var mythicColors = map[int]string{
@@ -78,39 +81,62 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 		return nil, nil
 	}
 
+	if report.HasCombat {
+		combatByGUID := make(map[int]int, len(report.CombatStats))
+		for _, c := range report.CombatStats {
+			combatByGUID[c.GUID] = c.DamageDone
+		}
+		slices.SortFunc(report.Members, func(a, b models.ReportMember) int {
+			return combatByGUID[b.MemberGUID] - combatByGUID[a.MemberGUID]
+		})
+	}
+
 	headerH := 100
 	if report.HasCombat {
 		headerH = 125
 	}
 
 	rowsTotalHeight := float64(len(report.Members)) * mRowHeight
-	height := float64(headerH) + 10 + mTableHeader + rowsTotalHeight + 45
+	height := float64(headerH) + 10 + mTableHeader + rowsTotalHeight + 20
 
-	dc := gg.NewContext(mWidth, int(height))
+	dc := gg.NewContext(mWidth*mScale, int(height)*mScale)
+	dc.Scale(mScale, mScale)
 
 	drawMythicBackground(dc, report)
 
 	// Title (Dungeon Name + Level)
-	loadMythicFontFace(dc, 22)
-	title := fmt.Sprintf("%s — +%d", report.Name, report.KeystoneLevel)
+	loadMythicFontFace(dc, 14*mScale)
+	title := fmt.Sprintf("%s — %d", report.Name, report.KeystoneLevel)
+	titleW, _ := dc.MeasureString(title)
+	titleW /= mScale
+
 	dc.SetRGBA(0, 0, 0, 0.8)
-	dc.DrawStringAnchored(title, mWidth/2+1, 31, 0.5, 0.5)
+	// dc.DrawStringAnchored(title, mWidth/2+1, 31, 0.5, 0.5)
 	dc.SetRGB(1, 1, 1)
-	dc.DrawStringAnchored(title, mWidth/2, 30, 0.5, 0.5)
+	dc.DrawStringAnchored(title, mWidth/2, 25, 0.5, 0.5)
+
+	// Bonus levels (closed key in time)
+	loadMythicFontFace(dc, 12*mScale)
+	bonus := report.RewardLevel
+	bonusText := fmt.Sprintf("+%d", report.RewardLevel)
+	bonusX := mWidth/2 + titleW
+	dc.SetRGBA(0, 0, 0, 0.8)
+	dc.SetHexColor(getBonusColor(bonus))
+	dc.DrawStringAnchored(bonusText, bonusX, 28, 0, 0.2)
 
 	// Status badge (in time / not in time)
 	statusStr := "В тайм"
 	statusColor := "#2ecc71"
-	if report.Timer <= 0 {
+	if report.RewardLevel <= 0 {
 		statusStr = "Не в тайм"
 		statusColor = "#e74c3c"
 	}
-	loadMythicFontFace(dc, 15)
+	loadMythicFontFace(dc, 10*mScale)
 	dc.SetHexColor(statusColor)
-	dc.DrawStringAnchored(statusStr, mWidth-mMargin, 30, 1.0, 0.5)
+	dc.DrawStringAnchored(statusStr, mWidth-mMargin+10, 20, 1.0, 0.5)
 
 	// Details Subtitle (Timer, Score, Deaths)
-	loadMythicFontFace(dc, 14)
+	loadMythicFontFace(dc, 9*mScale)
 	dc.SetHexColor("#9aa0a8")
 	min := report.Timer / 60
 	sec := report.Timer % 60
@@ -125,25 +151,25 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 		}
 	}
 	if len(affixNames) > 0 {
-		loadMythicFontFace(dc, 13)
+		loadMythicFontFace(dc, 9*mScale)
 		dc.SetHexColor("#d8a13c")
-		dc.DrawStringAnchored(fmt.Sprintf("Аффиксы: %s", strings.Join(affixNames, " • ")), mWidth/2, 80, 0.5, 0.5)
+		dc.DrawStringAnchored(fmt.Sprintf("Аффиксы: %s", strings.Join(affixNames, " • ")), mWidth/2, 85, 0.5, 0.5)
 	}
 
-	// Total DPS / HPS / Interrupts summary
+	// Total DPS / HPS / Kicks summary
 	if report.HasCombat {
-		var totalDPS, totalHPS, totalInterrupts int
+		var totalDPS, totalHPS, totalKicks int
 		for _, c := range report.CombatStats {
 			totalDPS += c.DamageDone
 			totalHPS += c.HealDone
-			totalInterrupts += c.Interrupts
+			totalKicks += c.Interrupts
 		}
 
-		loadMythicFontFace(dc, 13)
+		loadMythicFontFace(dc, 9*mScale)
 		dc.SetHexColor("#8f7bc9")
-		combatText := fmt.Sprintf("Суммарный ДПС: %s   |   ХПС: %s   |   Интеруптов: %d",
-			FormatNum(totalDPS), FormatNum(totalHPS), totalInterrupts)
-		dc.DrawStringAnchored(combatText, mWidth/2, 105, 0.5, 0.5)
+		combatText := fmt.Sprintf("Суммарный ДПС: %s   |   ХПС: %s   |   Кики: %d",
+			FormatNum(totalDPS), FormatNum(totalHPS), totalKicks)
+		dc.DrawStringAnchored(combatText, mWidth/2, 115, 0.5, 0.5)
 	}
 
 	// Table header
@@ -160,18 +186,23 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 		y = drawMythicPlayerRow(dc, i+1, member, combatByGUID[member.MemberGUID], y, report.HasCombat)
 	}
 
-	// Footer note
-	loadMythicFontFace(dc, 11)
-	dc.SetRGB(0.4, 0.4, 0.4)
-	footerText := "*Информация о забеге"
-	if report.HasCombat {
-		footerText = "*ДПС/ХПС рассчитаны на основе боевого журнала забега"
-	}
-	dc.DrawString(footerText, mMargin, y+20)
-
 	buf := new(bytes.Buffer)
-	err := dc.EncodePNG(buf)
+	full := dc.Image()
+	dst := image.NewRGBA(image.Rect(0, 0, mWidth, int(height)))
+	xdraw.ApproxBiLinear.Scale(dst, dst.Bounds(), full, full.Bounds(), xdraw.Over, nil)
+	err := png.Encode(buf, dst)
 	return buf.Bytes(), err
+}
+
+func getBonusColor(bonus int) string {
+	switch {
+	case bonus >= 2:
+		return "#2ecc71" // green — key closed well in time
+	case bonus == 1:
+		return "#f1c40f" // gold — key closed on the edge
+	default:
+		return "#e74c3c" // red — key not closed in time
+	}
 }
 
 func drawMythicBackground(dc *gg.Context, report *models.MythicReport) {
@@ -199,9 +230,9 @@ func drawMythicBackground(dc *gg.Context, report *models.MythicReport) {
 	fmt.Sscanf(bgColor, "#%02x%02x%02x", &r, &g, &b)
 	bgR, bgG, bgB := uint8(r), uint8(g), uint8(b)
 
-	grad.AddColorStop(0, color.RGBA{0, 0, 0, 220})
-	grad.AddColorStop(0.5, color.RGBA{0, 0, 0, 220})
-	grad.AddColorStop(1.0, color.RGBA{bgR, bgG, bgB, 255})
+	grad.AddColorStop(0, color.RGBA{0, 0, 0, 160})
+	grad.AddColorStop(0.5, color.RGBA{0, 0, 0, 110})
+	grad.AddColorStop(1.0, color.RGBA{bgR, bgG, bgB, 190})
 
 	dc.SetFillStyle(grad)
 	dc.DrawRectangle(0, 0, float64(mWidth), 400)
@@ -217,16 +248,17 @@ func drawMythicTableHeader(dc *gg.Context, y float64, combat bool) {
 	dc.DrawRectangle(0, y, float64(mWidth), mTableHeader)
 	dc.Fill()
 
-	loadMythicFontFace(dc, 12)
+	loadMythicFontFace(dc, 10*mScale)
 	dc.SetRGB(0.7, 0.7, 0.7)
 	dc.DrawString("#", mColRankX, y+20)
 	dc.DrawString("Игрок", mColNameX, y+20)
 	dc.DrawString("Роль", mColRoleX, y+20)
 	dc.DrawString("ILvl", mColIlvlX, y+20)
 	if combat {
+		dc.DrawString("Созв", mColZodiacX-15, y+20)
 		dc.DrawString("Дпс", mColDpsX, y+20)
 		dc.DrawString("Хпс", mColHpsX, y+20)
-		dc.DrawString("Инт", mColIntX, y+20)
+		dc.DrawString("Кики", mColIntX, y+20)
 	}
 }
 
@@ -237,7 +269,7 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 		dc.Fill()
 	}
 
-	loadMythicFontFace(dc, 13)
+	loadMythicFontFace(dc, 10*mScale)
 
 	// Rank
 	dc.SetRGB(0.5, 0.5, 0.5)
@@ -263,6 +295,7 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	dc.DrawString(member.Name, mColNameX, y+28)
 
 	// Role
+	loadMythicFontFace(dc, 9*mScale)
 	roleText := "Неизвестно"
 	switch member.RoleID {
 	case 1:

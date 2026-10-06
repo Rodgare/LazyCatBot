@@ -103,7 +103,7 @@ func (r *DiscordReporter) buildMythicFields(report *models.MythicReport) []*disc
 			Inline: true,
 		})
 		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   "Интерупты",
+			Name:   "Кики",
 			Value:  fmt.Sprintf("%d", totalInterrupts),
 			Inline: true,
 		})
