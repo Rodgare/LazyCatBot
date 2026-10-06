@@ -4,6 +4,7 @@ import (
 	"LazyCatBot/internal/models"
 	"bytes"
 	"fmt"
+	"log/slog"
 	"math/rand"
 	"os"
 	"strings"
@@ -35,7 +36,7 @@ var ansiColors = map[string]string{
 	"reset": "\033[0m",
 }
 
-func SendKillReport(s *discordgo.Session, channelID string, report models.BossKillReport) {
+func SendKillReport(s *discordgo.Session, channelID string, report models.BossKillReport) error {
 	ddBlocks, healBlocks := BuildReportText(report)
 
 	embed := &discordgo.MessageEmbed{
@@ -71,13 +72,14 @@ func SendKillReport(s *discordgo.Session, channelID string, report models.BossKi
 			},
 		}
 	} else {
-		fmt.Println("Error rendering image:", err)
+		slog.Error("Error rendering image", "error", err)
 	}
 
 	_, err = s.ChannelMessageSendComplex(channelID, params)
 	if err != nil {
-		fmt.Println("Error sending report:", err)
+		slog.Error("Error sending report", "error", err, "channel_id", channelID)
 	}
+	return err
 }
 
 func buildFields(report models.BossKillReport, ddBlocks, healBlocks []string, lootsBlock []models.LootReport) []*discordgo.MessageEmbedField {
@@ -224,7 +226,7 @@ func NewDiscordReporter(s *discordgo.Session) *DiscordReporter {
 	return &DiscordReporter{session: s}
 }
 
-func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKillReport) {
+func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKillReport) error {
 	if os.Getenv("DEBUG") == "true" {
 		debugChan := os.Getenv("DEBUG_CHANNEL_ID")
 		if debugChan != "" {
@@ -232,5 +234,5 @@ func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKil
 			channelID = debugChan
 		}
 	}
-	SendKillReport(r.session, channelID, report)
+	return SendKillReport(r.session, channelID, report)
 }

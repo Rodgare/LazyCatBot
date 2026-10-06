@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -160,7 +161,13 @@ func (s *SubscribeStorage) IsKillProcessed(id int, ch string) bool {
 }
 
 func (s *SubscribeStorage) MarkKillProcessed(id int, ch string) error {
-	_, err := s.db.Exec("INSERT OR IGNORE INTO processed_kills (kill_id, channel_id) VALUES (?, ?)", id, ch)
+	_, err := s.db.Exec("INSERT OR IGNORE INTO processed_kills (kill_id, channel_id, created_at) VALUES (?, ?, ?)", id, ch, time.Now().Unix())
+	return err
+}
+
+func (s *SubscribeStorage) CleanupProcessedKills(olderThan time.Duration) error {
+	cutoff := time.Now().Add(-olderThan).Unix()
+	_, err := s.db.Exec("DELETE FROM processed_kills WHERE created_at > 0 AND created_at < ?", cutoff)
 	return err
 }
 

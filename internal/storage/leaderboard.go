@@ -78,7 +78,7 @@ func (s *LeaderboardStorage) UpsertPlayer(realm string, raid, boss int, p models
 	query := fmt.Sprintf(`
 		INSERT INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, guild_id, zodiac, category, t4, role, dps, hps, realm) 
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-		ON CONFLICT(raid_id, boss_id, class_id, spec_id, player_name) 
+		ON CONFLICT(raid_id, boss_id, class_id, spec_id, player_name, realm) 
 		DO UPDATE SET 
     		ilvl = excluded.ilvl,
 			zodiac = excluded.zodiac,
@@ -147,6 +147,19 @@ func (s *LeaderboardStorage) GetPlayerRank(raid, boss int, p models.PlayerReport
 		p.OverallPercentile = int(float64(overallTotal-overallRank+1) / float64(overallTotal) * 100)
 	}
 	return p, nil
+}
+
+func (s *LeaderboardStorage) IsLeaderboardSyncDone(realm, syncDate string, raid, boss, class, spec int) (bool, error) {
+	var done bool
+	err := s.db.QueryRow("SELECT EXISTS(SELECT 1 FROM leaderboard_sync_state WHERE realm=? AND sync_date=? AND raid_id=? AND boss_id=? AND class_id=? AND spec_id=?)",
+		realm, syncDate, raid, boss, class, spec).Scan(&done)
+	return done, err
+}
+
+func (s *LeaderboardStorage) MarkLeaderboardSyncDone(realm, syncDate string, raid, boss, class, spec int) error {
+	_, err := s.db.Exec("INSERT OR IGNORE INTO leaderboard_sync_state (realm, sync_date, raid_id, boss_id, class_id, spec_id) VALUES (?, ?, ?, ?, ?, ?)",
+		realm, syncDate, raid, boss, class, spec)
+	return err
 }
 
 func (s *LeaderboardStorage) GetBossTop(realm string, raidID, bossID, guildID int, role string) ([]models.PlayerReport, error) {

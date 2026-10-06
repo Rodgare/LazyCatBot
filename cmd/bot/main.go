@@ -121,6 +121,7 @@ func main() {
 	go killWorker.PlayerKillMonitor(ctx)
 	go killWorker.MythicRunsMonitor(ctx)
 	go killWorker.GuildMembersUpdater(ctx)
+	go killWorker.CleanupRoutine(ctx)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 

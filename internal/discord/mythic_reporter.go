@@ -4,13 +4,14 @@ import (
 	"LazyCatBot/internal/models"
 	"bytes"
 	"fmt"
+	"log/slog"
 	"strings"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
 
-func (r *DiscordReporter) SendMythicReport(channelID string, report *models.MythicReport) {
+func (r *DiscordReporter) SendMythicReport(channelID string, report *models.MythicReport) error {
 	embed := &discordgo.MessageEmbed{
 		Title:  fmt.Sprintf("%s — %d +%d", report.Name, report.KeystoneLevel, report.RewardLevel),
 		URL:    fmt.Sprintf("https://sirus.su/base/ladder/keystone/run/%s/%d", report.Realm, report.ID),
@@ -39,13 +40,14 @@ func (r *DiscordReporter) SendMythicReport(channelID string, report *models.Myth
 			},
 		}
 	} else {
-		fmt.Println("Error mythic rendering image:", err)
+		slog.Error("Error mythic rendering image", "error", err)
 	}
 
 	_, err = r.session.ChannelMessageSendComplex(channelID, params)
 	if err != nil {
-		fmt.Println("Error sending mythic report:", err)
+		slog.Error("Error sending mythic report", "error", err, "channel_id", channelID)
 	}
+	return err
 }
 
 func (r *DiscordReporter) buildMythicFields(report *models.MythicReport) []*discordgo.MessageEmbedField {

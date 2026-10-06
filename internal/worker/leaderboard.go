@@ -10,6 +10,7 @@ import (
 func (w *Worker) StartLeaderboardSync() {
 	w.logger.Info("Starting leaderboard sync system...")
 	realms := []string{"x3", "x5"}
+	syncDate := time.Now().In(time.FixedZone("MSK", 3*3600)).Format("2006-01-02")
 
 	for _, r := range realms {
 		actualRaids, err := w.sirusClient.FetchActualRaids(r)
@@ -39,6 +40,15 @@ func (w *Worker) StartLeaderboardSync() {
 							"spec_id", specID,
 						)
 
+						done, err := w.lbStore.IsLeaderboardSyncDone(r, syncDate, raid.Order, bossID, classID, specID)
+						if err != nil {
+							l.Error("Check leaderboard sync state err", "error", err)
+							continue
+						}
+						if done {
+							continue
+						}
+
 						l.Info("Start parsing boss leaderboard")
 
 						role := sirus.GetRoleString(classID, specID)
@@ -59,6 +69,12 @@ func (w *Worker) StartLeaderboardSync() {
 						if err != nil {
 							l.Error("Error saving to database", "error", err)
 							time.Sleep(5 * time.Second)
+							continue
+						}
+
+						err = w.lbStore.MarkLeaderboardSyncDone(r, syncDate, raid.Order, bossID, classID, specID)
+						if err != nil {
+							l.Error("Mark leaderboard sync state err", "error", err)
 						}
 
 						time.Sleep(5 * time.Second)

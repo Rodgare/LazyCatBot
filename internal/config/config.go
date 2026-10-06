@@ -10,6 +10,7 @@ type Config struct {
 	DebugChannelID string
 	IsDebug        bool
 	SirusBaseURLs  []string
+	DefaultRealm   string
 }
 
 func LoadConfig() *Config {
@@ -31,7 +32,16 @@ func LoadConfig() *Config {
 		DebugChannelID: os.Getenv("DEBUG_CHANNEL_ID"),
 		IsDebug:        isDebug,
 		SirusBaseURLs:  cleanedURLs,
+		DefaultRealm:   getDefaultRealm(),
 	}
+}
+
+func getDefaultRealm() string {
+	realm := os.Getenv("SIRUS_REALM")
+	if realm == "" {
+		return "x3"
+	}
+	return realm
 }
 
 func (c *Config) GetSirusURLs() []string {

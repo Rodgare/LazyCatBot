@@ -14,6 +14,7 @@ import (
 type Client struct {
 	logger        *slog.Logger
 	sirusBaseURLs []string
+	httpClient    *http.Client
 }
 
 func NewClient(logger *slog.Logger, sirusBaseURLs []string) *Client {
@@ -31,6 +32,7 @@ func NewClient(logger *slog.Logger, sirusBaseURLs []string) *Client {
 	return &Client{
 		logger:        logger,
 		sirusBaseURLs: cleaned,
+		httpClient:    &http.Client{Timeout: 30 * time.Second},
 	}
 }
 
@@ -222,10 +224,6 @@ func (c *Client) calculateWeek(now time.Time) (string, string) {
 }
 
 func (c *Client) makeRequest(endpoint string, target any) error {
-	httpClient := &http.Client{
-		Timeout: 30 * time.Second,
-	}
-
 	var lastErr error
 	for _, baseURL := range c.sirusBaseURLs {
 		fullURL := fmt.Sprintf("%s%s", baseURL, endpoint)
@@ -237,23 +235,30 @@ func (c *Client) makeRequest(endpoint string, target any) error {
 		req.Header.Set("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) LazyCatBot/1.0")
 		req.Header.Set("Accept", "application/json")
 
-		for try := 1; try <= 2; try++ {
-			resp, err := httpClient.Do(req)
+		backoff := time.Second
+		for try := 1; try <= 3; try++ {
+			resp, err := c.httpClient.Do(req)
 			if err != nil {
 				lastErr = err
 				c.logger.Error("Http request failed", "url", fullURL, "error", err, "attempt", try)
-				time.Sleep(2 * time.Second)
+				time.Sleep(backoff)
+				backoff *= 2
 				continue
 			}
 			if resp.StatusCode != http.StatusOK {
 				lastErr = fmt.Errorf("API returned status: %d", resp.StatusCode)
 				resp.Body.Close()
-				c.logger.Error("Http request failed", "url", fullURL, "error", lastErr, "status_code", resp.StatusCode)
-				time.Sleep(2 * time.Second)
+				c.logger.Error("Http request failed", "url", fullURL, "error", lastErr, "status_code", resp.StatusCode, "attempt", try)
+				time.Sleep(backoff)
+				backoff *= 2
 				continue
 			}
-			defer resp.Body.Close()
-			return json.NewDecoder(resp.Body).Decode(target)
+			err = json.NewDecoder(resp.Body).Decode(target)
+			resp.Body.Close()
+			if err != nil {
+				return err
+			}
+			return nil
 		}
 	}
 

@@ -10,17 +10,19 @@ import (
 	"log/slog"
 	"os"
 	"sort"
+	"sync"
 	"time"
 )
 
 type Reporter interface {
-	SendKillReport(channelID string, report models.BossKillReport)
-	SendMythicReport(channelID string, report *models.MythicReport)
+	SendKillReport(channelID string, report models.BossKillReport) error
+	SendMythicReport(channelID string, report *models.MythicReport) error
 }
 
 type SubscribeStore interface {
 	IsKillProcessed(id int, ch string) bool
 	MarkKillProcessed(id int, ch string) error
+	CleanupProcessedKills(olderThan time.Duration) error
 	IsReportsEnabled(guild int, channelID string) bool
 	GetTrackedGuilds() (map[storage.TrackedGuildKey][]string, error)
 	IsMythicReportsEnabled(ch string) bool
@@ -54,6 +56,7 @@ type Worker struct {
 	arStore     *storage.ActualRaidsStorage
 	reporter    Reporter
 	killQueue   chan KillJob
+	apiLimiter  *RateLimiter
 	logger      *slog.Logger
 	cfg         *config.Config
 }
@@ -78,6 +81,7 @@ func NewWorker(
 		arStore:     ar,
 		reporter:    reporter,
 		killQueue:   make(chan KillJob, 100),
+		apiLimiter:  NewRateLimiter(2, 3),
 		logger:      logger,
 		cfg:         cfg,
 	}
@@ -177,7 +181,9 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 	if w.cfg.IsDebug {
 		w.logger.Info("[DEBUG] Pushing mock mythic run to killQueue...")
 		mockReport := w.makeMockMythicReport()
-		w.reporter.SendMythicReport(w.cfg.DebugChannelID, mockReport)
+		if err := w.reporter.SendMythicReport(w.cfg.DebugChannelID, mockReport); err != nil {
+			w.logger.Error("[DEBUG] Send mock mythic report err", "error", err)
+		}
 	}
 	for {
 		select {
@@ -231,7 +237,7 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 			}
 		}
 
-		realm := "x3"
+		realm := w.cfg.DefaultRealm
 		latestRuns, err := w.sirusClient.GetLatestMythicRuns(realm)
 		if err != nil {
 			w.logger.Error("[KillMonitor] GetLatestMythicRuns err", "error", err)
@@ -345,7 +351,10 @@ func (w *Worker) processRaids(job KillJob) {
 		}
 
 		if w.subStore.IsReportsEnabled(report.GuildID, ch) {
-			w.reporter.SendKillReport(ch, *report)
+			if err := w.reporter.SendKillReport(ch, *report); err != nil {
+				w.logger.Error("[Processor] Send kill report err", "error", err, "kill_id", job.KillID, "channel", ch)
+				continue
+			}
 		}
 		w.subStore.MarkKillProcessed(job.KillID, ch)
 
@@ -371,8 +380,10 @@ func (w *Worker) processMythicRuns(job KillJob) {
 		}
 
 		if w.subStore.IsMythicReportsEnabled(ch) {
-
-			w.reporter.SendMythicReport(ch, job.MythicReport)
+			if err := w.reporter.SendMythicReport(ch, job.MythicReport); err != nil {
+				w.logger.Error("[Processor] Send mythic report err", "error", err, "run_id", job.KillID, "channel", ch)
+				continue
+			}
 		}
 		w.subStore.MarkKillProcessed(job.KillID, ch)
 	}
@@ -383,29 +394,51 @@ func (w *Worker) getGuildKills(data map[storage.TrackedGuildKey][]string) (map[i
 	kills := make(map[int]map[string]bool)
 	killRealms := make(map[int]string)
 
-	for key, channels := range data {
-		gKills, err := w.sirusClient.FetchGuildLatestBossKills(key.Realm, key.GuildID)
-		if err != nil {
-			w.logger.Error("[KillMonitor] Fetch Guild Latest BossKills err", "error", err, "guild_id", key.GuildID, "realm", key.Realm)
-			continue
-		}
+	var mu sync.Mutex
+	keys := make([]storage.TrackedGuildKey, 0, len(data))
+	for key := range data {
+		keys = append(keys, key)
+	}
 
-		for _, kill := range gKills.Data {
-			for _, ch := range channels {
-				id := kill.KillID
-				if !w.subStore.IsKillProcessed(id, ch) {
+	const workers = 6
+	sem := make(chan struct{}, workers)
+	var wg sync.WaitGroup
+
+	for _, key := range keys {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(key storage.TrackedGuildKey) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			channels := data[key]
+			w.apiLimiter.Wait()
+			gKills, err := w.sirusClient.FetchGuildLatestBossKills(key.Realm, key.GuildID)
+			if err != nil {
+				w.logger.Error("[KillMonitor] Fetch Guild Latest BossKills err", "error", err, "guild_id", key.GuildID, "realm", key.Realm)
+				return
+			}
+
+			for _, kill := range gKills.Data {
+				for _, ch := range channels {
+					id := kill.KillID
+					if w.subStore.IsKillProcessed(id, ch) {
+						continue
+					}
+
+					mu.Lock()
 					if _, ok := kills[id]; !ok {
 						kills[id] = make(map[string]bool)
 					}
-
 					kills[id][ch] = true
 					killRealms[id] = key.Realm
+					mu.Unlock()
 				}
 			}
-		}
-		time.Sleep(300 * time.Millisecond)
+		}(key)
 	}
 
+	wg.Wait()
 	return kills, killRealms
 }
 
@@ -413,38 +446,59 @@ func (w *Worker) getPlayerKills(data map[storage.TrackedPlayerKey][]string) (map
 	kills := make(map[int]map[string]bool)
 	killRealms := make(map[int]string)
 
-	for key, channels := range data {
-		pKills, err := w.sirusClient.FetchPlayerLastActions(key.Realm, key.PlayerID)
-		if err != nil || pKills == nil {
-			w.logger.Error("[KillMonitor] pKills is nil or Fetch Player Latest BossKills err", "error", err, "player_id", key.PlayerID, "realm", key.Realm)
-			continue
-		}
-		lastKills := *pKills
+	var mu sync.Mutex
+	keys := make([]storage.TrackedPlayerKey, 0, len(data))
+	for key := range data {
+		keys = append(keys, key)
+	}
 
-		if len(lastKills) >= 10 {
-			lastKills = lastKills[:10]
-		}
+	const workers = 6
+	sem := make(chan struct{}, workers)
+	var wg sync.WaitGroup
 
-		for _, kill := range lastKills {
-			if kill.Type != "bosskill" || !sirus.IsPlayerKillToday(kill.Date) {
-				continue
+	for _, key := range keys {
+		wg.Add(1)
+		sem <- struct{}{}
+		go func(key storage.TrackedPlayerKey) {
+			defer wg.Done()
+			defer func() { <-sem }()
+
+			channels := data[key]
+			w.apiLimiter.Wait()
+			pKills, err := w.sirusClient.FetchPlayerLastActions(key.Realm, key.PlayerID)
+			if err != nil || pKills == nil {
+				w.logger.Error("[KillMonitor] pKills is nil or Fetch Player Latest BossKills err", "error", err, "player_id", key.PlayerID, "realm", key.Realm)
+				return
 			}
-			for _, ch := range channels {
-				id := kill.FightID
+			lastKills := *pKills
 
-				if !w.subStore.IsKillProcessed(id, ch) {
+			if len(lastKills) >= 10 {
+				lastKills = lastKills[:10]
+			}
+
+			for _, kill := range lastKills {
+				if kill.Type != "bosskill" || !sirus.IsPlayerKillToday(kill.Date) {
+					continue
+				}
+				for _, ch := range channels {
+					id := kill.FightID
+					if w.subStore.IsKillProcessed(id, ch) {
+						continue
+					}
+
+					mu.Lock()
 					if _, ok := kills[id]; !ok {
 						kills[id] = make(map[string]bool)
 					}
-
 					kills[id][ch] = true
 					killRealms[id] = key.Realm
+					mu.Unlock()
 				}
 			}
-		}
-		time.Sleep(300 * time.Millisecond)
+		}(key)
 	}
 
+	wg.Wait()
 	return kills, killRealms
 }
 
