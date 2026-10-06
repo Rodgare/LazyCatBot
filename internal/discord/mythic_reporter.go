@@ -43,11 +43,6 @@ func (r *DiscordReporter) SendMythicReport(channelID string, report *models.Myth
 	}
 
 	_, err = r.session.ChannelMessageSendComplex(channelID, params)
-	if err != nil && isEmojiAccessError(err) {
-		slog.Warn("Retrying mythic report without custom emojis", "channel_id", channelID, "error", err)
-		params.Embeds[0] = sanitizeEmbed(embed)
-		_, err = r.session.ChannelMessageSendComplex(channelID, params)
-	}
 	if err != nil {
 		slog.Error("Error sending mythic report", "error", err, "channel_id", channelID)
 	}
