@@ -81,7 +81,7 @@ func NewWorker(
 		arStore:     ar,
 		reporter:    reporter,
 		killQueue:   make(chan KillJob, 100),
-		apiLimiter:  NewRateLimiter(2, 3),
+		apiLimiter:  NewRateLimiter(1, 1),
 		logger:      logger,
 		cfg:         cfg,
 	}

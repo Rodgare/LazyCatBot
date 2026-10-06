@@ -176,9 +176,6 @@ func fetchChallenges(baseURL, realm string) ([]challengeInfo, error) {
 	client := &http.Client{Timeout: 60 * time.Second}
 
 	baseURLs := []string{baseURL}
-	if !strings.Contains(baseURL, "sirus.org") {
-		baseURLs = append(baseURLs, "https://sirus.org")
-	}
 	if !strings.Contains(baseURL, "sirus.su") {
 		baseURLs = append(baseURLs, "https://sirus.su")
 	}

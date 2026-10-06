@@ -51,7 +51,7 @@ func (s *GuildMembersStorage) GetPlayersByGuildID(realm string, guildID int) ([]
 		realm = "x3"
 	}
 
-	query := `SELECT id WHERE guild_id = ? AND realm = ?`
+	query := `SELECT id FROM guild_members WHERE guild_id = ? AND realm = ?`
 	rows, err := s.db.Query(query, guildID, realm)
 	if err != nil {
 		return nil, err

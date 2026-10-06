@@ -22,7 +22,7 @@ func LoadConfig() *Config {
 	if sirusURLsStr != "" {
 		sirusURLs = strings.Split(sirusURLsStr, ",")
 	} else {
-		sirusURLs = []string{"https://sirus.su", "https://sirus.org"}
+		sirusURLs = []string{"https://sirus.su"}
 	}
 
 	cleanedURLs := cleanURLs(sirusURLs)

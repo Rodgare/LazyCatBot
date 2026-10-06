@@ -26,7 +26,7 @@ func NewClient(logger *slog.Logger, sirusBaseURLs []string) *Client {
 		}
 	}
 	if len(cleaned) == 0 {
-		cleaned = []string{"https://sirus.org", "https://sirus.su"}
+		cleaned = []string{"https://sirus.su"}
 	}
 
 	return &Client{
