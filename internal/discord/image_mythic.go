@@ -7,19 +7,16 @@ import (
 	"fmt"
 	"image"
 	"image/color"
-	"image/png"
 	"log/slog"
 	"os"
 	"slices"
 	"strings"
 
 	"github.com/fogleman/gg"
-	xdraw "golang.org/x/image/draw"
 )
 
 const (
 	mWidth       = 800
-	mScale       = 2
 	mRowHeight   = 40
 	mTableHeader = 30
 	mMargin      = 20
@@ -48,14 +45,8 @@ var mythicColors = map[int]string{
 }
 
 var mythicFontPaths = []string{
+	"internal/discord/assets/fonts/DroidSans-Bold.ttf",
 	"internal/discord/assets/fonts/Roboto-Regular.ttf",
-	"C:\\Windows\\Fonts\\arialbd.ttf",
-	"C:\\Windows\\Fonts\\arial.ttf",
-	"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
-	"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
-	"/usr/share/fonts/truetype/freefont/FreeSansBold.ttf",
-	"/usr/share/fonts/truetype/liberation/LiberationSans-Bold.ttf",
-	"/usr/share/fonts/dejavu/DejaVuSans.ttf",
 }
 
 func getMythicColor(challengeID int) string {
@@ -99,8 +90,7 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 	rowsTotalHeight := float64(len(report.Members)) * mRowHeight
 	height := float64(headerH) + 10 + mTableHeader + rowsTotalHeight + 20
 
-	dc := gg.NewContext(mWidth*mScale, int(height)*mScale)
-	dc.Scale(mScale, mScale)
+	dc := gg.NewContext(mWidth, int(height))
 
 	drawMythicBackground(dc, report)
 
@@ -151,7 +141,7 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 	if len(affixNames) > 0 {
 		loadMythicFontFace(dc, 14)
 		dc.SetHexColor("#d8a13c")
-		dc.DrawStringAnchored(fmt.Sprintf("Аффиксы: %s", strings.Join(affixNames, " • ")), mWidth/2, 85, 0.5, 0.5)
+		dc.DrawStringAnchored(fmt.Sprintf("%s", strings.Join(affixNames, " • ")), mWidth/2, 85, 0.5, 0.5)
 	}
 
 	// Total DPS / HPS / Kicks summary
@@ -185,10 +175,7 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 	}
 
 	buf := new(bytes.Buffer)
-	full := dc.Image()
-	dst := image.NewRGBA(image.Rect(0, 0, mWidth, int(height)))
-	xdraw.ApproxBiLinear.Scale(dst, dst.Bounds(), full, full.Bounds(), xdraw.Over, nil)
-	err := png.Encode(buf, dst)
+	err := dc.EncodePNG(buf)
 	return buf.Bytes(), err
 }
 
@@ -307,7 +294,7 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	dc.DrawString(roleText, mColRoleX, y+28)
 
 	// Item level
-	dc.SetHexColor("#c8ccd4")
+	dc.SetHexColor("#ffffff")
 	dc.DrawString(fmt.Sprintf("%d", member.Ilvl), mColIlvlX, y+28)
 
 	// Zodiac icon
