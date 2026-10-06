@@ -44,16 +44,6 @@ type MythicMemberCombat struct {
 	Interrupts  int `json:"interrupts"`
 }
 
-type MythicRunLog struct {
-	DurationMs    int  `json:"durationMs"`
-	Timer         int  `json:"timer"`
-	Completed     bool `json:"completed"`
-	KeystoneLevel int  `json:"keystoneLevel"`
-	Frames        []struct {
-		Players []MythicMemberCombat `json:"players"`
-	} `json:"frames"`
-}
-
 type MythicRun struct {
 	ID          int    `json:"id"`
 	ChallengeID int    `json:"challengeId"`
@@ -81,6 +71,9 @@ type MythicRun struct {
 	Score         float64        `json:"score"`
 	Affixes       []int          `json:"affixes"`
 	Members       []ReportMember `json:"members"`
+	Frames        []struct {
+		Players []MythicMemberCombat `json:"players"`
+	} `json:"frames"`
 }
 
 type MythicReport struct {
@@ -187,13 +180,13 @@ func (r *MythicReport) HasCombatDetails() bool {
 	return r.HasRunLog && r.Completed && r.Timer > 0 && r.KeystoneLevel >= 10
 }
 
-func (r *MythicReport) ApplyCombatLog(log *MythicRunLog) {
-	if log == nil || len(log.Frames) == 0 {
+func (r *MythicReport) ApplyCombat(details *MythicRun) {
+	if details == nil || len(details.Frames) == 0 {
 		return
 	}
 
 	aggregated := make(map[int]*MythicMemberCombat)
-	for _, frame := range log.Frames {
+	for _, frame := range details.Frames {
 		for i := range frame.Players {
 			p := frame.Players[i]
 			agg, ok := aggregated[p.GUID]
@@ -210,7 +203,7 @@ func (r *MythicReport) ApplyCombatLog(log *MythicRunLog) {
 		}
 	}
 
-	duration := float64(log.DurationMs) / 1000
+	duration := float64(details.DurationMs) / 1000
 	for _, agg := range aggregated {
 		if duration > 0 {
 			agg.DamageDone = int(float64(agg.DamageDone) / duration)

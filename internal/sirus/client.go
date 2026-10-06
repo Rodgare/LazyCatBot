@@ -119,19 +119,6 @@ func (c *Client) FetchMythicRunDetails(realm string, runID int) (*models.MythicR
 	return &res, nil
 }
 
-func (c *Client) FetchMythicRunLog(realm string, runID int) (*models.MythicRunLog, error) {
-	realm = normalizeRealm(realm)
-	endpoint := fmt.Sprintf("/api/base/%s/details/challenge/%d/runlog", realm, runID)
-
-	var res models.MythicRunLog
-
-	if err := c.makeRequest(endpoint, &res); err != nil {
-		return nil, err
-	}
-
-	return &res, nil
-}
-
 func (c *Client) FetchGuildLatestBossKills(realm string, guildID int) (*models.LatestBossKills, error) {
 	realm = normalizeRealm(realm)
 	page := 1
