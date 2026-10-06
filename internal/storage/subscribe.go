@@ -58,6 +58,11 @@ func (s *SubscribeStorage) Unsubscribe(guild int, channelID, discordID string) e
 	return err
 }
 
+func (s *SubscribeStorage) DisableReportsForChannel(channelID string) error {
+	_, err := s.db.Exec(`UPDATE subscribe SET is_send = 0, is_myth_reps = 0 WHERE channel_id = ?`, channelID)
+	return err
+}
+
 func (s *SubscribeStorage) GetChannels(guild int) ([]string, error) {
 	query := `SELECT channel_id FROM subscribe WHERE guild_id = ?`
 	rows, err := s.db.Query(query, guild)

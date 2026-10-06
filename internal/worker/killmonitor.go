@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"os"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -23,9 +24,18 @@ type SubscribeStore interface {
 	IsKillProcessed(id int, ch string) bool
 	MarkKillProcessed(id int, ch string) error
 	CleanupProcessedKills(olderThan time.Duration) error
+	DisableReportsForChannel(ch string) error
 	IsReportsEnabled(guild int, channelID string) bool
 	GetTrackedGuilds() (map[storage.TrackedGuildKey][]string, error)
 	IsMythicReportsEnabled(ch string) bool
+}
+
+func isMissingAccess(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := err.Error()
+	return strings.Contains(msg, "Missing Access") || strings.Contains(msg, "50001")
 }
 
 type SirusAPI interface {
@@ -358,7 +368,12 @@ func (w *Worker) processRaids(job KillJob) {
 
 		if w.subStore.IsReportsEnabled(report.GuildID, ch) {
 			if err := w.reporter.SendKillReport(ch, *report); err != nil {
-				w.logger.Error("[Processor] Send kill report err", "error", err, "kill_id", job.KillID, "channel", ch)
+				if isMissingAccess(err) {
+					w.subStore.DisableReportsForChannel(ch)
+					w.logger.Warn("[Processor] Reports disabled for inaccessible channel", "error", err, "kill_id", job.KillID, "channel", ch)
+				} else {
+					w.logger.Error("[Processor] Send kill report err", "error", err, "kill_id", job.KillID, "channel", ch)
+				}
 				continue
 			}
 		}
@@ -387,7 +402,12 @@ func (w *Worker) processMythicRuns(job KillJob) {
 
 		if w.subStore.IsMythicReportsEnabled(ch) {
 			if err := w.reporter.SendMythicReport(ch, job.MythicReport); err != nil {
-				w.logger.Error("[Processor] Send mythic report err", "error", err, "run_id", job.KillID, "channel", ch)
+				if isMissingAccess(err) {
+					w.subStore.DisableReportsForChannel(ch)
+					w.logger.Warn("[Processor] Mythic reports disabled for inaccessible channel", "error", err, "run_id", job.KillID, "channel", ch)
+				} else {
+					w.logger.Error("[Processor] Send mythic report err", "error", err, "run_id", job.KillID, "channel", ch)
+				}
 				continue
 			}
 		}
