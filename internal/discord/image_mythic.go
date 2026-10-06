@@ -133,7 +133,7 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 	}
 	loadMythicFontFace(dc, 10*mScale)
 	dc.SetHexColor(statusColor)
-	dc.DrawStringAnchored(statusStr, mWidth-mMargin+10, 20, 1.0, 0.5)
+	dc.DrawStringAnchored(statusStr, mWidth-mMargin+10, 15, 1.0, 0.5)
 
 	// Details Subtitle (Timer, Score, Deaths)
 	loadMythicFontFace(dc, 9*mScale)
