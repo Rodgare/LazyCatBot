@@ -144,7 +144,7 @@ func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 
 	drawRaidBackground(dc, report.RaidOrder, bgColor)
 
-	if !loadCyrillicFontFace(dc, 16) {
+	if !loadCyrillicFontFace(dc, 17) {
 		slog.Warn("No suitable font found for Cyrillic support")
 	}
 
