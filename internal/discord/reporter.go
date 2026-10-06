@@ -37,8 +37,6 @@ var ansiColors = map[string]string{
 }
 
 func SendKillReport(s *discordgo.Session, channelID string, report models.BossKillReport) error {
-	ddBlocks, healBlocks := BuildReportText(report)
-
 	embed := &discordgo.MessageEmbed{
 		Author: &discordgo.MessageEmbedAuthor{
 			Name:    report.GuildName,
@@ -48,7 +46,7 @@ func SendKillReport(s *discordgo.Session, channelID string, report models.BossKi
 		Title:  fmt.Sprintf("%s — %s", report.MapName, report.BossName),
 		URL:    fmt.Sprintf("https://sirus.su/base/pve-progression/boss-kill/%s/%d", report.Realm, report.KillID),
 		Color:  0xf1c40f,
-		Fields: buildFields(report, ddBlocks, healBlocks, report.Loots),
+		Fields: buildFields(report, report.Loots),
 		Image: &discordgo.MessageEmbedImage{
 			URL: "attachment://report.png",
 		},
@@ -76,18 +74,13 @@ func SendKillReport(s *discordgo.Session, channelID string, report models.BossKi
 	}
 
 	_, err = s.ChannelMessageSendComplex(channelID, params)
-	if err != nil && isEmojiAccessError(err) {
-		slog.Warn("Retrying kill report without custom emojis", "channel_id", channelID, "error", err)
-		params.Embeds[0] = sanitizeEmbed(embed)
-		_, err = s.ChannelMessageSendComplex(channelID, params)
-	}
 	if err != nil {
 		slog.Error("Error sending report", "error", err, "channel_id", channelID)
 	}
 	return err
 }
 
-func buildFields(report models.BossKillReport, ddBlocks, healBlocks []string, lootsBlock []models.LootReport) []*discordgo.MessageEmbedField {
+func buildFields(report models.BossKillReport, lootsBlock []models.LootReport) []*discordgo.MessageEmbedField {
 	var fields []*discordgo.MessageEmbedField
 
 	fields = append(fields, &discordgo.MessageEmbedField{
@@ -120,25 +113,7 @@ func buildFields(report models.BossKillReport, ddBlocks, healBlocks []string, lo
 			ansiColors["red_bold"],
 			FormatNum(report.TotalDps),
 			ansiColors["reset"]),
-		Inline: false,
-	})
-
-	for i, block := range ddBlocks {
-		name := "ДД"
-		if i > 0 {
-			name = "\u200B"
-		}
-		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   name,
-			Value:  block,
-			Inline: false,
-		})
-	}
-
-	fields = append(fields, &discordgo.MessageEmbedField{
-		Name:   "\u200B",
-		Value:  "\u200B",
-		Inline: false,
+		Inline: true,
 	})
 
 	fields = append(fields, &discordgo.MessageEmbedField{
@@ -147,20 +122,8 @@ func buildFields(report models.BossKillReport, ddBlocks, healBlocks []string, lo
 			ansiColors["green_bold"],
 			FormatNum(report.TotalHps),
 			ansiColors["reset"]),
-		Inline: false,
+		Inline: true,
 	})
-
-	for i, block := range healBlocks {
-		name := "Хилы"
-		if i > 0 {
-			name = "\u200B"
-		}
-		fields = append(fields, &discordgo.MessageEmbedField{
-			Name:   name,
-			Value:  block,
-			Inline: false,
-		})
-	}
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name:   "\u200B",

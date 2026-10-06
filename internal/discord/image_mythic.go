@@ -129,7 +129,7 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 	}
 	if len(affixNames) > 0 {
 		loadMythicFontFace(dc, 14)
-		dc.SetHexColor("#d8a13c")
+		dc.SetHexColor("#8f7bc9")
 		dc.DrawStringAnchored(fmt.Sprintf("%s", strings.Join(affixNames, " • ")), mWidth/2, 85, 0.5, 0.5)
 	}
 
@@ -143,7 +143,7 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 		}
 
 		loadMythicFontFace(dc, 16)
-		dc.SetHexColor("#8f7bc9")
+		dc.SetHexColor("#d8a13c")
 		combatText := fmt.Sprintf("Суммарный ДПС: %s   |   ХПС: %s   |   Кики: %d",
 			FormatNum(totalDPS), FormatNum(totalHPS), totalKicks)
 		dc.DrawStringAnchored(combatText, mWidth/2, 115, 0.5, 0.5)
