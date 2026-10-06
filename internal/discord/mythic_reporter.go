@@ -82,5 +82,30 @@ func (r *DiscordReporter) buildMythicFields(report *models.MythicReport) []*disc
 		Inline: false,
 	})
 
+	if report.HasCombat {
+		var totalDPS, totalHPS, totalInterrupts int
+		for _, c := range report.CombatStats {
+			totalDPS += c.DamageDone
+			totalHPS += c.HealDone
+			totalInterrupts += c.Interrupts
+		}
+
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Общий ДПС",
+			Value:  fmt.Sprintf("%s", FormatNum(totalDPS)),
+			Inline: true,
+		})
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Общий ХПС",
+			Value:  fmt.Sprintf("%s", FormatNum(totalHPS)),
+			Inline: true,
+		})
+		fields = append(fields, &discordgo.MessageEmbedField{
+			Name:   "Интерупты",
+			Value:  fmt.Sprintf("%d", totalInterrupts),
+			Inline: true,
+		})
+	}
+
 	return fields
 }

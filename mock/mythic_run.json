@@ -84,5 +84,43 @@
             "ilvl": 257,
             "zodiac": 857
         }
-    ]
+    ],
+    "combatStats": [
+        {
+            "guid": 197857,
+            "damageDone": 125000,
+            "healDone": 0,
+            "interrupts": 12,
+            "deaths": 1
+        },
+        {
+            "guid": 314866,
+            "damageDone": 18000,
+            "healDone": 0,
+            "interrupts": 4,
+            "deaths": 0
+        },
+        {
+            "guid": 580423,
+            "damageDone": 98000,
+            "healDone": 2000,
+            "interrupts": 7,
+            "deaths": 0
+        },
+        {
+            "guid": 600722,
+            "damageDone": 5000,
+            "healDone": 82000,
+            "interrupts": 0,
+            "deaths": 2
+        },
+        {
+            "guid": 1029393,
+            "damageDone": 76000,
+            "healDone": 0,
+            "interrupts": 9,
+            "deaths": 1
+        }
+    ],
+    "hasCombat": true
 }

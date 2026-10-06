@@ -34,6 +34,26 @@ type MythicRuns struct {
 	Data []MythicRunItem `json:"data"`
 }
 
+type MythicMemberCombat struct {
+	GUID        int `json:"guid"`
+	DamageDone  int `json:"damageDone"`
+	HealDone    int `json:"healDone"`
+	DamageTaken int `json:"damageTaken"`
+	Absorbed    int `json:"absorbed"`
+	Deaths      int `json:"deaths"`
+	Interrupts  int `json:"interrupts"`
+}
+
+type MythicRunLog struct {
+	DurationMs    int  `json:"durationMs"`
+	Timer         int  `json:"timer"`
+	Completed     bool `json:"completed"`
+	KeystoneLevel int  `json:"keystoneLevel"`
+	Frames        []struct {
+		Players []MythicMemberCombat `json:"players"`
+	} `json:"frames"`
+}
+
 type MythicRun struct {
 	ID          int    `json:"id"`
 	ChallengeID int    `json:"challengeId"`
@@ -89,6 +109,8 @@ type MythicReport struct {
 	Template      int
 	HasRunLog     bool
 	Realm         string
+	CombatStats   []MythicMemberCombat
+	HasCombat     bool
 }
 
 func (r *MythicRun) ToReport() MythicReport {
@@ -159,6 +181,44 @@ func (r *MythicReport) Enrich(details *MythicRun) {
 	if len(details.Members) > 0 {
 		r.Members = details.Members
 	}
+}
+
+func (r *MythicReport) HasCombatDetails() bool {
+	return r.HasRunLog && r.Completed && r.Timer > 0 && r.KeystoneLevel >= 10
+}
+
+func (r *MythicReport) ApplyCombatLog(log *MythicRunLog) {
+	if log == nil || len(log.Frames) == 0 {
+		return
+	}
+
+	aggregated := make(map[int]*MythicMemberCombat)
+	for _, frame := range log.Frames {
+		for i := range frame.Players {
+			p := frame.Players[i]
+			agg, ok := aggregated[p.GUID]
+			if !ok {
+				agg = &MythicMemberCombat{GUID: p.GUID}
+				aggregated[p.GUID] = agg
+			}
+			agg.DamageDone += p.DamageDone
+			agg.HealDone += p.HealDone
+			agg.DamageTaken += p.DamageTaken
+			agg.Absorbed += p.Absorbed
+			agg.Deaths += p.Deaths
+			agg.Interrupts += p.Interrupts
+		}
+	}
+
+	duration := float64(log.DurationMs) / 1000
+	for _, agg := range aggregated {
+		if duration > 0 {
+			agg.DamageDone = int(float64(agg.DamageDone) / duration)
+			agg.HealDone = int(float64(agg.HealDone) / duration)
+		}
+		r.CombatStats = append(r.CombatStats, *agg)
+	}
+	r.HasCombat = true
 }
 
 type Affixes struct {

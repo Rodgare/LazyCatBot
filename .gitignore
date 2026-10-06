@@ -10,3 +10,4 @@ bot.db-wal
 bot_test.exe
 .vscode/justybase-favorites.json
 .gitignore
+bot.exe~

@@ -35,6 +35,7 @@ type SirusAPI interface {
 	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
 	GetLatestMythicRuns(realm string) (*models.MythicRuns, error)
 	FetchMythicRunDetails(realm string, runID int) (*models.MythicRun, error)
+	FetchMythicRunLog(realm string, runID int) (*models.MythicRunLog, error)
 }
 
 type KillJob struct {
@@ -361,6 +362,14 @@ func (w *Worker) processMythicRuns(job KillJob) {
 		}
 		job.MythicReport.Enrich(runDetails)
 
+		if job.MythicReport.HasCombatDetails() {
+			runLog, err := w.sirusClient.FetchMythicRunLog(job.Realm, job.KillID)
+			if err != nil {
+				w.logger.Error("[Processor] Fetch Mythic Run Log err", "error", err)
+			} else {
+				job.MythicReport.ApplyCombatLog(runLog)
+			}
+		}
 	}
 	for ch := range job.Channels {
 		if w.subStore.IsKillProcessed(job.KillID, ch) {
