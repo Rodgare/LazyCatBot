@@ -430,6 +430,9 @@ func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
 		return
 	}
 
+	canvasH := dc.Height()
+	imgH := img.Bounds().Dy()
+
 	dc.DrawImage(img, 0, 0)
 
 	grad := gg.NewLinearGradient(0, 0, 0, 400)
@@ -447,7 +450,17 @@ func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
 	dc.DrawRectangle(0, 0, float64(width), 400)
 	dc.Fill()
 
+	// Fill the area not covered by the background image with the solid color.
+	// A tall background (height >= canvas) covers the whole report; a short one
+	// only the top, so the rest is filled like before.
+	fillFrom := 400
+	if imgH > fillFrom {
+		fillFrom = imgH
+	}
+	if fillFrom > canvasH {
+		fillFrom = canvasH
+	}
 	dc.SetHexColor(bgColor + "ff")
-	dc.DrawRectangle(0, 400, float64(width), 5000)
+	dc.DrawRectangle(0, float64(fillFrom), float64(width), 5000)
 	dc.Fill()
 }

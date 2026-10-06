@@ -101,11 +101,11 @@ func buildFields(report models.BossKillReport, lootsBlock []models.LootReport) [
 		Inline: true,
 	})
 
-	fields = append(fields, &discordgo.MessageEmbedField{
-		Name:   "\u200B",
-		Value:  "\u200B",
-		Inline: false,
-	})
+	// fields = append(fields, &discordgo.MessageEmbedField{
+	// 	Name:   "\u200B",
+	// 	Value:  "\u200B",
+	// 	Inline: false,
+	// })
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name: "Общий DPS",
@@ -125,11 +125,11 @@ func buildFields(report models.BossKillReport, lootsBlock []models.LootReport) [
 		Inline: true,
 	})
 
-	fields = append(fields, &discordgo.MessageEmbedField{
-		Name:   "\u200B",
-		Value:  "\u200B",
-		Inline: false,
-	})
+	// fields = append(fields, &discordgo.MessageEmbedField{
+	// 	Name:   "\u200B",
+	// 	Value:  "\u200B",
+	// 	Inline: false,
+	// })
 
 	if len(lootsBlock) > 0 {
 		var sb strings.Builder
@@ -147,11 +147,11 @@ func buildFields(report models.BossKillReport, lootsBlock []models.LootReport) [
 				Inline: false,
 			})
 
-			fields = append(fields, &discordgo.MessageEmbedField{
-				Name:   "\u200B",
-				Value:  "\u200B",
-				Inline: false,
-			})
+			// fields = append(fields, &discordgo.MessageEmbedField{
+			// 	Name:   "\u200B",
+			// 	Value:  "\u200B",
+			// 	Inline: false,
+			// })
 		}
 	}
 

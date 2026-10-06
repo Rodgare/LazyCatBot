@@ -97,7 +97,7 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 	loadMythicFontFace(dc, 18)
 	bonus := report.RewardLevel
 	bonusText := fmt.Sprintf("+%d", report.RewardLevel)
-	bonusX := mWidth/2 + titleW/2
+	bonusX := mWidth/2 + titleW/2 + 2
 	dc.SetRGBA(0, 0, 0, 0.8)
 	dc.SetHexColor(getBonusColor(bonus))
 	dc.DrawStringAnchored(bonusText, bonusX, 28, 0, 0.2)
