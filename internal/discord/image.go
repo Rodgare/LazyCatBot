@@ -446,7 +446,7 @@ func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
 	// Gradient at the bottom so the report fades into darkness.
 	// Tune bottomGradHeight / bottomAlpha to taste.
 	const bottomGradHeight = 180.0
-	const bottomAlpha = 190
+	const bottomAlpha = 230
 	startFrac := (float64(canvasH) - bottomGradHeight) / float64(canvasH)
 	if startFrac < 0 {
 		startFrac = 0
