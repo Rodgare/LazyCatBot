@@ -136,6 +136,7 @@ func (item *MythicRunItem) ToReport() MythicReport {
 	return MythicReport{
 		ID:            item.ID,
 		ChallengeID:   item.ChallengeID,
+		Name:          ChallengeName(item.ChallengeID),
 		KeystoneLevel: item.ChallengeLevel,
 		Affixes:       item.Affixes,
 		MapID:         item.MapID,
@@ -160,7 +161,9 @@ func (runs *MythicRuns) ToReports() []MythicReport {
 }
 
 func (r *MythicReport) Enrich(details *MythicRun) {
-	r.Name = details.Name
+	if r.Name == "" {
+		r.Name = details.Name
+	}
 	r.Icon = details.Icon
 	r.WeekID = details.WeekID
 	r.TimeStart = details.TimeStart
@@ -225,6 +228,24 @@ type Affixes struct {
 	Emoji string
 	Name  string
 	ID    int
+}
+
+var ChallengeNames = map[int]string{
+	4:  "Крепость Утгард",
+	5:  "Бастионы",
+	6:  "Узилище",
+	8:  "Крепость Драк'Тарон",
+	9:  "Чертоги Молний",
+	10: "Кузня Крови",
+	11: "Гробницы Маны",
+	13: "Аукенайские гробницы",
+}
+
+func ChallengeName(challengeID int) string {
+	if name, ok := ChallengeNames[challengeID]; ok {
+		return name
+	}
+	return ""
 }
 
 var AffixMap = map[int]Affixes{
