@@ -76,6 +76,11 @@ func SendKillReport(s *discordgo.Session, channelID string, report models.BossKi
 	}
 
 	_, err = s.ChannelMessageSendComplex(channelID, params)
+	if err != nil && isEmojiAccessError(err) {
+		slog.Warn("Retrying kill report without custom emojis", "channel_id", channelID, "error", err)
+		params.Embeds[0] = sanitizeEmbed(embed)
+		_, err = s.ChannelMessageSendComplex(channelID, params)
+	}
 	if err != nil {
 		slog.Error("Error sending report", "error", err, "channel_id", channelID)
 	}

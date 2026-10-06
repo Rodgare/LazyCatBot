@@ -178,6 +178,8 @@ func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 }
 
 func (w *Worker) MythicRunsMonitor(ctx context.Context) {
+	monitorStartTime := int(time.Now().Unix())
+
 	if w.cfg.IsDebug {
 		w.logger.Info("[DEBUG] Pushing mock mythic run to killQueue...")
 		mockReport := w.makeMockMythicReport()
@@ -248,6 +250,10 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 		matchedRuns := make(map[int]map[string]models.MythicReport)
 
 		for _, run := range latestRuns.Data {
+			if run.DateTime < monitorStartTime {
+				continue
+			}
+
 			var (
 				report models.MythicReport
 				mapped bool
