@@ -167,6 +167,22 @@ func (h *BotHandler) HandleButtons(s *discordgo.Session, i *discordgo.Interactio
 		return
 	}
 
+	if data.CustomID == "toggle_mythic_reports" {
+		newState, _ := h.SubStore.ToggleMythicReports(i.ChannelID)
+		content := "🔔 Мифик-отчёты включены"
+		if !newState {
+			content = "🔕 Мифик-отчёты выключены"
+		}
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: content,
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
 	if after, ok := strings.CutPrefix(data.CustomID, "remove_player_"); ok {
 		playerIDStr := after
 		var pID int
@@ -309,10 +325,17 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 
 	var rows []discordgo.MessageComponent
 
+	mythicEnabled := h.SubStore.IsMythicReportsEnabled(i.ChannelID)
+
 	rows = append(rows, discordgo.ActionsRow{
 		Components: []discordgo.MessageComponent{
 			discordgo.Button{Label: "🏰 Добавить гильдию", Style: discordgo.PrimaryButton, CustomID: "btn_add_guild"},
 			discordgo.Button{Label: "👤 Добавить игрока", Style: discordgo.PrimaryButton, CustomID: "btn_add_player"},
+			discordgo.Button{
+				Label:    map[bool]string{true: "🔔 Мифик: ВКЛ", false: "🔕 Мифик: ВЫКЛ"}[mythicEnabled],
+				Style:    map[bool]discordgo.ButtonStyle{true: discordgo.SuccessButton, false: discordgo.SecondaryButton}[mythicEnabled],
+				CustomID: "toggle_mythic_reports",
+			},
 		},
 	})
 

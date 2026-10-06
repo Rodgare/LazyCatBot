@@ -188,10 +188,14 @@ func (s *SubscribeStorage) ToggleMythicReports(ch string) (bool, error) {
 		val = 1
 	}
 
-	query := `UPDATE subscribe SET is_myth_reps = ? WHERE channel_id = ?`
-	_, err := s.db.Exec(query, val, ch)
+	res, err := s.db.Exec(`UPDATE subscribe SET is_myth_reps = ? WHERE channel_id = ?`, val, ch)
 	if err != nil {
 		return false, err
+	}
+
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
+		return current, nil
 	}
 
 	return newState, nil
