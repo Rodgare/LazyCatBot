@@ -24,11 +24,11 @@ const (
 	colRankX        = 20
 	colCategoryX    = 45
 	colNameX        = 70
-	colIlvlX        = 240
-	colDiamondX     = 290
-	colZodiacX      = 320
-	ColSetX         = 365
-	colDpsX         = 405
+	colIlvlX        = 245
+	colDiamondX     = 295
+	colZodiacX      = 325
+	ColSetX         = 370
+	colDpsX         = 410
 	colIlvlRankX    = 480
 	colSpecRankX    = 570
 	colClassRankX   = 660
