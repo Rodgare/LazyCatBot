@@ -25,6 +25,8 @@ type SubscribeStore interface {
 	MarkKillProcessed(id int, ch string) error
 	CleanupProcessedKills(olderThan time.Duration) error
 	DisableReportsForChannel(ch string) error
+	SetGuildName(guildID int, realm, name string) error
+	GetGuildName(guildID int, realm string) (string, error)
 	IsReportsEnabled(guild int, channelID string) bool
 	GetTrackedGuilds() (map[storage.TrackedGuildKey][]string, error)
 	IsMythicReportsEnabled(ch string) bool
@@ -42,7 +44,7 @@ type SirusAPI interface {
 	FetchBossFightDetails(realm string, fightID int) (*models.BossFight, error)
 	FetchGuildLatestBossKills(realm string, guildID int) (*models.LatestBossKills, error)
 	FetchPlayerLastActions(realm string, playerID int) (*models.PlayerLastActions, error)
-	FetchGuildMembers(realm string, guildID int) (*[]models.GuildMembers, error)
+	FetchGuildMembers(realm string, guildID int) (*[]models.GuildMembers, string, error)
 	FetchActualRaids(realm string) (models.ActualSirusRaids, error)
 	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
 	GetLatestMythicRuns(realm string) (*models.MythicRuns, error)

@@ -63,6 +63,23 @@ func (s *SubscribeStorage) DisableReportsForChannel(channelID string) error {
 	return err
 }
 
+func (s *SubscribeStorage) SetGuildName(guildID int, realm, name string) error {
+	if realm == "" {
+		realm = "x3"
+	}
+	_, err := s.db.Exec(`UPDATE subscribe SET guild_name = ? WHERE guild_id = ? AND realm = ?`, name, guildID, realm)
+	return err
+}
+
+func (s *SubscribeStorage) GetGuildName(guildID int, realm string) (string, error) {
+	if realm == "" {
+		realm = "x3"
+	}
+	var name string
+	err := s.db.QueryRow(`SELECT COALESCE(guild_name, '') FROM subscribe WHERE guild_id = ? AND realm = ? LIMIT 1`, guildID, realm).Scan(&name)
+	return name, err
+}
+
 func (s *SubscribeStorage) GetChannels(guild int) ([]string, error) {
 	query := `SELECT channel_id FROM subscribe WHERE guild_id = ?`
 	rows, err := s.db.Query(query, guild)

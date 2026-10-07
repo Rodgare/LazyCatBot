@@ -108,10 +108,13 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 		}
 
 		go func(id int, r string) {
-			members, err := h.sirusClient.FetchGuildMembers(r, id)
+			members, guildName, err := h.sirusClient.FetchGuildMembers(r, id)
 			if err == nil && members != nil {
 				h.GMStore.UpdateGuildMembers(r, id, *members)
 				l.Info("Guild members are saved")
+				if guildName != "" {
+					h.SubStore.SetGuildName(id, r, guildName)
+				}
 			}
 		}(guildID, realm)
 

@@ -20,7 +20,7 @@ func (w *Worker) GuildMembersUpdater(ctx context.Context) {
 		}
 
 		for key := range guildsToUpdate {
-			gms, err := w.sirusClient.FetchGuildMembers(key.Realm, key.GuildID)
+			gms, guildName, err := w.sirusClient.FetchGuildMembers(key.Realm, key.GuildID)
 			if err != nil {
 				w.logger.Error("FetchGuildMembers error", "error", err, "guild_id", key.GuildID, "realm", key.Realm)
 				select {
@@ -36,6 +36,12 @@ func (w *Worker) GuildMembersUpdater(ctx context.Context) {
 				err = w.gmStore.UpdateGuildMembers(key.Realm, key.GuildID, *gms)
 				if err != nil {
 					w.logger.Error("Update Guild Members error", "error", err, "guild_id", key.GuildID, "realm", key.Realm)
+				}
+			}
+
+			if guildName != "" {
+				if err := w.subStore.SetGuildName(key.GuildID, key.Realm, guildName); err != nil {
+					w.logger.Error("Set guild name error", "error", err, "guild_id", key.GuildID, "realm", key.Realm)
 				}
 			}
 

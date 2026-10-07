@@ -134,7 +134,14 @@ func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 	slices.SortFunc(healers, func(a, b models.PlayerReport) int { return b.Hps - a.Hps })
 
 	totalRows := len(dds) + len(healers)
-	height := headerH + footerH + (totalRows+2)*rowHeight + margin*2
+	roleHeaders := 0
+	if len(dds) > 0 {
+		roleHeaders++
+	}
+	if len(healers) > 0 {
+		roleHeaders++
+	}
+	height := headerH + footerH + (totalRows+roleHeaders)*rowHeight + margin*2
 
 	dc := gg.NewContext(width, int(height))
 

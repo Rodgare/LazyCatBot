@@ -265,14 +265,14 @@ func (c *Client) makeRequest(endpoint string, target any) error {
 	return fmt.Errorf("all request attempts across all base URLs failed: %w", lastErr)
 }
 
-func (c *Client) FetchGuildMembers(realm string, guild_id int) (*[]models.GuildMembers, error) {
+func (c *Client) FetchGuildMembers(realm string, guild_id int) (*[]models.GuildMembers, string, error) {
 	realm = normalizeRealm(realm)
 	var gms models.Guild
 
 	endpoint := fmt.Sprintf("/api/base/%s/guild/%d", realm, guild_id)
 	if err := c.makeRequest(endpoint, &gms); err != nil {
-		return nil, err
+		return nil, "", err
 	}
 
-	return &gms.Members, nil
+	return &gms.Members, gms.Name, nil
 }

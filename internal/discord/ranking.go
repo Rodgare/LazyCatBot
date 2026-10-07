@@ -59,8 +59,13 @@ func (h *BotHandler) SendBossRanking(s *discordgo.Session, i *discordgo.Interact
 		}
 	}
 
+	guildName := "Рейтинг гильдии"
+	if n, err := h.SubStore.GetGuildName(targetSub.GuildID, targetSub.Realm); err == nil && n != "" {
+		guildName = n
+	}
+
 	report := models.BossKillReport{
-		MapName:   "Рейтинг гильдии",
+		MapName:   guildName,
 		BossName:  fmt.Sprintf("%s (%s)", sirus.GetBossName(raidID, bossID), strings.ToUpper(role)),
 		RaidOrder: raidID,
 		Players:   players,
