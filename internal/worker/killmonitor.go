@@ -63,19 +63,20 @@ type KillJob struct {
 }
 
 type Worker struct {
-	sirusClient SirusAPI
-	lbStore     *storage.LeaderboardStorage
-	mythLbStore *storage.MythicLeaderboardStorage
-	subStore    SubscribeStore
-	pSubStore   *storage.PlayerSubscribeStorage
-	gmStore     *storage.GuildMembersStorage
-	charStore   *storage.CharacterCacheStorage
-	arStore     *storage.ActualRaidsStorage
-	reporter    Reporter
-	killQueue   chan KillJob
-	apiLimiter  *RateLimiter
-	logger      *slog.Logger
-	cfg         *config.Config
+	sirusClient  SirusAPI
+	lbStore      *storage.LeaderboardStorage
+	mythLbStore  *storage.MythicLeaderboardStorage
+	subStore     SubscribeStore
+	pSubStore    *storage.PlayerSubscribeStorage
+	gmStore      *storage.GuildMembersStorage
+	charStore    *storage.CharacterCacheStorage
+	arStore      *storage.ActualRaidsStorage
+	reporter     Reporter
+	killQueue    chan KillJob
+	charPriority chan PriorityChar
+	apiLimiter   *RateLimiter
+	logger       *slog.Logger
+	cfg          *config.Config
 }
 
 func NewWorker(
@@ -91,18 +92,19 @@ func NewWorker(
 	cfg *config.Config,
 ) *Worker {
 	return &Worker{
-		sirusClient: sc,
-		lbStore:     lb,
-		subStore:    sub,
-		pSubStore:   ps,
-		gmStore:     gm,
-		charStore:   cc,
-		arStore:     ar,
-		reporter:    reporter,
-		killQueue:   make(chan KillJob, 100),
-		apiLimiter:  NewRateLimiter(1, 1),
-		logger:      logger,
-		cfg:         cfg,
+		sirusClient:  sc,
+		lbStore:      lb,
+		subStore:     sub,
+		pSubStore:    ps,
+		gmStore:      gm,
+		charStore:    cc,
+		arStore:      ar,
+		reporter:     reporter,
+		killQueue:    make(chan KillJob, 100),
+		charPriority: make(chan PriorityChar, 1000),
+		apiLimiter:   NewRateLimiter(1, 1),
+		logger:       logger,
+		cfg:          cfg,
 	}
 }
 
@@ -414,6 +416,10 @@ func (w *Worker) processRaids(job KillJob) {
 			rep := w.createReport(enrichedKill, job.KillID, job.Realm)
 			w.enrichRaidCharacters(&rep, job.Realm)
 			report = &rep
+
+			for _, p := range enrichedKill.Data.Players {
+				w.enqueueCharRefreshIfStale(job.Realm, p.Name, p.GUID)
+			}
 		}
 
 		if w.subStore.IsReportsEnabled(report.GuildID, ch) {
@@ -447,6 +453,9 @@ func (w *Worker) processMythicRuns(job KillJob) {
 		}
 	}
 	w.enrichMythicCharacters(job)
+	for _, m := range job.MythicReport.Members {
+		w.enqueueCharRefreshIfStale(job.Realm, m.Name, m.MemberGUID)
+	}
 	for ch := range job.Channels {
 		if w.subStore.IsKillProcessed(job.KillID, ch) {
 			continue
