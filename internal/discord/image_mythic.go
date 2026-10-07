@@ -188,6 +188,20 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 		y = drawMythicPlayerRow(dc, i+1, member, combatByGUID[member.MemberGUID], y, report.HasCombat)
 	}
 
+	if report.RewardLevel <= 0 {
+		loadMythicFontFace(dc, 54)
+		wasted := "WASTED"
+		wastedX := ((float64(mColRoleX) + float64(mColIlvlX)) / 2) + 20
+		wastedY := float64(headerH) + mTableHeader + rowsTotalHeight/2
+
+		// Shadow
+		dc.SetRGBA(0, 0, 0, 0.8)
+		dc.DrawStringAnchored(wasted, wastedX+1.5, wastedY+1.5, 0.5, 0.5)
+		// Main red text
+		dc.SetHexColor("#e74c3c")
+		dc.DrawStringAnchored(wasted, wastedX, wastedY, 0.5, 0.5)
+	}
+
 	buf := new(bytes.Buffer)
 	err := dc.EncodePNG(buf)
 	return buf.Bytes(), err
