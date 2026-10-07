@@ -26,8 +26,9 @@ const (
 	mColNameX   = 105
 	mColRoleX   = 280
 	mColIlvlX   = 365
-	mColZodiacX = 440
-	mColDpsX    = 510
+	mColZodiacX   = 440
+	mColDiamondX  = 470
+	mColDpsX      = 510
 	mColHpsX    = 620
 	mColIntX    = 720
 )
@@ -228,6 +229,7 @@ func drawMythicTableHeader(dc *gg.Context, y float64, combat bool) {
 	dc.DrawString("Игрок", mColNameX, y+20)
 	dc.DrawString("Роль", mColRoleX, y+20)
 	dc.DrawString("ILvl", mColIlvlX, y+20)
+	drawMythicImage(dc, "assets/images/4b.png", float64(mColDiamondX), y)
 	if combat {
 		dc.DrawString("Зодиак", mColZodiacX-15, y+20)
 		dc.DrawString("Дпс", mColDpsX, y+20)
@@ -303,6 +305,10 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	// Item level
 	dc.SetHexColor("#ffffff")
 	dc.DrawString(fmt.Sprintf("%d", member.Ilvl), mColIlvlX, y+28)
+
+	// Black diamonds
+	dc.SetHexColor("#ebb914")
+	dc.DrawString(fmt.Sprintf("%d", member.BlackDiamonds), mColDiamondX, y+28)
 
 	// Zodiac icon
 	drawMythicImage(dc, fmt.Sprintf("assets/images/zodiac/%d.png", member.Zodiac), mColZodiacX, y)
