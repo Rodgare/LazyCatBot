@@ -8,8 +8,10 @@ type CharacterGem struct {
 }
 
 type CharacterData struct {
-	Titled    json.RawMessage `json:"titled"`
-	Challenge json.RawMessage `json:"challenge"`
+	Character struct {
+		Titled json.RawMessage `json:"titled"`
+	} `json:"character"`
+	Challenge  json.RawMessage `json:"challenge"`
 	Equipments []struct {
 		Gems []CharacterGem `json:"gems"`
 	} `json:"equipments"`
@@ -51,9 +53,9 @@ func isBlackDiamond(entry int) bool {
 }
 
 func (c *CharacterData) Title() string {
-	if len(c.Titled) > 0 && c.Titled[0] == '"' {
+	if len(c.Character.Titled) > 0 && c.Character.Titled[0] == '"' {
 		var s string
-		if json.Unmarshal(c.Titled, &s) == nil {
+		if json.Unmarshal(c.Character.Titled, &s) == nil {
 			return s
 		}
 	}
