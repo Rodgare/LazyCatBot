@@ -27,7 +27,7 @@ func (s *CharacterCacheStorage) Upsert(realm, name string, data models.Character
 			mythic_rating = excluded.mythic_rating,
 			black_diamonds = excluded.black_diamonds,
 			updated_at = excluded.updated_at`,
-		realm, name, data.Title(), data.Challenge.CurrentScore, data.CountBlackDiamonds(), time.Now().Unix())
+		realm, name, data.Title(), data.MythicRating(), data.CountBlackDiamonds(), time.Now().Unix())
 	return err
 }
 
