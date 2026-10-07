@@ -568,7 +568,7 @@ func (h *BotHandler) HandleTopMMythicCommand(s *discordgo.Session, i *discordgo.
 	}
 	if len(players) == 0 {
 		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
-			Content: pointer("📭 Мифик-рейтинг ещё не собран. Данные подтягиваются автоматически."),
+			Content: pointer("📭 Мифик-рейтинг отсутствует."),
 		})
 		l.Info("empty mythic leaderboard for guild")
 		return
