@@ -10,7 +10,6 @@ import (
 	_ "image/png"
 	"log/slog"
 	"slices"
-	"strings"
 
 	"github.com/fogleman/gg"
 )
@@ -26,13 +25,14 @@ const (
 	colCategoryX    = 45
 	colNameX        = 70
 	colIlvlX        = 230
-	colZodiacX      = 270
-	ColSetX         = 310
-	colDpsX         = 350
-	colIlvlRankX    = 430
-	colSpecRankX    = 530
-	colClassRankX   = 630
-	colOverallRankX = 730
+	colDiamondX     = 260
+	colZodiacX      = 290
+	ColSetX         = 330
+	colDpsX         = 370
+	colIlvlRankX    = 450
+	colSpecRankX    = 550
+	colClassRankX   = 650
+	colOverallRankX = 750
 )
 
 var classColors = map[int]string{
@@ -205,6 +205,22 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 	dc.SetRGB(0.7, 0.7, 0.7)
 	dc.DrawString(title, colRankX, y+20)
 	dc.DrawString("ILvl", colIlvlX, y+20)
+
+	diamondFileData, err := imagesFS.ReadFile("assets/images/4b.png")
+	if err == nil {
+		img, _, errDecode := image.Decode(bytes.NewReader(diamondFileData))
+		if errDecode == nil {
+			bounds := img.Bounds()
+			imgH := bounds.Dy()
+			imgY := int(y) + int(rowHeight)/2 - imgH/2
+			dc.DrawImage(img, colDiamondX+4, imgY)
+		} else {
+			fmt.Printf("Error decoding %s: %v\n", diamondFileData, errDecode)
+		}
+	} else {
+		fmt.Printf("Error: file %s not found in embed\n", diamondFileData)
+	}
+
 	dc.DrawString("Созв", colZodiacX-7, y+20)
 	dc.DrawString("t4", ColSetX, y+20)
 	dc.DrawString("Спек/Илвл", colIlvlRankX-10, y+20)
@@ -233,24 +249,8 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	dc.SetHexColor(colorHex)
 	dc.DrawString(p.Name, colNameX, y+25)
 
-	nameW, _ := dc.MeasureString(p.Name)
-	var suffix strings.Builder
-	if p.Title != "" {
-		suffix.WriteString(" ")
-		suffix.WriteString(p.Title)
-	}
-	if p.MythicRating > 0 {
-		fmt.Fprintf(&suffix, " · Рио %.0f", p.MythicRating)
-	}
-	if p.BlackDiamonds > 0 {
-		fmt.Fprintf(&suffix, " · ЧБ %d", p.BlackDiamonds)
-	}
-	if suffix.Len() > 0 {
-		loadCyrillicFontFace(dc, 10)
-		dc.SetHexColor("#8b93a1")
-		dc.DrawString(suffix.String(), colNameX+nameW+5, y+25)
-		loadCyrillicFontFace(dc, 17)
-	}
+	//diamond
+	dc.DrawString(fmt.Sprintf("%d", p.BlackDiamonds), colDiamondX, y+25)
 
 	//zodiac
 	zodiacFilePath := fmt.Sprintf("assets/images/zodiac/%d.png", p.Zodiac)
