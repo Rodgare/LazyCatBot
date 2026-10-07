@@ -20,7 +20,7 @@ const (
 	headerH         = 50
 	footerH         = 20
 	margin          = 20
-	raidBgDimAlpha  = 0.35
+	raidBgDimAlpha  = 0.5
 	colRankX        = 20
 	colCategoryX    = 45
 	colNameX        = 70
