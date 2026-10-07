@@ -104,6 +104,13 @@ func NewWorker(
 }
 
 func (w *Worker) GuildKillMonitor(ctx context.Context) {
+	if w.cfg.IsDebug {
+		w.logger.Info("[DEBUG] Sending mock raid report...")
+		mockReport := w.makeMockReport()
+		if err := w.reporter.SendKillReport(w.cfg.DebugChannelID, mockReport); err != nil {
+			w.logger.Error("[DEBUG] Send mock raid report err", "error", err)
+		}
+	}
 	for {
 		select {
 		case <-ctx.Done():
@@ -646,7 +653,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int, realm string)
 func (w *Worker) makeMockReport() models.BossKillReport {
 	var report models.BossKillReport
 
-	data, err := os.ReadFile("internal/sirus/testdata/mock_sirus_boss_fight.json")
+	data, err := os.ReadFile("mock/raid_run.json")
 	if err != nil {
 		w.logger.Error("Mock json read error", "error", err)
 	}

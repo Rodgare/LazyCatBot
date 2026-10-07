@@ -38,7 +38,10 @@
             "raceId": 10,
             "genderId": 1,
             "ilvl": 261,
-            "zodiac": 847
+            "zodiac": 847,
+            "mythicRating": 2400,
+            "blackDiamonds": 12,
+            "title": "Покоритель героев"
         },
         {
             "memberGuid": 314866,
@@ -49,7 +52,10 @@
             "raceId": 6,
             "genderId": 0,
             "ilvl": 256,
-            "zodiac": 847
+            "zodiac": 847,
+            "mythicRating": 0,
+            "blackDiamonds": 3,
+            "title": ""
         },
         {
             "memberGuid": 580423,
@@ -60,7 +66,10 @@
             "raceId": 25,
             "genderId": 0,
             "ilvl": 259,
-            "zodiac": 851
+            "zodiac": 851,
+            "mythicRating": 1805,
+            "blackDiamonds": 0,
+            "title": "Владыка ключей"
         },
         {
             "memberGuid": 600722,
@@ -71,7 +80,10 @@
             "raceId": 17,
             "genderId": 1,
             "ilvl": 261,
-            "zodiac": 853
+            "zodiac": 853,
+            "mythicRating": 1987,
+            "blackDiamonds": 8,
+            "title": ""
         },
         {
             "memberGuid": 1029393,
@@ -82,7 +94,10 @@
             "raceId": 17,
             "genderId": 1,
             "ilvl": 257,
-            "zodiac": 857
+            "zodiac": 857,
+            "mythicRating": 0,
+            "blackDiamonds": 5,
+            "title": "Мастер стихий"
         }
     ],
     "combatStats": [
