@@ -24,9 +24,9 @@ const (
 	colRankX        = 20
 	colCategoryX    = 45
 	colNameX        = 70
-	colIlvlX        = 250
-	colDiamondX     = 300
-	colZodiacX      = 330
+	colIlvlX        = 265
+	colDiamondX     = 305
+	colZodiacX      = 335
 	ColSetX         = 375
 	colDpsX         = 410
 	colIlvlRankX    = 480
@@ -221,7 +221,7 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 		fmt.Printf("Error: file %s not found in embed\n", diamondFileData)
 	}
 
-	dc.DrawString("Созв", colZodiacX, y+20)
+	dc.DrawString("Созв", colZodiacX-3, y+20)
 	dc.DrawString("t4", ColSetX, y+20)
 	dc.DrawString("Спек/Илвл", colIlvlRankX-10, y+20)
 	dc.DrawString("Спек", colSpecRankX, y+20)
@@ -252,15 +252,15 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	//title after name
 	if p.Title != "" {
 		nameW, _ := dc.MeasureString(p.Name)
-		loadCyrillicFontFace(dc, 12)
+		loadCyrillicFontFace(dc, 10)
 		dc.SetRGB(0.7, 0.7, 0.7)
-		dc.DrawString(p.Title, float64(colNameX)+nameW+5, y+25)
+		dc.DrawString(p.Title, float64(colNameX)+nameW+5, y+20)
 		loadCyrillicFontFace(dc, 17)
 	}
 
 	//diamond
 	dc.SetHexColor("#ebb914")
-	dc.DrawString(fmt.Sprintf("%d", p.BlackDiamonds), colDiamondX, y+25)
+	dc.DrawString(fmt.Sprintf("%d", p.BlackDiamonds), colDiamondX+2, y+25)
 
 	//zodiac
 	zodiacFilePath := fmt.Sprintf("assets/images/zodiac/%d.png", p.Zodiac)
@@ -271,7 +271,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 			bounds := img.Bounds()
 			imgH := bounds.Dy()
 			imgY := int(y) + int(rowHeight)/2 - imgH/2
-			dc.DrawImage(img, colZodiacX+4, imgY)
+			dc.DrawImage(img, colZodiacX, imgY)
 		} else {
 			fmt.Printf("Error decoding %s: %v\n", zodiacFilePath, errDecode)
 		}
