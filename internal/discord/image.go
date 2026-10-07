@@ -25,12 +25,12 @@ const (
 	colCategoryX    = 45
 	colNameX        = 70
 	colIlvlX        = 230
-	colDiamondX     = 265
-	colZodiacX      = 300
-	ColSetX         = 340
-	colDpsX         = 380
-	colIlvlRankX    = 460
-	colSpecRankX    = 560
+	colDiamondX     = 270
+	colZodiacX      = 305
+	ColSetX         = 350
+	colDpsX         = 390
+	colIlvlRankX    = 480
+	colSpecRankX    = 570
 	colClassRankX   = 660
 	colOverallRankX = 750
 )
@@ -421,7 +421,7 @@ func getColorByPercentile(p int) (float64, float64, float64) {
 	case p >= 25:
 		return 0.12, 1.00, 0.00 // green (#1eff00)
 	default:
-		return 0.40, 0.40, 0.40 // gray (#666666)
+		return 0.48, 0.48, 0.48 // gray (#666666)
 	}
 }
 
