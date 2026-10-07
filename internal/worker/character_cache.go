@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"strings"
 	"time"
 )
@@ -19,30 +20,32 @@ func (w *Worker) CharacterCacheUpdater(ctx context.Context) {
 		default:
 		}
 
-		candidates := map[string]struct{}{}
+		candidates := map[string]string{}
 		if players, err := w.pSubStore.GetAllPlayers(); err == nil {
 			for _, p := range players {
-				candidates[p.Realm+"|"+p.Name] = struct{}{}
+				candidates[fmt.Sprintf("%d|%s", p.ID, p.Realm)] = p.Name
 			}
 		} else {
 			w.logger.Error("[CharacterCacheUpdater] Get players err", "error", err)
 		}
 		if members, err := w.gmStore.GetAllMembers(); err == nil {
 			for _, m := range members {
-				candidates[m.Realm+"|"+m.Name] = struct{}{}
+				candidates[fmt.Sprintf("%d|%s", m.ID, m.Realm)] = m.Name
 			}
 		} else {
 			w.logger.Error("[CharacterCacheUpdater] Get members err", "error", err)
 		}
 
 		refreshed := 0
-		for key := range candidates {
+		for key, name := range candidates {
 			if refreshed >= maxPerCycle {
 				break
 			}
 
 			parts := strings.SplitN(key, "|", 2)
-			realm, name := parts[0], parts[1]
+			realm := parts[1]
+			var id int
+			fmt.Sscanf(parts[0], "%d", &id)
 
 			stale, err := w.charStore.StaleOrMissing(realm, name, ttl)
 			if err != nil || !stale {
@@ -50,9 +53,9 @@ func (w *Worker) CharacterCacheUpdater(ctx context.Context) {
 			}
 
 			w.apiLimiter.Wait()
-			data, err := w.sirusClient.FetchCharacter(realm, name)
+			data, err := w.sirusClient.FetchCharacter(realm, id)
 			if err != nil {
-				w.logger.Error("[CharacterCacheUpdater] Fetch character err", "error", err, "realm", realm, "name", name)
+				w.logger.Error("[CharacterCacheUpdater] Fetch character err", "error", err, "realm", realm, "name", name, "id", id)
 				continue
 			}
 

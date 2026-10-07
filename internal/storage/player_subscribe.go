@@ -79,12 +79,13 @@ func (s *PlayerSubscribeStorage) GetPlayersByChannel(channelID string) (map[int]
 }
 
 type TrackedPlayerName struct {
+	ID    int
 	Name  string
 	Realm string
 }
 
 func (s *PlayerSubscribeStorage) GetAllPlayers() ([]TrackedPlayerName, error) {
-	query := `SELECT DISTINCT name, COALESCE(realm, 'x3') FROM player_subscribe`
+	query := `SELECT DISTINCT id, name, COALESCE(realm, 'x3') FROM player_subscribe`
 	rows, err := s.db.Query(query)
 	if err != nil {
 		return nil, err
@@ -94,7 +95,7 @@ func (s *PlayerSubscribeStorage) GetAllPlayers() ([]TrackedPlayerName, error) {
 	var players []TrackedPlayerName
 	for rows.Next() {
 		var p TrackedPlayerName
-		if err := rows.Scan(&p.Name, &p.Realm); err != nil {
+		if err := rows.Scan(&p.ID, &p.Name, &p.Realm); err != nil {
 			return nil, err
 		}
 		players = append(players, p)
