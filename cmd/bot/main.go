@@ -120,6 +120,7 @@ func main() {
 	killWorker.SetMythicLeaderboardStore(mythLbStore)
 
 	killWorker.StartCronScheduler()
+	go killWorker.StartMythicLeaderboardSync()
 	go killWorker.StartProcessor(ctx)
 	go killWorker.GuildKillMonitor(ctx)
 	go killWorker.PlayerKillMonitor(ctx)

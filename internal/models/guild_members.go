@@ -1,7 +1,9 @@
 package models
 
 type Guild struct {
-	Name    string          `json:"name"`
+	Guild struct {
+		Name string `json:"name"`
+	} `json:"guild"`
 	Members []GuildMembers `json:"members"`
 }
 

@@ -322,7 +322,7 @@ func (c *Client) FetchGuildMembers(realm string, guild_id int) (*[]models.GuildM
 		return nil, "", err
 	}
 
-	return &gms.Members, gms.Name, nil
+	return &gms.Members, gms.Guild.Name, nil
 }
 
 func (c *Client) FetchCharacter(realm string, id int) (*models.CharacterData, error) {

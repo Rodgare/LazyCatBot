@@ -104,8 +104,8 @@ func (w *Worker) StartCronScheduler() {
 		return
 	}
 
-	_, err = c.AddFunc("0 19 * * *", func() {
-		w.logger.Info("[Cron] 19:00: mythic leaderboard sync started")
+	_, err = c.AddFunc("0 18 * * *", func() {
+		w.logger.Info("[Cron] 18:00: mythic leaderboard sync started")
 		w.StartMythicLeaderboardSync()
 	})
 

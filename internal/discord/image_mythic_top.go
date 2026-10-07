@@ -47,7 +47,7 @@ func RenderMythicGuildTopImage(guildName, realm string, players []models.GuildMy
 
 	// Title
 	loadMythicFontFace(dc, 22)
-	title := fmt.Sprintf("🏆 Мифик-рейтинг: %s", guildName)
+	title := fmt.Sprintf("Мифик-рейтинг: %s", guildName)
 	dc.SetRGBA(0, 0, 0, 0.8)
 	dc.DrawStringAnchored(title, mtWidth/2+1, 31, 0.5, 0.5)
 	dc.SetRGB(1, 1, 1)

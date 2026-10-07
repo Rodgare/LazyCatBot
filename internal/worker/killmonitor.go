@@ -102,7 +102,7 @@ func NewWorker(
 		reporter:     reporter,
 		killQueue:    make(chan KillJob, 100),
 		charPriority: make(chan PriorityChar, 1000),
-		apiLimiter:   NewRateLimiter(1, 1),
+		apiLimiter:   NewRateLimiter(2, 1),
 		logger:       logger,
 		cfg:          cfg,
 	}
