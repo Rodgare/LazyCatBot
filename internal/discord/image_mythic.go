@@ -20,17 +20,18 @@ const (
 	mTableHeader = 30
 	mMargin      = 20
 
-	mColRankX   = 20
-	mColClassX  = 45
-	mColSpecX   = 75
-	mColNameX   = 105
-	mColRoleX   = 280
-	mColIlvlX   = 365
-	mColZodiacX   = 440
-	mColDiamondX  = 470
-	mColDpsX      = 510
-	mColHpsX    = 620
-	mColIntX    = 720
+	mColRankX    = 20
+	mColClassX   = 45
+	mColSpecX    = 75
+	mColNameX    = 105
+	mColRoleX    = 315
+	mColIlvlX    = 380
+	mColZodiacX  = 440
+	mColDiamondX = 500
+	mColRioX     = 535
+	mColDpsX     = 595
+	mColHpsX     = 655
+	mColIntX     = 715
 )
 
 var mythicColors = map[int]string{
@@ -229,7 +230,8 @@ func drawMythicTableHeader(dc *gg.Context, y float64, combat bool) {
 	dc.DrawString("Игрок", mColNameX, y+20)
 	dc.DrawString("Роль", mColRoleX, y+20)
 	dc.DrawString("ILvl", mColIlvlX, y+20)
-	drawMythicImage(dc, "assets/images/4b.png", float64(mColDiamondX), y)
+	drawMythicImage(dc, "assets/images/4b.png", float64(mColDiamondX)-1, y-5)
+	dc.DrawString("Рио", mColRioX, y+20)
 	if combat {
 		dc.DrawString("Зодиак", mColZodiacX-15, y+20)
 		dc.DrawString("Дпс", mColDpsX, y+20)
@@ -276,12 +278,6 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 		suffix.WriteString(" ")
 		suffix.WriteString(member.Title)
 	}
-	if member.MythicRating > 0 {
-		fmt.Fprintf(&suffix, " · Рио %.0f", member.MythicRating)
-	}
-	if member.BlackDiamonds > 0 {
-		fmt.Fprintf(&suffix, " · ЧБ %d", member.BlackDiamonds)
-	}
 	if suffix.Len() > 0 {
 		loadMythicFontFace(dc, 10)
 		dc.SetHexColor("#8b93a1")
@@ -309,6 +305,16 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	// Black diamonds
 	dc.SetHexColor("#ebb914")
 	dc.DrawString(fmt.Sprintf("%d", member.BlackDiamonds), mColDiamondX, y+28)
+
+	// Rio (mythic rating)
+	loadMythicFontFace(dc, 16)
+	if member.MythicRatingPercentile > 0 {
+		r, g, b := getColorByPercentile(member.MythicRatingPercentile)
+		dc.SetRGB(r, g, b)
+	} else {
+		dc.SetHexColor("#d8a13c")
+	}
+	dc.DrawString(fmt.Sprintf("%.0f", member.MythicRating), mColRioX, y+28)
 
 	// Zodiac icon
 	drawMythicImage(dc, fmt.Sprintf("assets/images/zodiac/%d.png", member.Zodiac), mColZodiacX, y)

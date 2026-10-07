@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"os"
 	"strings"
 )
@@ -11,6 +12,8 @@ type Config struct {
 	IsDebug        bool
 	SirusBaseURLs  []string
 	DefaultRealm   string
+	MythicSeason   int
+	MythicWeekID   int
 }
 
 func LoadConfig() *Config {
@@ -33,7 +36,21 @@ func LoadConfig() *Config {
 		IsDebug:        isDebug,
 		SirusBaseURLs:  cleanedURLs,
 		DefaultRealm:   getDefaultRealm(),
+		MythicSeason:   getIntEnv("SIRUS_MYTHIC_SEASON", 6),
+		MythicWeekID:   getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
 	}
+}
+
+func getIntEnv(key string, def int) int {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	var n int
+	if _, err := fmt.Sscanf(v, "%d", &n); err != nil {
+		return def
+	}
+	return n
 }
 
 func getDefaultRealm() string {

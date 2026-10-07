@@ -50,6 +50,7 @@ type SirusAPI interface {
 	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
 	GetLatestMythicRuns(realm string) (*models.MythicRuns, error)
 	FetchMythicRunDetails(realm string, runID int) (*models.MythicRun, error)
+	FetchChallengeScores(realm string, season, weekID int) ([]models.MythicScorePlayer, error)
 }
 
 type KillJob struct {
@@ -63,6 +64,7 @@ type KillJob struct {
 type Worker struct {
 	sirusClient SirusAPI
 	lbStore     *storage.LeaderboardStorage
+	mythLbStore *storage.MythicLeaderboardStorage
 	subStore    SubscribeStore
 	pSubStore   *storage.PlayerSubscribeStorage
 	gmStore     *storage.GuildMembersStorage
@@ -101,6 +103,12 @@ func NewWorker(
 		logger:      logger,
 		cfg:         cfg,
 	}
+}
+
+// SetMythicLeaderboardStore wires the optional mythic leaderboard store used by
+// the challenge scores sync and report enrichment.
+func (w *Worker) SetMythicLeaderboardStore(ml *storage.MythicLeaderboardStorage) {
+	w.mythLbStore = ml
 }
 
 func (w *Worker) GuildKillMonitor(ctx context.Context) {
@@ -444,6 +452,15 @@ func (w *Worker) enrichMythicCharacters(job KillJob) {
 		m.MythicRating = c.MythicRating
 		m.BlackDiamonds = c.BlackDiamonds
 		m.Title = c.Title
+
+		if w.mythLbStore != nil {
+			if _, _, percentile, err := w.mythLbStore.GetPlayerMythicRank(
+				job.Realm, w.cfg.MythicSeason, w.cfg.MythicWeekID,
+				m.ClassID, m.SpecID, m.MythicRating,
+			); err == nil {
+				m.MythicRatingPercentile = percentile
+			}
+		}
 	}
 }
 

@@ -41,6 +41,7 @@
             "zodiac": 847,
             "mythicRating": 2400,
             "blackDiamonds": 12,
+            "mythicRatingPercentile": 99,
             "title": "Покоритель героев"
         },
         {
@@ -69,6 +70,7 @@
             "zodiac": 851,
             "mythicRating": 1805,
             "blackDiamonds": 0,
+            "mythicRatingPercentile": 88,
             "title": "Владыка ключей"
         },
         {
@@ -83,6 +85,7 @@
             "zodiac": 853,
             "mythicRating": 1987,
             "blackDiamonds": 8,
+            "mythicRatingPercentile": 95,
             "title": ""
         },
         {
@@ -97,6 +100,7 @@
             "zodiac": 857,
             "mythicRating": 0,
             "blackDiamonds": 5,
+            "mythicRatingPercentile": 12,
             "title": "Мастер стихий"
         }
     ],

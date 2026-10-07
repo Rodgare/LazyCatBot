@@ -121,6 +121,54 @@ func (c *Client) FetchMythicRunDetails(realm string, runID int) (*models.MythicR
 	return &res, nil
 }
 
+// FetchChallengeScoresPage returns a single page of the mythic challenge scores
+// leaderboard. Pass weekID <= 0 to fetch the whole-season aggregate board.
+func (c *Client) FetchChallengeScoresPage(realm string, season, weekID, page int) (*models.MythicScoreboard, error) {
+	realm = normalizeRealm(realm)
+	endpoint := fmt.Sprintf("/api/base/%s/leaderboard/challenge/scores?page=%d&season=%d", realm, page, season)
+	if weekID > 0 {
+		endpoint += fmt.Sprintf("&weekId=%d", weekID)
+	}
+
+	var res models.MythicScoreboard
+	if err := c.makeRequest(endpoint, &res); err != nil {
+		return nil, err
+	}
+	for i := range res.Data {
+		res.Data[i].Season = season
+		res.Data[i].WeekID = weekID
+	}
+	return &res, nil
+}
+
+// FetchChallengeScores fetches the whole challenge scores leaderboard by paging
+// through meta.last_page.
+func (c *Client) FetchChallengeScores(realm string, season, weekID int) ([]models.MythicScorePlayer, error) {
+	realm = normalizeRealm(realm)
+	var all []models.MythicScorePlayer
+
+	first, err := c.FetchChallengeScoresPage(realm, season, weekID, 1)
+	if err != nil {
+		time.Sleep(15 * time.Second)
+		return nil, err
+	}
+	all = append(all, first.Data...)
+	totalPages := first.Meta.LastPage
+
+	for p := 2; p <= totalPages; p++ {
+		page, err := c.FetchChallengeScoresPage(realm, season, weekID, p)
+		if err != nil {
+			c.logger.Error("Error fetch challenge scores page", "error", err, "page", p)
+			time.Sleep(5 * time.Second)
+			continue
+		}
+		all = append(all, page.Data...)
+		time.Sleep(2 * time.Second)
+	}
+
+	return all, nil
+}
+
 func (c *Client) FetchGuildLatestBossKills(realm string, guildID int) (*models.LatestBossKills, error) {
 	realm = normalizeRealm(realm)
 	page := 1

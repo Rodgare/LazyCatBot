@@ -101,6 +101,7 @@ func main() {
 	pSubStore := storage.NewPlayerSubscribeStorage(db)
 	ccStore := storage.NewCharacterCacheStorage(db)
 	arStore := storage.NewActualRaidsStorage(db)
+	mythLbStore := storage.NewMythicLeaderboardStorage(db, logger)
 
 	sirusClient := sirus.NewClient(logger, appCfg.GetSirusURLs())
 	discordReporter := discord.NewDiscordReporter(dg)
@@ -116,6 +117,7 @@ func main() {
 		logger,
 		appCfg,
 	)
+	killWorker.SetMythicLeaderboardStore(mythLbStore)
 
 	killWorker.StartCronScheduler()
 	go killWorker.StartProcessor(ctx)

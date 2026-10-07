@@ -97,6 +97,7 @@ func (w *Worker) StartCronScheduler() {
 	_, err := c.AddFunc("0 3 * * *", func() {
 		w.logger.Info("[Cron] 03:00: cron tast is started")
 		w.StartLeaderboardSync()
+		w.StartMythicLeaderboardSync()
 	})
 
 	if err != nil {

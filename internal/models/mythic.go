@@ -13,6 +13,9 @@ type ReportMember struct {
 	MythicRating  float64
 	BlackDiamonds int
 	Title         string
+	// MythicRatingPercentile 0..100 of the player's spec position on the challenge
+	// scores leaderboard, used to color the Rio value like raid percentiles.
+	MythicRatingPercentile int `json:"mythicRatingPercentile"`
 }
 
 type MythicRunItem struct {
@@ -35,6 +38,28 @@ type MythicRunItem struct {
 
 type MythicRuns struct {
 	Data []MythicRunItem `json:"data"`
+}
+
+type MythicScoreboard struct {
+	Data []MythicScorePlayer `json:"data"`
+	Meta struct {
+		LastPage int `json:"last_page"`
+	} `json:"meta"`
+}
+
+type MythicScorePlayer struct {
+	Position   int     `json:"position"`
+	GUID       int     `json:"guid"`
+	Name       string  `json:"name"`
+	Class      int     `json:"class"`
+	SpecID     int     `json:"spec_id"`
+	Zodiac     int     `json:"zodiac"`
+	Score      float64 `json:"current_score"`
+	BestKey    int     `json:"best_key"`
+	TotalRuns  int     `json:"total_runs"`
+	TimedRuns  int     `json:"timed_runs"`
+	Season     int
+	WeekID     int
 }
 
 type MythicMemberCombat struct {
