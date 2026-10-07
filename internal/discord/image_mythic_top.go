@@ -171,7 +171,7 @@ func drawMythicGuildPlayerRow(dc *gg.Context, rank int, p models.GuildMythicPlay
 	drawMythicGuildRank(dc, p.SpecRank, p.SpecTotal, mtColSpecRankX, y)
 
 	// Best key
-	dc.SetHexColor("#8b93a1")
+	dc.SetHexColor("#d4dbe9")
 	dc.DrawString(fmt.Sprintf("%d", p.BestKey), mtColKeyX, y+28)
 
 	// Runs
