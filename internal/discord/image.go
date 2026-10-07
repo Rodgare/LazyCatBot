@@ -221,7 +221,7 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 		fmt.Printf("Error: file %s not found in embed\n", diamondFileData)
 	}
 
-	dc.DrawString("Созв", colZodiacX-7, y+20)
+	dc.DrawString("Созв", colZodiacX-5, y+20)
 	dc.DrawString("t4", ColSetX, y+20)
 	dc.DrawString("Спек/Илвл", colIlvlRankX-10, y+20)
 	dc.DrawString("Спек", colSpecRankX, y+20)
