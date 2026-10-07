@@ -25,10 +25,10 @@ const (
 	colCategoryX    = 45
 	colNameX        = 70
 	colIlvlX        = 230
-	colDiamondX     = 270
-	colZodiacX      = 305
-	ColSetX         = 350
-	colDpsX         = 390
+	colDiamondX     = 280
+	colZodiacX      = 310
+	ColSetX         = 355
+	colDpsX         = 395
 	colIlvlRankX    = 480
 	colSpecRankX    = 570
 	colClassRankX   = 660
@@ -213,7 +213,7 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 			bounds := img.Bounds()
 			imgH := bounds.Dy()
 			imgY := int(y) + int(rowHeight)/2 - imgH/2
-			dc.DrawImage(img, colDiamondX+4, imgY)
+			dc.DrawImage(img, colDiamondX, imgY)
 		} else {
 			fmt.Printf("Error decoding %s: %v\n", diamondFileData, errDecode)
 		}
