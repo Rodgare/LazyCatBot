@@ -20,18 +20,20 @@ const (
 	mTableHeader = 30
 	mMargin      = 20
 
-	mColRankX    = 20
-	mColClassX   = 45
-	mColSpecX    = 75
-	mColNameX    = 105
-	mColRoleX    = 315
-	mColIlvlX    = 380
-	mColZodiacX  = 440
-	mColDiamondX = 500
-	mColRioX     = 535
-	mColDpsX     = 595
-	mColHpsX     = 655
-	mColIntX     = 715
+	mColRankX  = 20
+	mColClassX = 45
+	mColSpecX  = 75
+	mColNameX  = 105
+	mColRoleX  = 320
+
+	mColDpsX = 380
+	mColHpsX = 450
+	mColIntX = 510
+
+	mColIlvlX    = 560
+	mColDiamondX = 620
+	mColZodiacX  = 670
+	mColRioX     = 720
 )
 
 var mythicColors = map[int]string{
@@ -145,10 +147,31 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 		}
 
 		loadMythicFontFace(dc, 16)
-		dc.SetHexColor("#d8a13c")
-		combatText := fmt.Sprintf("Суммарный ДПС: %s   |   ХПС: %s   |   Кики: %d",
-			FormatNum(totalDPS), FormatNum(totalHPS), totalKicks)
-		dc.DrawStringAnchored(combatText, mWidth/2, 115, 0.5, 0.5)
+		labelColor := "#d8a13c"
+		segments := []struct {
+			text  string
+			color string
+		}{
+			{"Суммарный ДПС: ", labelColor},
+			{FormatNum(totalDPS), "#bb2222"},
+			{"   |   ХПС: ", labelColor},
+			{FormatNum(totalHPS), "#3fd777"},
+			{"   |   Кики: ", labelColor},
+			{fmt.Sprintf("%d", totalKicks), "#378ef9"},
+		}
+
+		var totalW float64
+		for _, seg := range segments {
+			segW, _ := dc.MeasureString(seg.text)
+			totalW += segW
+		}
+		x := (float64(mWidth) - totalW) / 2
+		for _, seg := range segments {
+			dc.SetHexColor(seg.color)
+			dc.DrawStringAnchored(seg.text, x, 115, 0, 0.5)
+			segW, _ := dc.MeasureString(seg.text)
+			x += segW
+		}
 	}
 
 	// Table header
@@ -230,7 +253,7 @@ func drawMythicTableHeader(dc *gg.Context, y float64, combat bool) {
 	dc.DrawString("Игрок", mColNameX, y+20)
 	dc.DrawString("Роль", mColRoleX, y+20)
 	dc.DrawString("ILvl", mColIlvlX, y+20)
-	drawMythicImage(dc, "assets/images/4b.png", float64(mColDiamondX)-1, y-5)
+	drawMythicImage(dc, "assets/images/4b.png", float64(mColDiamondX)-2, y-5)
 	dc.DrawString("Рио", mColRioX, y+20)
 	if combat {
 		dc.DrawString("Зодиак", mColZodiacX-15, y+20)
@@ -272,6 +295,7 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	dc.SetHexColor(colorHex)
 	dc.DrawString(member.Name, mColNameX, y+28)
 
+	//title
 	nameW, _ := dc.MeasureString(member.Name)
 	var suffix strings.Builder
 	if member.Title != "" {
@@ -281,7 +305,7 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	if suffix.Len() > 0 {
 		loadMythicFontFace(dc, 10)
 		dc.SetHexColor("#8b93a1")
-		dc.DrawString(suffix.String(), mColNameX+nameW+5, y+28)
+		dc.DrawString(suffix.String(), mColNameX+nameW, y+20)
 	}
 
 	// Role
@@ -321,15 +345,19 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 
 	// DPS / HPS / Interrupts from the run log
 	if hasCombat {
-		dc.SetRGB(1, 1, 1)
+
 		if combat.GUID != 0 {
+			dc.SetHexColor("#bb2222")
 			dc.DrawString(FormatNum(combat.DamageDone), mColDpsX, y+28)
+			dc.SetHexColor("#3fd777")
 			dc.DrawString(FormatNum(combat.HealDone), mColHpsX, y+28)
+			dc.SetHexColor("#378ef9")
 			dc.DrawString(fmt.Sprintf("%d", combat.Interrupts), mColIntX, y+28)
+			dc.SetRGB(1, 1, 1)
 		} else {
-			dc.DrawString("-", mColDpsX, y+28)
-			dc.DrawString("-", mColHpsX, y+28)
-			dc.DrawString("-", mColIntX, y+28)
+			dc.DrawString("лог отсуствует", mColDpsX, y+28)
+			dc.DrawString("лог отсуствует", mColHpsX, y+28)
+			dc.DrawString("лог отсуствует", mColIntX, y+28)
 		}
 	}
 
