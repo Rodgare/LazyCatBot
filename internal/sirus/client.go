@@ -276,3 +276,15 @@ func (c *Client) FetchGuildMembers(realm string, guild_id int) (*[]models.GuildM
 
 	return &gms.Members, gms.Name, nil
 }
+
+func (c *Client) FetchCharacter(realm, name string) (*models.CharacterData, error) {
+	realm = normalizeRealm(realm)
+	endpoint := fmt.Sprintf("/api/base/%s/character/%s", realm, url.PathEscape(name))
+
+	var res models.CharacterData
+	if err := c.makeRequest(endpoint, &res); err != nil {
+		return nil, err
+	}
+
+	return &res, nil
+}

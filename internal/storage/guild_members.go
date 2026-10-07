@@ -68,3 +68,27 @@ func (s *GuildMembersStorage) GetPlayersByGuildID(realm string, guildID int) ([]
 	}
 	return players, rows.Err()
 }
+
+type TrackedMemberName struct {
+	Name  string
+	Realm string
+}
+
+func (s *GuildMembersStorage) GetAllMembers() ([]TrackedMemberName, error) {
+	query := `SELECT DISTINCT name, COALESCE(realm, 'x3') FROM guild_members`
+	rows, err := s.db.Query(query)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var members []TrackedMemberName
+	for rows.Next() {
+		var m TrackedMemberName
+		if err := rows.Scan(&m.Name, &m.Realm); err != nil {
+			return nil, err
+		}
+		members = append(members, m)
+	}
+	return members, rows.Err()
+}

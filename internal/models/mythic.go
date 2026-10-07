@@ -1,15 +1,18 @@
 package models
 
 type ReportMember struct {
-	MemberGUID int    `json:"memberGuid"`
-	Name       string `json:"name"`
-	ClassID    int    `json:"classId"`
-	SpecID     int    `json:"specId"`
-	RoleID     int    `json:"roleId"`
-	RaceID     int    `json:"raceId"`
-	GenderID   int    `json:"genderId"`
-	Ilvl       int    `json:"ilvl"`
-	Zodiac     int    `json:"zodiac"`
+	MemberGUID    int    `json:"memberGuid"`
+	Name          string `json:"name"`
+	ClassID       int    `json:"classId"`
+	SpecID        int    `json:"specId"`
+	RoleID        int    `json:"roleId"`
+	RaceID        int    `json:"raceId"`
+	GenderID      int    `json:"genderId"`
+	Ilvl          int    `json:"ilvl"`
+	Zodiac        int    `json:"zodiac"`
+	MythicRating  float64
+	BlackDiamonds int
+	Title         string
 }
 
 type MythicRunItem struct {

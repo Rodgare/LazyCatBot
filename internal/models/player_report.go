@@ -20,4 +20,7 @@ type PlayerReport struct {
 	T4                int
 	Zodiac            int
 	Category          int
+	MythicRating      float64
+	BlackDiamonds     int
+	Title             string
 }

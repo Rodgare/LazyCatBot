@@ -99,6 +99,7 @@ func main() {
 	subStore := storage.NewSubscribeStorage(db)
 	gmStore := storage.NewGuildMembersStorage(db)
 	pSubStore := storage.NewPlayerSubscribeStorage(db)
+	ccStore := storage.NewCharacterCacheStorage(db)
 	arStore := storage.NewActualRaidsStorage(db)
 
 	sirusClient := sirus.NewClient(logger, appCfg.GetSirusURLs())
@@ -109,6 +110,7 @@ func main() {
 		lbStore, subStore,
 		gmStore,
 		pSubStore,
+		ccStore,
 		arStore,
 		discordReporter,
 		logger,
@@ -121,6 +123,7 @@ func main() {
 	go killWorker.PlayerKillMonitor(ctx)
 	go killWorker.MythicRunsMonitor(ctx)
 	go killWorker.GuildMembersUpdater(ctx)
+	go killWorker.CharacterCacheUpdater(ctx)
 	go killWorker.CleanupRoutine(ctx)
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds

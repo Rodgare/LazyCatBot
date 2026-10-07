@@ -10,6 +10,7 @@ import (
 	_ "image/png"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/fogleman/gg"
 )
@@ -231,6 +232,25 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	}
 	dc.SetHexColor(colorHex)
 	dc.DrawString(p.Name, colNameX, y+25)
+
+	nameW, _ := dc.MeasureString(p.Name)
+	var suffix strings.Builder
+	if p.Title != "" {
+		suffix.WriteString(" ")
+		suffix.WriteString(p.Title)
+	}
+	if p.MythicRating > 0 {
+		fmt.Fprintf(&suffix, " · Рио %.0f", p.MythicRating)
+	}
+	if p.BlackDiamonds > 0 {
+		fmt.Fprintf(&suffix, " · ЧБ %d", p.BlackDiamonds)
+	}
+	if suffix.Len() > 0 {
+		loadCyrillicFontFace(dc, 10)
+		dc.SetHexColor("#8b93a1")
+		dc.DrawString(suffix.String(), colNameX+nameW+5, y+25)
+		loadCyrillicFontFace(dc, 17)
+	}
 
 	//zodiac
 	zodiacFilePath := fmt.Sprintf("assets/images/zodiac/%d.png", p.Zodiac)

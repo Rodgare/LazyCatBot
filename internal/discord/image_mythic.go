@@ -268,6 +268,24 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	dc.SetHexColor(colorHex)
 	dc.DrawString(member.Name, mColNameX, y+28)
 
+	nameW, _ := dc.MeasureString(member.Name)
+	var suffix strings.Builder
+	if member.Title != "" {
+		suffix.WriteString(" ")
+		suffix.WriteString(member.Title)
+	}
+	if member.MythicRating > 0 {
+		fmt.Fprintf(&suffix, " · Рио %.0f", member.MythicRating)
+	}
+	if member.BlackDiamonds > 0 {
+		fmt.Fprintf(&suffix, " · ЧБ %d", member.BlackDiamonds)
+	}
+	if suffix.Len() > 0 {
+		loadMythicFontFace(dc, 10)
+		dc.SetHexColor("#8b93a1")
+		dc.DrawString(suffix.String(), mColNameX+nameW+5, y+28)
+	}
+
 	// Role
 	loadMythicFontFace(dc, 16)
 	roleText := "Неизвестно"

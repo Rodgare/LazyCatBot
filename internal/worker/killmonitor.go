@@ -45,6 +45,7 @@ type SirusAPI interface {
 	FetchGuildLatestBossKills(realm string, guildID int) (*models.LatestBossKills, error)
 	FetchPlayerLastActions(realm string, playerID int) (*models.PlayerLastActions, error)
 	FetchGuildMembers(realm string, guildID int) (*[]models.GuildMembers, string, error)
+	FetchCharacter(realm, name string) (*models.CharacterData, error)
 	FetchActualRaids(realm string) (models.ActualSirusRaids, error)
 	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
 	GetLatestMythicRuns(realm string) (*models.MythicRuns, error)
@@ -65,6 +66,7 @@ type Worker struct {
 	subStore    SubscribeStore
 	pSubStore   *storage.PlayerSubscribeStorage
 	gmStore     *storage.GuildMembersStorage
+	charStore   *storage.CharacterCacheStorage
 	arStore     *storage.ActualRaidsStorage
 	reporter    Reporter
 	killQueue   chan KillJob
@@ -79,6 +81,7 @@ func NewWorker(
 	sub SubscribeStore,
 	gm *storage.GuildMembersStorage,
 	ps *storage.PlayerSubscribeStorage,
+	cc *storage.CharacterCacheStorage,
 	ar *storage.ActualRaidsStorage,
 	reporter Reporter,
 	logger *slog.Logger,
@@ -90,6 +93,7 @@ func NewWorker(
 		subStore:    sub,
 		pSubStore:   ps,
 		gmStore:     gm,
+		charStore:   cc,
 		arStore:     ar,
 		reporter:    reporter,
 		killQueue:   make(chan KillJob, 100),
@@ -365,6 +369,7 @@ func (w *Worker) processRaids(job KillJob) {
 			}
 
 			rep := w.createReport(enrichedKill, job.KillID, job.Realm)
+			w.enrichRaidCharacters(&rep, job.Realm)
 			report = &rep
 		}
 
@@ -397,6 +402,7 @@ func (w *Worker) processMythicRuns(job KillJob) {
 			job.MythicReport.ApplyCombat(runDetails)
 		}
 	}
+	w.enrichMythicCharacters(job)
 	for ch := range job.Channels {
 		if w.subStore.IsKillProcessed(job.KillID, ch) {
 			continue
@@ -416,6 +422,38 @@ func (w *Worker) processMythicRuns(job KillJob) {
 		w.subStore.MarkKillProcessed(job.KillID, ch)
 	}
 
+}
+
+func (w *Worker) enrichMythicCharacters(job KillJob) {
+	if job.MythicReport == nil {
+		return
+	}
+	for i := range job.MythicReport.Members {
+		m := &job.MythicReport.Members[i]
+		c, err := w.charStore.Get(job.Realm, m.Name)
+		if err != nil {
+			continue
+		}
+		m.MythicRating = c.MythicRating
+		m.BlackDiamonds = c.BlackDiamonds
+		m.Title = c.Title
+	}
+}
+
+func (w *Worker) enrichRaidCharacters(report *models.BossKillReport, realm string) {
+	if report == nil {
+		return
+	}
+	for i := range report.Players {
+		p := &report.Players[i]
+		c, err := w.charStore.Get(realm, p.Name)
+		if err != nil {
+			continue
+		}
+		p.MythicRating = c.MythicRating
+		p.BlackDiamonds = c.BlackDiamonds
+		p.Title = c.Title
+	}
 }
 
 func (w *Worker) getGuildKills(data map[storage.TrackedGuildKey][]string) (map[int]map[string]bool, map[int]string) {
