@@ -305,7 +305,7 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	if suffix.Len() > 0 {
 		loadMythicFontFace(dc, 10)
 		dc.SetHexColor("#8b93a1")
-		dc.DrawString(suffix.String(), mColNameX+nameW, y+20)
+		dc.DrawString(suffix.String(), mColNameX+nameW, y+23)
 	}
 
 	// Role

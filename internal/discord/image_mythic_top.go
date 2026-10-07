@@ -5,29 +5,29 @@ import (
 	"LazyCatBot/internal/sirus"
 	"bytes"
 	"fmt"
-	"image/color"
+	"math/rand"
 	"strings"
 
 	"github.com/fogleman/gg"
 )
 
 const (
-	mtWidth       = 940
+	mtWidth       = 800
 	mtRowHeight   = 40
 	mtTableHeader = 30
 
-	mtColRankX        = 20
-	mtColClassX       = 45
-	mtColSpecX        = 75
-	mtColNameX        = 105
-	mtColIlvlX        = 285
-	mtColZodiacX      = 345
-	mtColDiamondX     = 405
-	mtColRioX         = 450
-	mtColClassRankX   = 580
-	mtColSpecRankX    = 690
-	mtColKeyX         = 800
-	mtColRunsX        = 875
+	mtColRankX      = 20
+	mtColClassX     = 45
+	mtColSpecX      = 75
+	mtColNameX      = 105
+	mtColIlvlX      = 340
+	mtColZodiacX    = 390
+	mtColDiamondX   = 440
+	mtColRioX       = 480
+	mtColClassRankX = 550
+	mtColSpecRankX  = 600
+	mtColKeyX       = 650
+	mtColRunsX      = 710
 )
 
 // RenderMythicGuildTopImage renders a mythic rating leaderboard table for guild
@@ -72,15 +72,11 @@ func RenderMythicGuildTopImage(guildName, realm string, players []models.GuildMy
 	return buf.Bytes(), err
 }
 
+var raidBgIDs = []int{1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36, 37, 38, 39, 40, 41, 42, 43, 44, 45, 46}
+
 func drawMythicGuildBackground(dc *gg.Context) {
-	dc.SetHexColor("#0a0e14ff")
-	dc.Clear()
-	grad := gg.NewLinearGradient(0, 0, 0, 200)
-	grad.AddColorStop(0, color.RGBA{30, 34, 46, 255})
-	grad.AddColorStop(1, color.RGBA{10, 14, 20, 255})
-	dc.SetFillStyle(grad)
-	dc.DrawRectangle(0, 0, float64(mtWidth), 200)
-	dc.Fill()
+	raidID := raidBgIDs[rand.Intn(len(raidBgIDs))]
+	drawRaidBackground(dc, raidID, "#0a0e14")
 }
 
 func drawMythicGuildTableHeader(dc *gg.Context, y float64) {
@@ -95,10 +91,10 @@ func drawMythicGuildTableHeader(dc *gg.Context, y float64) {
 	dc.DrawString("ILvl", mtColIlvlX, y+20)
 	drawMythicImage(dc, "assets/images/4b.png", float64(mtColDiamondX)-1, y-5)
 	dc.DrawString("Рио", mtColRioX, y+20)
-	dc.DrawString("Класс", mtColClassRankX, y+20)
-	dc.DrawString("Спек", mtColSpecRankX, y+20)
-	dc.DrawString("Ключ", mtColKeyX, y+20)
-	dc.DrawString("Забегов", mtColRunsX-20, y+20)
+	dc.DrawString("Класс", mtColClassRankX-15, y+20)
+	dc.DrawString("Спек", mtColSpecRankX-15, y+20)
+	dc.DrawString("Ключ", mtColKeyX-15, y+20)
+	dc.DrawString("Забегов", mtColRunsX-15, y+20)
 }
 
 func drawMythicGuildPlayerRow(dc *gg.Context, rank int, p models.GuildMythicPlayer, total int, y float64) float64 {
@@ -137,7 +133,7 @@ func drawMythicGuildPlayerRow(dc *gg.Context, rank int, p models.GuildMythicPlay
 	if p.Title != "" {
 		loadMythicFontFace(dc, 10)
 		dc.SetHexColor("#8b93a1")
-		dc.DrawString(" "+p.Title, mtColNameX+nameW+5, y+28)
+		dc.DrawString(" "+p.Title, mtColNameX+nameW, y+23)
 	}
 
 	// ILvl
