@@ -213,7 +213,7 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 			bounds := img.Bounds()
 			imgH := bounds.Dy()
 			imgY := int(y) + int(rowHeight)/2 - imgH/2
-			dc.DrawImage(img, colDiamondX-5, imgY)
+			dc.DrawImage(img, colDiamondX-5, imgY-2)
 		} else {
 			fmt.Printf("Error decoding %s: %v\n", diamondFileData, errDecode)
 		}
