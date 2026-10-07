@@ -95,8 +95,17 @@ func (w *Worker) StartCronScheduler() {
 	c := cron.New(cron.WithLocation(msk))
 
 	_, err := c.AddFunc("0 3 * * *", func() {
-		w.logger.Info("[Cron] 03:00: cron tast is started")
+		w.logger.Info("[Cron] 03:00: raid leaderboard sync started")
 		w.StartLeaderboardSync()
+	})
+
+	if err != nil {
+		w.logger.Error("Cron error", "error", err)
+		return
+	}
+
+	_, err = c.AddFunc("0 19 * * *", func() {
+		w.logger.Info("[Cron] 19:00: mythic leaderboard sync started")
 		w.StartMythicLeaderboardSync()
 	})
 
