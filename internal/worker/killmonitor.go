@@ -275,6 +275,7 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 		}
 
 		realm := w.cfg.DefaultRealm
+		w.apiLimiter.Wait()
 		latestRuns, err := w.sirusClient.GetLatestMythicRuns(realm)
 		if err != nil {
 			w.logger.Error("[KillMonitor] GetLatestMythicRuns err", "error", err)
@@ -347,27 +348,49 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 	}
 }
 
+const killQueueOverloadThreshold = 10
+
 func (w *Worker) StartProcessor(ctx context.Context) {
-	for job := range w.killQueue {
+	queueOverloaded := false
+	for {
 		select {
 		case <-ctx.Done():
 			w.logger.Info("[KillMonitor] Processor stopped")
 			return
-		default:
-		}
+		case job, ok := <-w.killQueue:
+			if !ok {
+				w.logger.Info("[KillMonitor] Kill queue closed, processor stopped")
+				return
+			}
 
-		switch job.Type {
-		case "myth":
-			w.processMythicRuns(job)
-		default:
-			w.processRaids(job)
-		}
+			queued := len(w.killQueue)
+			if queued >= killQueueOverloadThreshold {
+				if !queueOverloaded {
+					queueOverloaded = true
+					w.logger.Warn("[KillMonitor] Kill queue is accumulating",
+						"queued", queued, "threshold", killQueueOverloadThreshold,
+					)
+				}
+			} else {
+				if queueOverloaded {
+					queueOverloaded = false
+					w.logger.Info("[KillMonitor] Kill queue drained", "queued", queued)
+				}
+			}
 
-		select {
-		case <-ctx.Done():
-			w.logger.Info("[KillMonitor] Processor stopped")
-			return
-		case <-time.After(300 * time.Millisecond):
+			switch job.Type {
+			case "myth":
+				w.processMythicRuns(job)
+			default:
+				w.processRaids(job)
+			}
+
+			select {
+			case <-ctx.Done():
+				w.logger.Info("[KillMonitor] Processor stopped")
+				return
+			case <-time.After(300 * time.Millisecond):
+			}
 		}
 	}
 }
@@ -381,6 +404,7 @@ func (w *Worker) processRaids(job KillJob) {
 		}
 
 		if report == nil {
+			w.apiLimiter.Wait()
 			enrichedKill, err := w.sirusClient.FetchBossFightDetails(job.Realm, job.KillID)
 			if err != nil {
 				w.logger.Error("[Processor] Fetch Boss Fight Details err", "error", err)
@@ -410,6 +434,7 @@ func (w *Worker) processRaids(job KillJob) {
 
 func (w *Worker) processMythicRuns(job KillJob) {
 	if job.MythicReport.HasRunLog {
+		w.apiLimiter.Wait()
 		runDetails, err := w.sirusClient.FetchMythicRunDetails(job.Realm, job.KillID)
 		if err != nil {
 			w.logger.Error("[Processor] Fetch Mythic Run Details err", "error", err)

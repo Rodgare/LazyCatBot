@@ -20,6 +20,7 @@ func (w *Worker) GuildMembersUpdater(ctx context.Context) {
 		}
 
 		for key := range guildsToUpdate {
+			w.apiLimiter.Wait()
 			gms, guildName, err := w.sirusClient.FetchGuildMembers(key.Realm, key.GuildID)
 			if err != nil {
 				w.logger.Error("FetchGuildMembers error", "error", err, "guild_id", key.GuildID, "realm", key.Realm)

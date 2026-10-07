@@ -24,7 +24,7 @@ const (
 	colRankX        = 20
 	colCategoryX    = 45
 	colNameX        = 70
-	colIlvlX        = 265
+	colIlvlX        = 260
 	colDiamondX     = 305
 	colZodiacX      = 335
 	ColSetX         = 375
