@@ -18,6 +18,7 @@ import (
 type Reporter interface {
 	SendKillReport(channelID string, report models.BossKillReport) error
 	SendMythicReport(channelID string, report *models.MythicReport) error
+	SendMythicTopMock(channelID string) error
 }
 
 type SubscribeStore interface {
@@ -216,6 +217,9 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 		mockReport := w.makeMockMythicReport()
 		if err := w.reporter.SendMythicReport(w.cfg.DebugChannelID, mockReport); err != nil {
 			w.logger.Error("[DEBUG] Send mock mythic report err", "error", err)
+		}
+		if err := w.reporter.SendMythicTopMock(w.cfg.DebugChannelID); err != nil {
+			w.logger.Error("[DEBUG] Send mock mythic top err", "error", err)
 		}
 	}
 	for {
