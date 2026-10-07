@@ -24,10 +24,10 @@ const (
 	colRankX        = 20
 	colCategoryX    = 45
 	colNameX        = 70
-	colIlvlX        = 245
-	colDiamondX     = 295
-	colZodiacX      = 325
-	ColSetX         = 370
+	colIlvlX        = 250
+	colDiamondX     = 300
+	colZodiacX      = 330
+	ColSetX         = 375
 	colDpsX         = 410
 	colIlvlRankX    = 480
 	colSpecRankX    = 570
@@ -221,7 +221,7 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 		fmt.Printf("Error: file %s not found in embed\n", diamondFileData)
 	}
 
-	dc.DrawString("Созв", colZodiacX-5, y+20)
+	dc.DrawString("Созв", colZodiacX, y+20)
 	dc.DrawString("t4", ColSetX, y+20)
 	dc.DrawString("Спек/Илвл", colIlvlRankX-10, y+20)
 	dc.DrawString("Спек", colSpecRankX, y+20)
