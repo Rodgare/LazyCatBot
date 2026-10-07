@@ -25,13 +25,13 @@ const (
 	colCategoryX    = 45
 	colNameX        = 70
 	colIlvlX        = 230
-	colDiamondX     = 260
-	colZodiacX      = 290
-	ColSetX         = 330
-	colDpsX         = 370
-	colIlvlRankX    = 450
-	colSpecRankX    = 550
-	colClassRankX   = 650
+	colDiamondX     = 265
+	colZodiacX      = 300
+	ColSetX         = 340
+	colDpsX         = 380
+	colIlvlRankX    = 460
+	colSpecRankX    = 560
+	colClassRankX   = 660
 	colOverallRankX = 750
 )
 
@@ -250,6 +250,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	dc.DrawString(p.Name, colNameX, y+25)
 
 	//diamond
+	dc.SetHexColor("#ebb914")
 	dc.DrawString(fmt.Sprintf("%d", p.BlackDiamonds), colDiamondX, y+25)
 
 	//zodiac
