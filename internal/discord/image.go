@@ -20,6 +20,7 @@ const (
 	headerH         = 50
 	footerH         = 20
 	margin          = 20
+	raidBgDimAlpha  = 0.35
 	colRankX        = 20
 	colCategoryX    = 45
 	colNameX        = 70
@@ -440,6 +441,13 @@ func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
 	if canvasH > imgH {
 		dc.SetHexColor(bgColor + "ff")
 		dc.DrawRectangle(0, float64(imgH), float64(width), float64(canvasH-imgH))
+		dc.Fill()
+	}
+
+	// Semi-transparent dark overlay to dim bright backgrounds. Tune raidBgDimAlpha.
+	if raidBgDimAlpha > 0 {
+		dc.SetRGBA(0, 0, 0, raidBgDimAlpha)
+		dc.DrawRectangle(0, 0, float64(width), float64(canvasH))
 		dc.Fill()
 	}
 
