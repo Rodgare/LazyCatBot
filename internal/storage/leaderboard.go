@@ -172,9 +172,11 @@ func (s *LeaderboardStorage) GetBossTop(realm string, raidID, bossID, guildID in
 	}
 
 	query := fmt.Sprintf(`
-		SELECT l.player_name, l.class_id, l.spec_id, l.ilvl, l.zodiac, l.category, l.t4, l.dps, l.hps
+		SELECT l.player_name, l.class_id, l.spec_id, l.ilvl, l.zodiac, l.category, l.t4, l.dps, l.hps,
+		       COALESCE(cc.black_diamonds, 0), COALESCE(cc.title, '')
 		FROM leaderboard l
 		JOIN guild_members gm ON l.player_name = gm.name AND COALESCE(l.realm, 'x3') = COALESCE(gm.realm, 'x3')
+		LEFT JOIN character_cache cc ON cc.realm = COALESCE(l.realm, 'x3') AND cc.name = l.player_name
 		WHERE l.raid_id = ? 
 		  AND l.boss_id = ? 
 		  AND l.role = ? 
@@ -192,7 +194,7 @@ func (s *LeaderboardStorage) GetBossTop(realm string, raidID, bossID, guildID in
 	var players []models.PlayerReport
 	for rows.Next() {
 		var p models.PlayerReport
-		err := rows.Scan(&p.Name, &p.ClassID, &p.SpecID, &p.Ilvl, &p.Zodiac, &p.Category, &p.T4, &p.Dps, &p.Hps)
+		err := rows.Scan(&p.Name, &p.ClassID, &p.SpecID, &p.Ilvl, &p.Zodiac, &p.Category, &p.T4, &p.Dps, &p.Hps, &p.BlackDiamonds, &p.Title)
 		if err != nil {
 			return nil, err
 		}
