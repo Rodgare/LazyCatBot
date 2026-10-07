@@ -254,7 +254,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 		nameW, _ := dc.MeasureString(p.Name)
 		loadCyrillicFontFace(dc, 10)
 		dc.SetRGB(0.7, 0.7, 0.7)
-		dc.DrawString(p.Title, float64(colNameX)+nameW+5, y+20)
+		dc.DrawString(p.Title, float64(colNameX)+nameW+2, y+20)
 		loadCyrillicFontFace(dc, 17)
 	}
 
