@@ -62,6 +62,28 @@ type MythicScorePlayer struct {
 	WeekID     int
 }
 
+// GuildMythicPlayer is a guild member joined with their latest mythic leaderboard
+// snapshot and cached character data, used by the /topm command.
+type GuildMythicPlayer struct {
+	GUID          int
+	Name          string
+	ClassID       int
+	SpecID        int
+	Score         float64
+	Position      int
+	BestKey       int
+	Zodiac        int
+	TotalRuns     int
+	TimedRuns     int
+	Ilvl          int
+	BlackDiamonds int
+	Title         string
+	ClassRank     int
+	ClassTotal    int
+	SpecRank      int
+	SpecTotal     int
+}
+
 type MythicMemberCombat struct {
 	GUID        int `json:"guid"`
 	DamageDone  int `json:"damageDone"`

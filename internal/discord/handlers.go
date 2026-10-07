@@ -3,6 +3,7 @@ package discord
 import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
+	"bytes"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -17,6 +18,7 @@ type BotHandler struct {
 	PlayerSubStore *storage.PlayerSubscribeStorage
 	GMStore        *storage.GuildMembersStorage
 	arStore        *storage.ActualRaidsStorage
+	MythicStore    *storage.MythicLeaderboardStorage
 	Logger         *slog.Logger
 }
 
@@ -27,6 +29,7 @@ func NewHandler(
 	pSub *storage.PlayerSubscribeStorage,
 	gm *storage.GuildMembersStorage,
 	ar *storage.ActualRaidsStorage,
+	mythic *storage.MythicLeaderboardStorage,
 	logger *slog.Logger,
 ) *BotHandler {
 	return &BotHandler{
@@ -36,6 +39,7 @@ func NewHandler(
 		PlayerSubStore: pSub,
 		GMStore:        gm,
 		arStore:        ar,
+		MythicStore:    mythic,
 		Logger:         logger,
 	}
 }
@@ -516,6 +520,83 @@ func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.Intera
 	})
 }
 
+func (h *BotHandler) HandleTopMMythicCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	l := h.Logger.With(
+		"command", "topm",
+		"guild_id", i.GuildID,
+		"user", i.Member.User.Username,
+	)
+
+	l.Info("generating mythic guild ranking")
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+
+	subs, err := h.SubStore.GetGuildSubsByChannel(i.ChannelID)
+	if err != nil || len(subs) == 0 {
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("❌ В этом канале не настроено отслеживание гильдий."),
+		})
+		l.Error("empty guilds tracked list", "error", err)
+		return
+	}
+	targetSub := subs[0]
+
+	guids, err := h.GMStore.GetPlayersByGuildID(targetSub.Realm, targetSub.GuildID)
+	if err != nil {
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("❌ Ошибка при получении участников гильдии."),
+		})
+		l.Error("getting guild members error", "error", err)
+		return
+	}
+	if len(guids) == 0 {
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("📭 В базе нет данных об участниках этой гильдии."),
+		})
+		return
+	}
+
+	players, err := h.MythicStore.GetGuildMythicPlayers(targetSub.Realm, guids)
+	if err != nil {
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("❌ Ошибка при получении мифик-рейтинга."),
+		})
+		l.Error("getting guild mythic players error", "error", err)
+		return
+	}
+	if len(players) == 0 {
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("📭 Мифик-рейтинг ещё не собран. Данные подтягиваются автоматически."),
+		})
+		l.Info("empty mythic leaderboard for guild")
+		return
+	}
+
+	guildName := "Рейтинг гильдии"
+	if n, err := h.SubStore.GetGuildName(targetSub.GuildID, targetSub.Realm); err == nil && n != "" {
+		guildName = n
+	}
+
+	img, err := RenderMythicGuildTopImage(guildName, targetSub.Realm, players)
+	if err != nil {
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("❌ Ошибка при генерации изображения."),
+		})
+		l.Error("mythic top image generation error", "error", err)
+		return
+	}
+	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Files: []*discordgo.File{
+			{
+				Name:   "topm.png",
+				Reader: bytes.NewReader(img),
+			},
+		},
+	})
+}
+
 func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ApplicationCommandData()
 
@@ -567,8 +648,11 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 				Content: content.String(),
 			},
 		})
-	case "topm":
+	case "top":
 		h.HandleTopMCommand(s, i)
+
+	case "topm":
+		h.HandleTopMMythicCommand(s, i)
 
 	case "listcats":
 		characters, err := h.PlayerSubStore.GetPlayersByChannel(channelID)
@@ -606,7 +690,8 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 						Title: "🐈 Справка LazyCatBot",
 						Description: "Я помогаю отслеживать прогресс гильдий на Sirus!\n\n" +
 							"**/menu** Вызывает меню с настройкой подписок бота, трекинга и т.д.\n" +
-							"**/topm** Команда вызывает меню с кнопками, который видят все, нажав на которые можно отправить рейтинги по чек босам среди игроков гильдии\n" +
+							"**/top** Открывает меню с кнопками, нажав на которые можно отправить рейтинги по чек боссам среди игроков гильдии.\n" +
+							"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
 							"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 							"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
 							"**/help** — Показать это сообщение.\n" +

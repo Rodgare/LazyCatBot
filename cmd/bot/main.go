@@ -130,7 +130,7 @@ func main() {
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
-	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, arStore, logger)
+	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, arStore, mythLbStore, logger)
 
 	dg.AddHandler(h.InteractionCreate)
 	if !appCfg.IsDebug {
@@ -155,8 +155,12 @@ func main() {
 			DefaultMemberPermissions: &manageChannelsPerm,
 		},
 		{
+			Name:        "top",
+			Description: "Открыть меню отправки рейтингов по боссам среди игроков гильдии",
+		},
+		{
 			Name:        "topm",
-			Description: "Открыть меню отправки рейтингов по босам среди игроков гильдии",
+			Description: "Показать мифик-рейтинг (Рио) среди участников гильдии",
 		},
 		{
 			Name:        "help",

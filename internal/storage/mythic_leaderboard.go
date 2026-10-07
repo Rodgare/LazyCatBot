@@ -4,6 +4,7 @@ import (
 	"LazyCatBot/internal/models"
 	"database/sql"
 	"log/slog"
+	"strings"
 
 	_ "modernc.org/sqlite"
 )
@@ -80,4 +81,66 @@ func (s *MythicLeaderboardStorage) GetPlayerMythicRank(realm string, season, wee
 		}
 	}
 	return rank, total, percentile, nil
+}
+
+// GetGuildMythicPlayers returns the latest mythic leaderboard snapshot rows for
+// the given guild member GUIDs, joined with guild ilvl and cached character
+// data (black diamonds, title), sorted by current_score descending.
+func (s *MythicLeaderboardStorage) GetGuildMythicPlayers(realm string, guids []int) ([]models.GuildMythicPlayer, error) {
+	if realm == "" {
+		realm = "x3"
+	}
+	if len(guids) == 0 {
+		return nil, nil
+	}
+
+	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(guids)), ",")
+	args := make([]any, 0, len(guids)+2)
+	args = append(args, realm, realm)
+	for _, g := range guids {
+		args = append(args, g)
+	}
+
+	query := `SELECT ml.guid, ml.name, ml.class_id, ml.spec_id, ml.current_score, ml.position,
+	       ml.best_key, ml.zodiac, ml.total_runs, ml.timed_runs,
+	       gm.ilvl, COALESCE(cc.black_diamonds, 0), COALESCE(cc.title, ''),
+	       (SELECT COUNT(*)+1 FROM mythic_leaderboard ml2
+	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id
+	            AND ml2.current_score > ml.current_score
+	            AND ml2.updated_at = ml.updated_at) AS class_rank,
+	       (SELECT COUNT(*) FROM mythic_leaderboard ml2
+	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id
+	            AND ml2.updated_at = ml.updated_at) AS class_total,
+	       (SELECT COUNT(*)+1 FROM mythic_leaderboard ml2
+	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id AND ml2.spec_id = ml.spec_id
+	            AND ml2.current_score > ml.current_score
+	            AND ml2.updated_at = ml.updated_at) AS spec_rank,
+	       (SELECT COUNT(*) FROM mythic_leaderboard ml2
+	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id AND ml2.spec_id = ml.spec_id
+	            AND ml2.updated_at = ml.updated_at) AS spec_total
+	FROM mythic_leaderboard ml
+	JOIN guild_members gm ON gm.id = ml.guid AND gm.realm = ml.realm
+	LEFT JOIN character_cache cc ON cc.realm = ml.realm AND cc.name = ml.name
+	WHERE ml.realm = ? AND ml.updated_at = (SELECT MAX(updated_at) FROM mythic_leaderboard WHERE realm = ?)
+	  AND ml.guid IN (` + placeholders + `)
+	ORDER BY ml.current_score DESC`
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var players []models.GuildMythicPlayer
+	for rows.Next() {
+		var p models.GuildMythicPlayer
+		if err := rows.Scan(&p.GUID, &p.Name, &p.ClassID, &p.SpecID, &p.Score, &p.Position,
+			&p.BestKey, &p.Zodiac, &p.TotalRuns, &p.TimedRuns,
+			&p.Ilvl, &p.BlackDiamonds, &p.Title,
+			&p.ClassRank, &p.ClassTotal, &p.SpecRank, &p.SpecTotal); err != nil {
+			return nil, err
+		}
+		players = append(players, p)
+	}
+	return players, rows.Err()
 }
