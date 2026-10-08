@@ -153,7 +153,7 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 			color string
 		}{
 			{"Суммарный ДПС: ", labelColor},
-			{FormatNum(totalDPS), "#bb2222"},
+			{FormatNum(totalDPS), "#cf1616"},
 			{"   |   ХПС: ", labelColor},
 			{FormatNum(totalHPS), "#3fd777"},
 			{"   |   Кики: ", labelColor},
@@ -189,7 +189,7 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 	}
 
 	if report.RewardLevel <= 0 {
-		loadMythicFontFace(dc, 54)
+		loadMythicFontFace(dc, 45)
 		wasted := "WASTED"
 		wastedX := ((float64(mColRoleX) + float64(mColIlvlX)) / 2) + 20
 		wastedY := float64(headerH) + mTableHeader + rowsTotalHeight/2
@@ -359,9 +359,10 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 
 	// DPS / HPS / Interrupts from the run log
 	if hasCombat {
+		loadMythicFontFace(dc, 16)
 
 		if combat.GUID != 0 {
-			dc.SetHexColor("#bb2222")
+			dc.SetHexColor("#cf1616")
 			dc.DrawString(FormatNum(combat.DamageDone), mColDpsX, y+28)
 			dc.SetHexColor("#3fd777")
 			dc.DrawString(FormatNum(combat.HealDone), mColHpsX, y+28)

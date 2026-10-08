@@ -1,8 +1,8 @@
 {
     "realm": "x3",
     "id": 1106549,
-    "challengeId": 13,
-    "name": "Крепость Утгард",
+    "challengeId": 5,
+    "name": "Бастионы",
     "icon": "/images/ejbackgrounds/slavepens.webp",
     "mapId": 547,
     "keystoneLevel": 21,
@@ -16,7 +16,7 @@
     "forcesMax": 90,
     "forcesPercent": 114,
     "timer": 2130,
-    "rewardLevel": 0,
+    "rewardLevel": 1,
     "deathCounter": 5,
     "score": 228.958,
     "affixes": [
