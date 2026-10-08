@@ -204,3 +204,16 @@ func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKil
 	}
 	return SendKillReport(r.session, channelID, report)
 }
+
+func (r *DiscordReporter) GetChannelName(channelID string) string {
+	ch, err := r.session.Channel(channelID)
+	if err != nil || ch == nil || ch.Name == "" {
+		return channelID
+	}
+	return ch.Name
+}
+
+func (r *DiscordReporter) SendChannelNotice(channelID, text string) error {
+	_, err := r.session.ChannelMessageSend(channelID, text)
+	return err
+}

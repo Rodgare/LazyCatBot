@@ -688,7 +688,8 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 				Embeds: []*discordgo.MessageEmbed{
 					{
 						Title: "🐈 Справка LazyCatBot",
-						Description: "Я помогаю отслеживать прогресс гильдий на Sirus!\n\n" +
+						Description: "**⚠️ Не приходят отчёты?** Проверьте, что у бота есть права **Просмотр канала** и **Отправка сообщений** в этом канале. Без них бот не сможет писать сюда.\n\n" +
+							"Я помогаю отслеживать прогресс гильдий на Sirus!\n\n" +
 							"**/menu** Вызывает меню с настройкой подписок бота, трекинга и т.д.\n" +
 							"**/top** Открывает меню с кнопками, нажав на которые можно отправить рейтинги по чек боссам среди игроков гильдии.\n" +
 							"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
@@ -707,11 +708,6 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 }
 
 func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {
-	if h.SubStore.IsDiscordGuildSubscribed(g.ID) {
-		h.Logger.Info("guild already subscribed", "discord_guild_id", g.ID)
-		return
-	}
-
 	var channelID string
 	if g.SystemChannelID != "" {
 		channelID = g.SystemChannelID
@@ -729,12 +725,26 @@ func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate)
 		return
 	}
 
+	// Remember the welcome channel so we can notify the guild later (e.g. when
+	// the bot has no permission to post reports to a subscribed channel).
+	if err := h.SubStore.SetWelcomeChannel(g.ID, channelID); err != nil {
+		h.Logger.Error("Save welcome channel err", "error", err, "discord_guild_id", g.ID)
+	}
+
+	if h.SubStore.IsDiscordGuildSubscribed(g.ID) {
+		h.Logger.Info("guild already subscribed", "discord_guild_id", g.ID)
+		return
+	}
+
 	embed := &discordgo.MessageEmbed{
 		Title: "🐈 Привет! Я LazyCatBot",
 		Description: "Я помогу вам отслеживать убийства боссов вашей гильдии!\n\n" +
 			"**Как меня настроить:**\n" +
 			"Создайте текстовый канал и введите в этом канале команду /menu\n\n" +
 			"Появится меню с возможностью добавить гильдию для отслеживания по ID гильдии.\n\n" +
+			"**⚠️ Важно:** чтобы я мог присылать отчёты, выдайте мне права на текстовые каналы — " +
+			"**Просмотр канала** и **Отправка сообщений** (View Channel и Send Messages). " +
+			"Без этих прав отчёты не будут доставляться.\n\n" +
 			"Список комманд /help\n\n" +
 			"*(ID гильдии можно найти в ссылке на вашу гильдию на сайте Sirus)*",
 		Color: 0xf1c40f,

@@ -7,6 +7,7 @@ import (
 	"LazyCatBot/internal/storage"
 	"context"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"os"
 	"sort"
@@ -19,6 +20,8 @@ type Reporter interface {
 	SendKillReport(channelID string, report models.BossKillReport) error
 	SendMythicReport(channelID string, report *models.MythicReport) error
 	SendMythicTopMock(channelID string) error
+	GetChannelName(channelID string) string
+	SendChannelNotice(channelID, text string) error
 }
 
 type SubscribeStore interface {
@@ -31,6 +34,8 @@ type SubscribeStore interface {
 	IsReportsEnabled(guild int, channelID string) bool
 	GetTrackedGuilds() (map[storage.TrackedGuildKey][]string, error)
 	IsMythicReportsEnabled(ch string) bool
+	GetWelcomeChannel(discordID string) (string, error)
+	GetDiscordIDByChannel(channelID string) (string, error)
 }
 
 func isMissingAccess(err error) bool {
@@ -39,6 +44,51 @@ func isMissingAccess(err error) bool {
 	}
 	msg := err.Error()
 	return strings.Contains(msg, "Missing Access") || strings.Contains(msg, "50001")
+}
+
+const missingAccessSuppressInterval = 1800 // seconds (30 min)
+
+// isAccessSuppressed reports whether we already tried to send to this channel
+// and hit Missing Access recently. While suppressed we skip further send
+// attempts for the same channel so a large batch of kills does not spam errors,
+// without touching the report setting in the DB (so reports resume as soon as
+// the user grants permissions).
+func (w *Worker) isAccessSuppressed(channelID string) bool {
+	now := int(time.Now().Unix())
+	if last, ok := w.missingAccessSuppressed[channelID]; ok && now-last < missingAccessSuppressInterval {
+		return true
+	}
+	return false
+}
+
+func (w *Worker) suppressAccess(channelID string) {
+	w.missingAccessSuppressed[channelID] = int(time.Now().Unix())
+}
+
+// notifyMissingAccess posts a notice to the guild's welcome channel when the bot
+// cannot send reports to a subscribed channel (Missing Access).
+func (w *Worker) notifyMissingAccess(channelID string) {
+	discordID, _ := w.subStore.GetDiscordIDByChannel(channelID)
+	welcomeID := ""
+	if discordID != "" {
+		welcomeID, _ = w.subStore.GetWelcomeChannel(discordID)
+	}
+	if welcomeID == "" {
+		w.logger.Warn("[Processor] No welcome channel to report missing access", "channel", channelID)
+		return
+	}
+
+	channelName := w.reporter.GetChannelName(channelID)
+	text := fmt.Sprintf("⚠️ Не удалось отправить отчёт в канал **«%s»** (`%s`).\n"+
+		"Похоже, у бота нет прав писать в этот канал. "+
+		"Выдайте роли бота права **Просмотр канала** и **Отправка сообщений** в этом канале — "+
+		"отчёты отправятся автоматически, ничего включать заново не нужно.", channelName, channelID)
+
+	if err := w.reporter.SendChannelNotice(welcomeID, text); err != nil {
+		w.logger.Error("[Processor] Send missing-access notice err", "error", err, "channel", channelID, "welcome_channel", welcomeID)
+		return
+	}
+	w.logger.Warn("[Processor] Missing-access notice sent", "channel", channelID, "channel_name", channelName, "welcome_channel", welcomeID)
 }
 
 type SirusAPI interface {
@@ -77,6 +127,12 @@ type Worker struct {
 	apiLimiter   *RateLimiter
 	logger       *slog.Logger
 	cfg          *config.Config
+
+	// In-memory suppression: channelID -> last time (unix) we hit Missing Access.
+	// While suppressed we skip send attempts for the channel to avoid error spam,
+	// but the report setting in the DB is untouched, so reports resume automatically
+	// once the user grants the bot permissions.
+	missingAccessSuppressed map[string]int
 }
 
 func NewWorker(
@@ -92,19 +148,20 @@ func NewWorker(
 	cfg *config.Config,
 ) *Worker {
 	return &Worker{
-		sirusClient:  sc,
-		lbStore:      lb,
-		subStore:     sub,
-		pSubStore:    ps,
-		gmStore:      gm,
-		charStore:    cc,
-		arStore:      ar,
-		reporter:     reporter,
-		killQueue:    make(chan KillJob, 100),
-		charPriority: make(chan PriorityChar, 1000),
-		apiLimiter:   NewRateLimiter(2, 1),
-		logger:       logger,
-		cfg:          cfg,
+		sirusClient:             sc,
+		lbStore:                 lb,
+		subStore:                sub,
+		pSubStore:               ps,
+		gmStore:                 gm,
+		charStore:               cc,
+		arStore:                 ar,
+		reporter:                reporter,
+		killQueue:               make(chan KillJob, 100),
+		charPriority:            make(chan PriorityChar, 1000),
+		apiLimiter:              NewRateLimiter(2, 1),
+		logger:                  logger,
+		cfg:                     cfg,
+		missingAccessSuppressed: make(map[string]int),
 	}
 }
 
@@ -423,10 +480,14 @@ func (w *Worker) processRaids(job KillJob) {
 		}
 
 		if w.subStore.IsReportsEnabled(report.GuildID, ch) {
+			if w.isAccessSuppressed(ch) {
+				continue
+			}
 			if err := w.reporter.SendKillReport(ch, *report); err != nil {
 				if isMissingAccess(err) {
-					w.subStore.DisableReportsForChannel(ch)
-					w.logger.Warn("[Processor] Reports disabled for inaccessible channel", "error", err, "kill_id", job.KillID, "channel", ch)
+					w.suppressAccess(ch)
+					w.notifyMissingAccess(ch)
+					w.logger.Warn("[Processor] Missing access for channel (reports kept enabled)", "error", err, "kill_id", job.KillID, "channel", ch)
 				} else {
 					w.logger.Error("[Processor] Send kill report err", "error", err, "kill_id", job.KillID, "channel", ch)
 				}
@@ -462,10 +523,14 @@ func (w *Worker) processMythicRuns(job KillJob) {
 		}
 
 		if w.subStore.IsMythicReportsEnabled(ch) {
+			if w.isAccessSuppressed(ch) {
+				continue
+			}
 			if err := w.reporter.SendMythicReport(ch, job.MythicReport); err != nil {
 				if isMissingAccess(err) {
-					w.subStore.DisableReportsForChannel(ch)
-					w.logger.Warn("[Processor] Mythic reports disabled for inaccessible channel", "error", err, "run_id", job.KillID, "channel", ch)
+					w.suppressAccess(ch)
+					w.notifyMissingAccess(ch)
+					w.logger.Warn("[Processor] Missing access for channel (reports kept enabled)", "error", err, "run_id", job.KillID, "channel", ch)
 				} else {
 					w.logger.Error("[Processor] Send mythic report err", "error", err, "run_id", job.KillID, "channel", ch)
 				}

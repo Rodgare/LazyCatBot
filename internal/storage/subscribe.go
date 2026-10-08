@@ -193,6 +193,36 @@ func (s *SubscribeStorage) CleanupProcessedKills(olderThan time.Duration) error 
 	return err
 }
 
+func (s *SubscribeStorage) SetWelcomeChannel(discordID, channelID string) error {
+	if discordID == "" || channelID == "" {
+		return nil
+	}
+	query := `INSERT OR REPLACE INTO welcome_channels (discord_id, channel_id) VALUES (?, ?)`
+	_, err := s.db.Exec(query, discordID, channelID)
+	return err
+}
+
+func (s *SubscribeStorage) GetWelcomeChannel(discordID string) (string, error) {
+	if discordID == "" {
+		return "", nil
+	}
+	var channelID string
+	err := s.db.QueryRow(`SELECT channel_id FROM welcome_channels WHERE discord_id = ?`, discordID).Scan(&channelID)
+	if err != nil {
+		return "", err
+	}
+	return channelID, nil
+}
+
+func (s *SubscribeStorage) GetDiscordIDByChannel(channelID string) (string, error) {
+	var discordID string
+	err := s.db.QueryRow(`SELECT discord_id FROM subscribe WHERE channel_id = ? AND discord_id != '' LIMIT 1`, channelID).Scan(&discordID)
+	if err != nil {
+		return "", err
+	}
+	return discordID, nil
+}
+
 func (s *SubscribeStorage) IsMythicReportsEnabled(ch string) bool {
 	var isEnabled bool
 	query := `SELECT COALESCE(MAX(is_myth_reps), 0) FROM subscribe WHERE channel_id = ?`
