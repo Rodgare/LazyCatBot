@@ -227,6 +227,27 @@ func (s *SubscribeStorage) GetDiscordIDByChannel(channelID string) (string, erro
 	return discordID, nil
 }
 
+// RemoveChannelSubscriptions deletes every subscription (guild and player) for
+// a channel the bot can no longer write to (Missing Access).
+func (s *SubscribeStorage) RemoveChannelSubscriptions(channelID string) error {
+	if channelID == "" {
+		return nil
+	}
+	tx, err := s.db.Begin()
+	if err != nil {
+		return err
+	}
+	defer tx.Rollback()
+
+	if _, err := tx.Exec(`DELETE FROM subscribe WHERE channel_id = ?`, channelID); err != nil {
+		return err
+	}
+	if _, err := tx.Exec(`DELETE FROM player_subscribe WHERE channel_id = ?`, channelID); err != nil {
+		return err
+	}
+	return tx.Commit()
+}
+
 func (s *SubscribeStorage) IsMythicReportsEnabled(ch string) bool {
 	var isEnabled bool
 	query := `SELECT COALESCE(MAX(is_myth_reps), 0) FROM subscribe WHERE channel_id = ?`

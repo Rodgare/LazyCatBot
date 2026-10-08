@@ -36,6 +36,7 @@ type SubscribeStore interface {
 	IsMythicReportsEnabled(ch string) bool
 	GetWelcomeChannel(discordID string) (string, error)
 	GetDiscordIDByChannel(channelID string) (string, error)
+	RemoveChannelSubscriptions(channelID string) error
 }
 
 func isMissingAccess(err error) bool {
@@ -66,7 +67,8 @@ func (w *Worker) suppressAccess(channelID string) {
 }
 
 // notifyMissingAccess posts a notice to the guild's welcome channel when the bot
-// cannot send reports to a subscribed channel (Missing Access).
+// cannot send reports to a subscribed channel (Missing Access). It should be
+// called while the subscription still exists, so the channel can be resolved.
 func (w *Worker) notifyMissingAccess(channelID string) {
 	discordID, _ := w.subStore.GetDiscordIDByChannel(channelID)
 	welcomeID := ""
@@ -487,7 +489,12 @@ func (w *Worker) processRaids(job KillJob) {
 				if isMissingAccess(err) {
 					w.suppressAccess(ch)
 					w.notifyMissingAccess(ch)
-					w.logger.Warn("[Processor] Missing access for channel (reports kept enabled)", "error", err, "kill_id", job.KillID, "channel", ch)
+					if rmErr := w.subStore.RemoveChannelSubscriptions(ch); rmErr != nil {
+						w.logger.Error("[Processor] Remove inaccessible channel subscriptions err", "error", rmErr, "channel", ch)
+					} else {
+						w.logger.Warn("[Processor] Removed subscriptions for inaccessible channel", "channel", ch)
+					}
+					w.logger.Warn("[Processor] Missing access for channel (subscriptions removed)", "error", err, "kill_id", job.KillID, "channel", ch)
 				} else {
 					w.logger.Error("[Processor] Send kill report err", "error", err, "kill_id", job.KillID, "channel", ch)
 				}
@@ -530,7 +537,12 @@ func (w *Worker) processMythicRuns(job KillJob) {
 				if isMissingAccess(err) {
 					w.suppressAccess(ch)
 					w.notifyMissingAccess(ch)
-					w.logger.Warn("[Processor] Missing access for channel (reports kept enabled)", "error", err, "run_id", job.KillID, "channel", ch)
+					if rmErr := w.subStore.RemoveChannelSubscriptions(ch); rmErr != nil {
+						w.logger.Error("[Processor] Remove inaccessible channel subscriptions err", "error", rmErr, "channel", ch)
+					} else {
+						w.logger.Warn("[Processor] Removed subscriptions for inaccessible channel", "channel", ch)
+					}
+					w.logger.Warn("[Processor] Missing access for channel (subscriptions removed)", "error", err, "run_id", job.KillID, "channel", ch)
 				} else {
 					w.logger.Error("[Processor] Send mythic report err", "error", err, "run_id", job.KillID, "channel", ch)
 				}
