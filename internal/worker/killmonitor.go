@@ -49,11 +49,6 @@ func isMissingAccess(err error) bool {
 
 const missingAccessSuppressInterval = 1800 // seconds (30 min)
 
-// isAccessSuppressed reports whether we already tried to send to this channel
-// and hit Missing Access recently. While suppressed we skip further send
-// attempts for the same channel so a large batch of kills does not spam errors,
-// without touching the report setting in the DB (so reports resume as soon as
-// the user grants permissions).
 func (w *Worker) isAccessSuppressed(channelID string) bool {
 	now := int(time.Now().Unix())
 	if last, ok := w.missingAccessSuppressed[channelID]; ok && now-last < missingAccessSuppressInterval {
@@ -66,9 +61,6 @@ func (w *Worker) suppressAccess(channelID string) {
 	w.missingAccessSuppressed[channelID] = int(time.Now().Unix())
 }
 
-// notifyMissingAccess posts a notice to the guild's welcome channel when the bot
-// cannot send reports to a subscribed channel (Missing Access). It should be
-// called while the subscription still exists, so the channel can be resolved.
 func (w *Worker) notifyMissingAccess(channelID string) {
 	discordID, _ := w.subStore.GetDiscordIDByChannel(channelID)
 	welcomeID := ""
@@ -115,25 +107,21 @@ type KillJob struct {
 }
 
 type Worker struct {
-	sirusClient  SirusAPI
-	lbStore      *storage.LeaderboardStorage
-	mythLbStore  *storage.MythicLeaderboardStorage
-	subStore     SubscribeStore
-	pSubStore    *storage.PlayerSubscribeStorage
-	gmStore      *storage.GuildMembersStorage
-	charStore    *storage.CharacterCacheStorage
-	arStore      *storage.ActualRaidsStorage
-	reporter     Reporter
-	killQueue    chan KillJob
-	charPriority chan PriorityChar
-	apiLimiter   *RateLimiter
-	logger       *slog.Logger
-	cfg          *config.Config
-
-	// In-memory suppression: channelID -> last time (unix) we hit Missing Access.
-	// While suppressed we skip send attempts for the channel to avoid error spam,
-	// but the report setting in the DB is untouched, so reports resume automatically
-	// once the user grants the bot permissions.
+	sirusClient             SirusAPI
+	lbStore                 *storage.LeaderboardStorage
+	mythLbStore             *storage.MythicLeaderboardStorage
+	subStore                SubscribeStore
+	pSubStore               *storage.PlayerSubscribeStorage
+	gmStore                 *storage.GuildMembersStorage
+	charStore               *storage.CharacterCacheStorage
+	arStore                 *storage.ActualRaidsStorage
+	reporter                Reporter
+	killQueue               chan KillJob
+	charPriority            chan PriorityChar
+	apiLimiter              *RateLimiter
+	killApiLimiter          *RateLimiter
+	logger                  *slog.Logger
+	cfg                     *config.Config
 	missingAccessSuppressed map[string]int
 }
 
@@ -161,16 +149,33 @@ func NewWorker(
 		killQueue:               make(chan KillJob, 100),
 		charPriority:            make(chan PriorityChar, 1000),
 		apiLimiter:              NewRateLimiter(2, 1),
+		killApiLimiter:          NewRateLimiter(2, 1),
 		logger:                  logger,
 		cfg:                     cfg,
 		missingAccessSuppressed: make(map[string]int),
 	}
 }
 
-// SetMythicLeaderboardStore wires the optional mythic leaderboard store used by
-// the challenge scores sync and report enrichment.
 func (w *Worker) SetMythicLeaderboardStore(ml *storage.MythicLeaderboardStorage) {
 	w.mythLbStore = ml
+}
+
+const killPollWindowSeconds = 90
+
+const killPollWindow = killPollWindowSeconds * time.Second
+
+func (w *Worker) prepareGuildPollLimiter(guildCount int) {
+	if guildCount <= 1 {
+		w.killApiLimiter = NewRateLimiter(1000, 1)
+		return
+	}
+	rate := guildCount / killPollWindowSeconds
+	if rate < 1 {
+		rate = 1
+	} else if rate > 4 {
+		rate = 4
+	}
+	w.killApiLimiter = NewRateLimiter(rate, 1)
 }
 
 func (w *Worker) GuildKillMonitor(ctx context.Context) {
@@ -189,6 +194,8 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 		default:
 		}
 
+		started := time.Now()
+
 		guilds, err := w.subStore.GetTrackedGuilds()
 		if err != nil {
 			w.logger.Error("[KillMonitor] Getting tracked guilds err", "error", err)
@@ -199,6 +206,8 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 			}
 			continue
 		}
+
+		w.prepareGuildPollLimiter(len(guilds))
 
 		kills, killRealms := w.getGuildKills(guilds)
 		sortedKillsIDs := w.sortKills(kills)
@@ -216,11 +225,15 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 			}
 		}
 
-		select {
-		case <-ctx.Done():
-			w.logger.Info("[KillMonitor] Guild monitor stopped")
-			return
-		case <-time.After(1 * time.Minute):
+		elapsed := time.Since(started)
+		remain := killPollWindow - elapsed
+		if remain > 0 {
+			select {
+			case <-ctx.Done():
+				w.logger.Info("[KillMonitor] Guild monitor stopped")
+				return
+			case <-time.After(remain):
+			}
 		}
 	}
 }
@@ -336,7 +349,7 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 		}
 
 		realm := w.cfg.DefaultRealm
-		w.apiLimiter.Wait()
+		w.killApiLimiter.Wait()
 		latestRuns, err := w.sirusClient.GetLatestMythicRuns(realm)
 		if err != nil {
 			w.logger.Error("[KillMonitor] GetLatestMythicRuns err", "error", err)
@@ -617,7 +630,7 @@ func (w *Worker) getGuildKills(data map[storage.TrackedGuildKey][]string) (map[i
 			defer func() { <-sem }()
 
 			channels := data[key]
-			w.apiLimiter.Wait()
+			w.killApiLimiter.Wait()
 			gKills, err := w.sirusClient.FetchGuildLatestBossKills(key.Realm, key.GuildID)
 			if err != nil {
 				w.logger.Error("[KillMonitor] Fetch Guild Latest BossKills err", "error", err, "guild_id", key.GuildID, "realm", key.Realm)
