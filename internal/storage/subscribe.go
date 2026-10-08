@@ -217,6 +217,10 @@ func (s *SubscribeStorage) GetWelcomeChannel(discordID string) (string, error) {
 func (s *SubscribeStorage) GetDiscordIDByChannel(channelID string) (string, error) {
 	var discordID string
 	err := s.db.QueryRow(`SELECT discord_id FROM subscribe WHERE channel_id = ? AND discord_id != '' LIMIT 1`, channelID).Scan(&discordID)
+	if err == nil && discordID != "" {
+		return discordID, nil
+	}
+	err = s.db.QueryRow(`SELECT discord_id FROM player_subscribe WHERE channel_id = ? AND discord_id != '' LIMIT 1`, channelID).Scan(&discordID)
 	if err != nil {
 		return "", err
 	}
