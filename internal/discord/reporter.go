@@ -13,6 +13,15 @@ import (
 	"github.com/bwmarrin/discordgo"
 )
 
+func formatKilledAt(s string) string {
+	loc := time.FixedZone("MSK", 3*3600)
+	t, err := time.ParseInLocation("2006-01-02 15:04:05", s, loc)
+	if err != nil {
+		return s
+	}
+	return t.Format("02-01-2006 15:04")
+}
+
 var ansiColors = map[string]string{
 	// Базовые (яркие)
 	"red":    "\033[31m",
@@ -91,7 +100,7 @@ func buildFields(report models.BossKillReport, lootsBlock []models.LootReport) [
 
 	fields = append(fields, &discordgo.MessageEmbedField{
 		Name:   "Когда убили",
-		Value:  fmt.Sprintf("%s", report.KilledAt),
+		Value:  formatKilledAt(report.KilledAt),
 		Inline: true,
 	})
 
