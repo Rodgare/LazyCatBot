@@ -759,6 +759,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int, realm string)
 	for _, p := range fight.Data.Players {
 		specName := sirus.GetSpecName(p.ClassID, p.Spec)
 		t4Count := sirus.GetT4Count(p.Itemset)
+		setPieces := sirus.GetSetPieces(p.Itemset)
 		role := sirus.GetRoleString(p.ClassID, p.Spec)
 
 		err := w.lbStore.UpsertPlayer(realm, fight.Order, fight.Encounter, p)
@@ -775,6 +776,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int, realm string)
 			ClassID:  p.ClassID,
 			SpecName: specName,
 			T4:       t4Count,
+			SetPieces: setPieces,
 			Role:     sirus.GetRole(p.ClassID, p.Spec),
 			Zodiac:   p.Zodiac.ID,
 			Category: p.Category,

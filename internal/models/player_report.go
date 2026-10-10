@@ -18,6 +18,7 @@ type PlayerReport struct {
 	Role              int
 	ClassID           int
 	T4                int
+	SetPieces         string
 	Zodiac            int
 	Category          int
 	MythicRating      float64

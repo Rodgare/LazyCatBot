@@ -19,6 +19,77 @@ func GetT4Count(itemset []models.Itemset) int {
 	return 0
 }
 
+func getTierByID(setID int) int {
+	return GetSetTierForID(setID)
+}
+
+func GetItemsetTier(set models.Itemset) int {
+	if tier := getTierByID(set.Id); tier > 0 {
+		return tier
+	}
+
+	for t := 4; t <= 6; t++ {
+		if strings.Contains(set.Name, fmt.Sprintf("Тир %d", t)) {
+			return t
+		}
+		if strings.Contains(set.Name, fmt.Sprintf("Tier %d", t)) {
+			return t
+		}
+	}
+
+	return 0
+}
+
+func formatSetPieces(tiers map[int]int) string {
+	var keys []int
+	for t, count := range tiers {
+		if count > 0 {
+			keys = append(keys, t)
+		}
+	}
+	slices.SortFunc(keys, func(a, b int) int { return a - b })
+
+	var parts []string
+	for _, t := range keys {
+		parts = append(parts, fmt.Sprintf("%dт%d", tiers[t], t))
+	}
+
+	return strings.Join(parts, " ")
+}
+
+func addToTierCount(tiers map[int]int, tier, count int) {
+	if _, ok := tiers[tier]; ok {
+		tiers[tier] += count
+	} else {
+		tiers[tier] = count
+	}
+}
+
+func GetSetPieces(itemset []models.Itemset) string {
+	tiers := make(map[int]int)
+	for _, set := range itemset {
+		tier := GetItemsetTier(set)
+		if tier > 0 {
+			addToTierCount(tiers, tier, set.Count)
+		}
+	}
+
+	return formatSetPieces(tiers)
+}
+
+func GetSetPiecesForLeaderboard(itemset [][]int) string {
+	tiers := make(map[int]int)
+	for _, pair := range itemset {
+		if len(pair) == 2 {
+			if tier := getTierByID(pair[0]); tier > 0 {
+				addToTierCount(tiers, tier, pair[1])
+			}
+		}
+	}
+
+	return formatSetPieces(tiers)
+}
+
 func GetT4CountForLeaderboard(itemset [][]int) int {
 	res := 0
 	for _, set := range itemset {

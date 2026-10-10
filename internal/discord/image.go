@@ -222,7 +222,7 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 	}
 
 	dc.DrawString("Созв", colZodiacX-3, y+20)
-	dc.DrawString("t4", ColSetX, y+20)
+	dc.DrawString("Сет", ColSetX, y+20)
 	dc.DrawString("Спек/Илвл", colIlvlRankX-10, y+20)
 	dc.DrawString("Спек", colSpecRankX, y+20)
 	dc.DrawString("Класс", colClassRankX, y+20)
@@ -398,9 +398,12 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	dc.SetRGB(0.8, 0.8, 0.8)
 	dc.DrawString(fmt.Sprintf("%d", p.Ilvl), colIlvlX, y+25)
 
-	//T4
-	dc.SetRGB(0.7, 0.2, 1.0)
-	dc.DrawString(fmt.Sprintf("%d", p.T4), ColSetX+5, y+25)
+	if p.SetPieces != "" {
+		loadCyrillicFontFace(dc, 13)
+		dc.SetRGB(0.7, 0.2, 1.0)
+		dc.DrawString(p.SetPieces, ColSetX+5, y+25)
+		loadCyrillicFontFace(dc, 17)
+	}
 
 	val := p.Dps
 	if !isDD {

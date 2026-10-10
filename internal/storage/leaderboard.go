@@ -39,8 +39,8 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, e
 		return err
 	}
 
-	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, guild_id, zodiac, category, t4, role, dps, hps, realm) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+	stmt, err := tx.Prepare(`INSERT OR IGNORE INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, guild_id, zodiac, category, t4, set_pieces, role, dps, hps, realm) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -50,7 +50,8 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, e
 
 	for _, p := range players {
 		t4 := sirus.GetT4CountForLeaderboard(p.Itemset)
-		_, err = stmt.Exec(raidOrder, encounter, p.ClassID, p.SpecID, p.Name, p.Ilvl, p.GuildID, p.Zodiac.ID, p.Category, t4, role, p.Dps, p.Hps, realm)
+		setPieces := sirus.GetSetPiecesForLeaderboard(p.Itemset)
+		_, err = stmt.Exec(raidOrder, encounter, p.ClassID, p.SpecID, p.Name, p.Ilvl, p.GuildID, p.Zodiac.ID, p.Category, t4, setPieces, role, p.Dps, p.Hps, realm)
 
 		if err != nil {
 			return err
@@ -74,21 +75,23 @@ func (s *LeaderboardStorage) UpsertPlayer(realm string, raid, boss int, p models
 		condition = "excluded.hps > leaderboard.hps"
 	}
 	t4 := sirus.GetT4Count(p.Itemset)
+	setPieces := sirus.GetSetPieces(p.Itemset)
 
 	query := fmt.Sprintf(`
-		INSERT INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, guild_id, zodiac, category, t4, role, dps, hps, realm) 
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		INSERT INTO leaderboard (raid_id, boss_id, class_id, spec_id, player_name, ilvl, guild_id, zodiac, category, t4, set_pieces, role, dps, hps, realm) 
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 		ON CONFLICT(raid_id, boss_id, class_id, spec_id, player_name, realm) 
 		DO UPDATE SET 
     		ilvl = excluded.ilvl,
 			zodiac = excluded.zodiac,
 			category = excluded.category,
 			t4 = excluded.t4,
+			set_pieces = excluded.set_pieces,
     		dps = excluded.dps,
     		hps = excluded.hps
 		WHERE %s;
 	`, condition)
-	_, err := s.db.Exec(query, raid, boss, p.ClassID, p.Spec, p.Name, p.Ilvl, p.Guild.ID, p.Zodiac.ID, p.Category, t4, role, p.Dps, p.Hps, realm)
+	_, err := s.db.Exec(query, raid, boss, p.ClassID, p.Spec, p.Name, p.Ilvl, p.Guild.ID, p.Zodiac.ID, p.Category, t4, setPieces, role, p.Dps, p.Hps, realm)
 	return err
 }
 
@@ -172,7 +175,7 @@ func (s *LeaderboardStorage) GetBossTop(realm string, raidID, bossID, guildID in
 	}
 
 	query := fmt.Sprintf(`
-		SELECT l.player_name, l.class_id, l.spec_id, l.ilvl, l.zodiac, l.category, l.t4, l.dps, l.hps,
+		SELECT l.player_name, l.class_id, l.spec_id, l.ilvl, l.zodiac, l.category, l.t4, l.set_pieces, l.dps, l.hps,
 		       COALESCE(cc.black_diamonds, 0), COALESCE(cc.title, '')
 		FROM leaderboard l
 		JOIN guild_members gm ON l.player_name = gm.name AND COALESCE(l.realm, 'x3') = COALESCE(gm.realm, 'x3')
@@ -194,7 +197,7 @@ func (s *LeaderboardStorage) GetBossTop(realm string, raidID, bossID, guildID in
 	var players []models.PlayerReport
 	for rows.Next() {
 		var p models.PlayerReport
-		err := rows.Scan(&p.Name, &p.ClassID, &p.SpecID, &p.Ilvl, &p.Zodiac, &p.Category, &p.T4, &p.Dps, &p.Hps, &p.BlackDiamonds, &p.Title)
+		err := rows.Scan(&p.Name, &p.ClassID, &p.SpecID, &p.Ilvl, &p.Zodiac, &p.Category, &p.T4, &p.SetPieces, &p.Dps, &p.Hps, &p.BlackDiamonds, &p.Title)
 		if err != nil {
 			return nil, err
 		}
