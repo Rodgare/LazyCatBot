@@ -10,6 +10,7 @@ import (
 	_ "image/png"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/fogleman/gg"
 )
@@ -27,7 +28,7 @@ const (
 	colIlvlX        = 260
 	colDiamondX     = 305
 	colZodiacX      = 335
-	ColSetX         = 375
+	ColSetX         = 370
 	colDpsX         = 410
 	colIlvlRankX    = 480
 	colSpecRankX    = 570
@@ -221,7 +222,7 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 		fmt.Printf("Error: file %s not found in embed\n", diamondFileData)
 	}
 
-	dc.DrawString("Созв", colZodiacX-3, y+20)
+	// dc.DrawString("Созв", colZodiacX-3, y+20)
 	dc.DrawString("Сет", ColSetX, y+20)
 	dc.DrawString("Спек/Илвл", colIlvlRankX-10, y+20)
 	dc.DrawString("Спек", colSpecRankX, y+20)
@@ -399,10 +400,16 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	dc.DrawString(fmt.Sprintf("%d", p.Ilvl), colIlvlX, y+25)
 
 	if p.SetPieces != "" {
-		loadCyrillicFontFace(dc, 13)
 		dc.SetRGB(0.7, 0.2, 1.0)
-		dc.DrawString(p.SetPieces, ColSetX+5, y+25)
-		loadCyrillicFontFace(dc, 17)
+		parts := strings.Split(p.SetPieces, " ")
+		if len(parts) == 2 {
+			loadCyrillicFontFace(dc, 15)
+			dc.DrawString(parts[0], ColSetX, y+18)
+			dc.DrawString(parts[1], ColSetX, y+31)
+			loadCyrillicFontFace(dc, 17)
+		} else {
+			dc.DrawString(p.SetPieces, ColSetX, y+25)
+		}
 	}
 
 	val := p.Dps
