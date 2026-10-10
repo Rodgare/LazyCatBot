@@ -49,6 +49,13 @@ func isBlackDiamond(entry int) bool {
 	if entry >= 100700 && entry <= 100885 {
 		return true
 	}
+	if entry >= 260050 && entry <= 260071 {
+		return true
+	}
+
+	if entry >= 104000 && entry <= 104019 {
+		return true
+	}
 	return false
 }
 
