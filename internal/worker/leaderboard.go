@@ -9,7 +9,7 @@ import (
 
 func (w *Worker) StartLeaderboardSync() {
 	w.logger.Info("Starting leaderboard sync system...")
-	realms := []string{"x3", "x5"}
+	realms := w.cfg.Realms
 	syncDate := time.Now().In(time.FixedZone("MSK", 3*3600)).Format("2006-01-02")
 
 	for _, r := range realms {
@@ -19,14 +19,24 @@ func (w *Worker) StartLeaderboardSync() {
 			continue
 		}
 
+		onlyActual := w.cfg.IsSecondaryRealm(r)
+
 		w.arStore.ResetActualRaids(r)
 
 		for _, raid := range actualRaids {
-			for bossID, encounter := range raid.Encounters {
-				if raid.Actual && !sirus.IsRaidBannedForDpsMeter(raid.Order) {
+			if onlyActual && !raid.Actual {
+				w.logger.Info("Skipping non-actual raid on secondary realm",
+					"realm", r, "raid_id", raid.Order, "raid_name", raid.MapName)
+				continue
+			}
+
+			if raid.Actual && !sirus.IsRaidBannedForDpsMeter(raid.Order) {
+				for bossID := range raid.Encounters {
 					w.arStore.UpdateActualRaids(raid.Order, bossID, r)
 				}
+			}
 
+			for bossID, encounter := range raid.Encounters {
 				classes := sirus.GetSpecs()
 
 				for classID, specs := range classes {

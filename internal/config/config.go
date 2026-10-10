@@ -7,13 +7,15 @@ import (
 )
 
 type Config struct {
-	DiscordToken   string
-	DebugChannelID string
-	IsDebug        bool
-	SirusBaseURLs  []string
-	DefaultRealm   string
-	MythicSeason   int
-	MythicWeekID   int
+	DiscordToken    string
+	DebugChannelID  string
+	IsDebug         bool
+	SirusBaseURLs   []string
+	DefaultRealm    string
+	Realms          []string
+	SecondaryRealms []string
+	MythicSeason    int
+	MythicWeekID    int
 }
 
 func LoadConfig() *Config {
@@ -31,14 +33,31 @@ func LoadConfig() *Config {
 	cleanedURLs := cleanURLs(sirusURLs)
 
 	return &Config{
-		DiscordToken:   os.Getenv("DISCORD_TOKEN"),
-		DebugChannelID: os.Getenv("DEBUG_CHANNEL_ID"),
-		IsDebug:        isDebug,
-		SirusBaseURLs:  cleanedURLs,
-		DefaultRealm:   getDefaultRealm(),
-		MythicSeason:   getIntEnv("SIRUS_MYTHIC_SEASON", 6),
-		MythicWeekID:   getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
+		DiscordToken:    os.Getenv("DISCORD_TOKEN"),
+		DebugChannelID:  os.Getenv("DEBUG_CHANNEL_ID"),
+		IsDebug:         isDebug,
+		SirusBaseURLs:   cleanedURLs,
+		DefaultRealm:    getDefaultRealm(),
+		Realms:          getStringListEnv("SIRUS_REALMS", []string{"x3", "x5"}),
+		SecondaryRealms: getStringListEnv("SIRUS_SECONDARY_REALMS", []string{"x5"}),
+		MythicSeason:    getIntEnv("SIRUS_MYTHIC_SEASON", 6),
+		MythicWeekID:    getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
 	}
+}
+
+func getStringListEnv(key string, def []string) []string {
+	v := os.Getenv(key)
+	if v == "" {
+		return def
+	}
+	var parts []string
+	for _, s := range strings.Split(v, ",") {
+		t := strings.TrimSpace(s)
+		if t != "" {
+			parts = append(parts, t)
+		}
+	}
+	return parts
 }
 
 func getIntEnv(key string, def int) int {
@@ -63,6 +82,17 @@ func getDefaultRealm() string {
 
 func (c *Config) GetSirusURLs() []string {
 	return c.SirusBaseURLs
+}
+
+// IsSecondaryRealm reports whether realm is a secondary server that must only
+// parse actual (current) raids instead of the full history.
+func (c *Config) IsSecondaryRealm(realm string) bool {
+	for _, r := range c.SecondaryRealms {
+		if r == realm {
+			return true
+		}
+	}
+	return false
 }
 
 func cleanURLs(urls []string) []string {
