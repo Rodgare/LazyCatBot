@@ -119,6 +119,25 @@ func (w *Worker) syncRealm(r string, force bool) {
 	}
 }
 
+// RequestLeaderboardSync starts a leaderboard resync in the background, targeting
+// a single realm (empty = all configured realms). With force=true it re-parses
+// even combos already marked synced for today. Admin command entry point.
+func (w *Worker) RequestLeaderboardSync(realm string, force bool) {
+	go func() {
+		w.resyncMu.Lock()
+		defer w.resyncMu.Unlock()
+		realms := w.cfg.Realms
+		if realm != "" {
+			realms = []string{realm}
+		}
+		w.logger.Info("Leaderboard resync via admin command", "realms", realms, "force", force)
+		for _, r := range realms {
+			w.syncRealm(r, force)
+		}
+		w.logger.Info("Leaderboard resync finished")
+	}()
+}
+
 func (w *Worker) StartCronScheduler() {
 	msk := time.FixedZone("MSK", 3*3600)
 

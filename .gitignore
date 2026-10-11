@@ -11,3 +11,4 @@ bot_test.exe
 .vscode/justybase-favorites.json
 .gitignore
 bot.exe~
+bot_linux

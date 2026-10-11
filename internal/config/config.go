@@ -10,6 +10,7 @@ type Config struct {
 	DiscordToken    string
 	DebugChannelID  string
 	IsDebug         bool
+	AdminUserID     string
 	SirusBaseURLs   []string
 	DefaultRealm    string
 	Realms          []string
@@ -39,6 +40,7 @@ func LoadConfig() *Config {
 		DiscordToken:    os.Getenv("DISCORD_TOKEN"),
 		DebugChannelID:  os.Getenv("DEBUG_CHANNEL_ID"),
 		IsDebug:         isDebug,
+		AdminUserID:     getStringEnv("ADMIN_USER_ID", "195175537356963840"),
 		SirusBaseURLs:   cleanedURLs,
 		DefaultRealm:    getDefaultRealm(),
 		Realms:          getStringListEnv("SIRUS_REALMS", []string{"x3", "x5"}),
@@ -49,6 +51,13 @@ func LoadConfig() *Config {
 		MythicSeason:    getIntEnv("SIRUS_MYTHIC_SEASON", 6),
 		MythicWeekID:    getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
 	}
+}
+
+func getStringEnv(key string, def string) string {
+	if v := os.Getenv(key); v != "" {
+		return v
+	}
+	return def
 }
 
 func getStringListEnv(key string, def []string) []string {

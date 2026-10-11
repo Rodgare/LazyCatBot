@@ -123,6 +123,7 @@ type Worker struct {
 	logger                  *slog.Logger
 	cfg                     *config.Config
 	missingAccessSuppressed map[string]int
+	resyncMu                sync.Mutex
 }
 
 func NewWorker(

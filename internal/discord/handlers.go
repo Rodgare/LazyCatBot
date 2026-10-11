@@ -20,6 +20,8 @@ type BotHandler struct {
 	arStore        *storage.ActualRaidsStorage
 	MythicStore    *storage.MythicLeaderboardStorage
 	Logger         *slog.Logger
+	AdminUserID    string
+	ResyncFunc     func(realm string, force bool)
 }
 
 func NewHandler(
@@ -707,11 +709,71 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 							"Например  в гильдии есть статик десятки смешанный с пугами, и сирус не засчитывает их килы как гильдейские. " +
 							"Вы можете отслеживать РЛа этого статика по его нику и бот будет присылать отчеты килов этого статика.",
 						Color: 0xf1c40f,
+						Fields: []*discordgo.MessageEmbedField{
+							{
+								Name:   "⚙️ Команды администратора",
+								Value:  "**/resync** — Пересчитать рейтинги. Параметры: `realm` (напр. `x5`, пусто = все) и `force` (true — игнорировать уже синхронизированное за сегодня).",
+							},
+						},
 					},
 				},
 			},
 		})
+
+	case "resync":
+		if !h.isAdmin(i) {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "⛔ У вас нет прав на эту команду.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			return
+		}
+		if h.ResyncFunc == nil {
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "❌ Функция пересчёта не подключена.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			return
+		}
+		var realm string
+		force := false
+		for _, o := range data.Options {
+			switch o.Name {
+			case "realm":
+				realm = o.StringValue()
+			case "force":
+				force = o.BoolValue()
+			}
+		}
+		desc := "все серверы"
+		if realm != "" {
+			desc = realm
+		}
+		h.ResyncFunc(realm, force)
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: fmt.Sprintf("🔄 Запущен пересчёт рейтингов: **%s** (force=%v).", desc, force),
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
 	}
+}
+
+func (h *BotHandler) isAdmin(i *discordgo.InteractionCreate) bool {
+	uid := ""
+	if i.Member != nil && i.Member.User != nil {
+		uid = i.Member.User.ID
+	} else if i.User != nil {
+		uid = i.User.ID
+	}
+	return uid != "" && uid == h.AdminUserID
 }
 
 func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate) {

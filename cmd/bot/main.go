@@ -135,6 +135,8 @@ func main() {
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 
 	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, arStore, mythLbStore, logger)
+	h.AdminUserID = appCfg.AdminUserID
+	h.ResyncFunc = killWorker.RequestLeaderboardSync
 
 	dg.AddHandler(h.InteractionCreate)
 	if !appCfg.IsDebug {
@@ -177,6 +179,25 @@ func main() {
 		{
 			Name:        "listcats",
 			Description: "Список отслеживаемых игроков в данном канале",
+		},
+		{
+			Name:        "resync",
+			Description: "Пересчитать рейтинги (только администратор)",
+			DefaultMemberPermissions: &manageChannelsPerm,
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Name:        "realm",
+					Description: "Сервер (x3/x5); пусто = все",
+					Type:        discordgo.ApplicationCommandOptionString,
+					Required:    false,
+				},
+				{
+					Name:        "force",
+					Description: "Игнорировать уже синхронизированное за сегодня",
+					Type:        discordgo.ApplicationCommandOptionBoolean,
+					Required:    false,
+				},
+			},
 		},
 	}
 
