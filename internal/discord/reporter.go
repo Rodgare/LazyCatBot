@@ -141,26 +141,39 @@ func buildFields(report models.BossKillReport, lootsBlock []models.LootReport) [
 	// })
 
 	if len(lootsBlock) > 0 {
-		var sb strings.Builder
-
+		var lines []string
+		totalItems := 0
 		for _, item := range lootsBlock {
-			if item.Name != "" {
-				fmt.Fprintf(&sb, "x%d [%s](https://sirus.su/base/item/%d/%s)\n",
-					item.Count, item.Name, item.ID, report.Realm)
+			if item.Name == "" {
+				continue
 			}
+			totalItems++
+			lines = append(lines, fmt.Sprintf("x%d [%s](https://sirus.su/base/item/%d/%s)\n",
+				item.Count, item.Name, item.ID, report.Realm))
 		}
-		if sb.Len() > 0 {
+
+		if totalItems > 0 {
+			const limit = 1024
+			var sb strings.Builder
+			shown := 0
+			for _, line := range lines {
+				if sb.Len()+len(line) > limit {
+					break
+				}
+				sb.WriteString(line)
+				shown++
+			}
+			if remaining := totalItems - shown; remaining > 0 {
+				note := fmt.Sprintf("…и ещё %d", remaining)
+				if sb.Len()+len(note) <= limit {
+					sb.WriteString(note)
+				}
+			}
 			fields = append(fields, &discordgo.MessageEmbedField{
 				Name:   "Лут",
 				Value:  sb.String(),
 				Inline: false,
 			})
-
-			// fields = append(fields, &discordgo.MessageEmbedField{
-			// 	Name:   "\u200B",
-			// 	Value:  "\u200B",
-			// 	Inline: false,
-			// })
 		}
 	}
 
