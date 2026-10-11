@@ -14,6 +14,9 @@ type Config struct {
 	DefaultRealm    string
 	Realms          []string
 	SecondaryRealms []string
+	SyncOnStart     bool
+	SyncRealms      []string
+	SyncForce       bool
 	MythicSeason    int
 	MythicWeekID    int
 }
@@ -40,6 +43,9 @@ func LoadConfig() *Config {
 		DefaultRealm:    getDefaultRealm(),
 		Realms:          getStringListEnv("SIRUS_REALMS", []string{"x3", "x5"}),
 		SecondaryRealms: getStringListEnv("SIRUS_SECONDARY_REALMS", []string{"x5"}),
+		SyncOnStart:     os.Getenv("SYNC_LEADERBOARD_ON_START") == "true",
+		SyncRealms:      getStringListEnv("SYNC_LEADERBOARD_REALMS", nil),
+		SyncForce:       os.Getenv("SYNC_LEADERBOARD_FORCE") == "true",
 		MythicSeason:    getIntEnv("SIRUS_MYTHIC_SEASON", 6),
 		MythicWeekID:    getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
 	}
