@@ -40,7 +40,7 @@ func LoadConfig() *Config {
 		DiscordToken:    os.Getenv("DISCORD_TOKEN"),
 		DebugChannelID:  os.Getenv("DEBUG_CHANNEL_ID"),
 		IsDebug:         isDebug,
-		AdminUserID:     getStringEnv("ADMIN_USER_ID", "195175537356963840"),
+		AdminUserID:     os.Getenv("ADMIN_USER_ID"),
 		SirusBaseURLs:   cleanedURLs,
 		DefaultRealm:    getDefaultRealm(),
 		Realms:          getStringListEnv("SIRUS_REALMS", []string{"x3", "x5"}),
