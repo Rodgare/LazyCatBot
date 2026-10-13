@@ -60,6 +60,28 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.ModalSubmitData()
 
+	if data.CustomID == "confirm_remove_channel" {
+		if err := h.SubStore.RemoveChannelData(i.ChannelID); err != nil {
+			h.Logger.Error("Remove channel data error", "error", err, "channel_id", i.ChannelID)
+			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+				Type: discordgo.InteractionResponseChannelMessageWithSource,
+				Data: &discordgo.InteractionResponseData{
+					Content: "❌ Ошибка при удалении канала из отслеживания.",
+					Flags:   discordgo.MessageFlagsEphemeral,
+				},
+			})
+			return
+		}
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "🗑️ Канал полностью убран из отслеживания: гильдии, игроки и отчёты удалены.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
 	l := h.Logger.With(
 		"command_modal", data.CustomID,
 		"guild_id", i.GuildID,
@@ -699,11 +721,12 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 							"Бот сразу начнёт мониторинг. Если отчёт отправился — всё работает, можно в /menu отключить лишние типы отчётов.\n\n" +
 
 							"**Команды:**\n" +
-							"**/menu** Вызывает меню с настройкой подписок бота, трекинга и т.д.\n" +
+							"**/menu** Вызывает меню с настройкой подписок бота, трекинга и т.д. (Требует права Управление каналами)\n" +
 							"**/top** Открывает меню с кнопками, нажав на которые можно отправить рейтинги по чек боссам среди игроков гильдии.\n" +
 							"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
 							"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 							"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
+							"**/removechannel** — Полностью убрать этот канал из отслеживания (гильдии, игроки, отчёты). Требует права Управление каналами.\n" +
 							"**/help** — Показать это сообщение.\n" +
 							"Бот может следить как за гильдиями так и за конкретными игроками. " +
 							"Например  в гильдии есть статик десятки смешанный с пугами, и сирус не засчитывает их килы как гильдейские. " +
@@ -711,14 +734,39 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 						Color: 0xf1c40f,
 						Fields: []*discordgo.MessageEmbedField{
 							{
-								Name:   "⚙️ Команды администратора",
-								Value:  "**/resync** — Пересчитать рейтинги. Параметры: `realm` (напр. `x5`, пусто = все) и `force` (true — игнорировать уже синхронизированное за сегодня).",
+								Name:  "⚙️ Команды администратора",
+								Value: "**/resync** — Пересчитать рейтинги. Параметры: `realm` (напр. `x5`, пусто = все) и `force` (true — игнорировать уже синхронизированное за сегодня).",
 							},
 						},
 					},
 				},
 			},
 		})
+
+	case "removechannel":
+		err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseModal,
+			Data: &discordgo.InteractionResponseData{
+				CustomID: "confirm_remove_channel",
+				Title:    "Удалить канал из отслеживания",
+				Components: []discordgo.MessageComponent{
+					discordgo.ActionsRow{
+						Components: []discordgo.MessageComponent{
+							discordgo.TextInput{
+								CustomID: "confirm_warning",
+								Label:    "Предупреждение",
+								Style:    discordgo.TextInputParagraph,
+								Required: false,
+								Value:    "Бот безвозвратно удалит ВСЁ, что связано с этим каналом: подписки на гильдии и игроков, историю отправленных отчётов и настройки канала. Действие нельзя отменить. Нажмите «Отправить», чтобы подтвердить удаление, или закройте это окно, чтобы отказаться.",
+							},
+						},
+					},
+				},
+			},
+		})
+		if err != nil {
+			h.Logger.Error("Remove channel: open confirm modal error", "error", err, "channel_id", channelID)
+		}
 
 	case "resync":
 		if !h.isAdmin(i) {
@@ -807,19 +855,18 @@ func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate)
 
 	embed := &discordgo.MessageEmbed{
 		Title: "🐈 Справка LazyCatBot",
-		Description: "**⚠️ Не приходят отчёты?** Проверьте, что у бота есть права **Просмотр канала** и **Отправка сообщений** в этом канале. Без них бот не сможет писать сюда.\n\n" +
-
-			"**Настройка бота:**\n" +
+		Description: "**Настройка бота:**\n" +
 			"1. Создайте текстовый канал (например, #raid-alerts) и **выдайте боту права на чтение и отправку сообщений в него**.\n" +
 			"2. В этом канале введите /menu — откроется меню с кнопками.\n" +
 			"3. Нажмите «Добавить гильдию», выберите сервер и введите ID гильдии. Аналогично можно добавить игрока через «Добавить игрока».\n\n" +
 
 			"**Команды:**\n" +
-			"**/menu** Вызывает меню с настройкой подписок бота, трекинга и т.д.\n" +
+			"**/menu** Вызывает меню с настройкой подписок бота, трекинга и т.д. (Требует права Управление каналами.)\n" +
 			"**/top** Открывает меню с кнопками, нажав на которые можно отправить рейтинги по чек боссам среди игроков гильдии.\n" +
 			"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
 			"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 			"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
+			"**/removechannel** — Полностью убрать этот канал из отслеживания (гильдии, игроки, отчёты). Требует права Управление каналами.\n" +
 			"**/help** — Показать это сообщение.\n",
 
 		Color: 0xf1c40f,

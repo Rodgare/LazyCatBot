@@ -181,6 +181,11 @@ func main() {
 			Description: "Список отслеживаемых игроков в данном канале",
 		},
 		{
+			Name:                     "removechannel",
+			Description:              "Полностью удалить этот канал из отслеживания (гильдии, игроки, отчёты)",
+			DefaultMemberPermissions: &manageChannelsPerm,
+		},
+		{
 			Name:        "resync",
 			Description: "Пересчитать рейтинги (только администратор)",
 			DefaultMemberPermissions: &manageChannelsPerm,

@@ -227,9 +227,10 @@ func (s *SubscribeStorage) GetDiscordIDByChannel(channelID string) (string, erro
 	return discordID, nil
 }
 
-// RemoveChannelSubscriptions deletes every subscription (guild and player) for
-// a channel the bot can no longer write to (Missing Access).
-func (s *SubscribeStorage) RemoveChannelSubscriptions(channelID string) error {
+// RemoveChannelData deletes every row tied to a channel: guild/player
+// subscriptions, processed-kill dedup markers and the welcome-channel pointer.
+// Channel-independent data (leaderboard, guild_members, caches) is left intact.
+func (s *SubscribeStorage) RemoveChannelData(channelID string) error {
 	if channelID == "" {
 		return nil
 	}
@@ -239,13 +240,23 @@ func (s *SubscribeStorage) RemoveChannelSubscriptions(channelID string) error {
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec(`DELETE FROM subscribe WHERE channel_id = ?`, channelID); err != nil {
-		return err
-	}
-	if _, err := tx.Exec(`DELETE FROM player_subscribe WHERE channel_id = ?`, channelID); err != nil {
-		return err
+	for _, stmt := range []string{
+		`DELETE FROM subscribe WHERE channel_id = ?`,
+		`DELETE FROM player_subscribe WHERE channel_id = ?`,
+		`DELETE FROM processed_kills WHERE channel_id = ?`,
+		`DELETE FROM welcome_channels WHERE channel_id = ?`,
+	} {
+		if _, err := tx.Exec(stmt, channelID); err != nil {
+			return err
+		}
 	}
 	return tx.Commit()
+}
+
+// RemoveChannelSubscriptions deletes every subscription (guild and player) for
+// a channel the bot can no longer write to (Missing Access).
+func (s *SubscribeStorage) RemoveChannelSubscriptions(channelID string) error {
+	return s.RemoveChannelData(channelID)
 }
 
 func (s *SubscribeStorage) IsMythicReportsEnabled(ch string) bool {
