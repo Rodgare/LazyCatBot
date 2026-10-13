@@ -92,7 +92,7 @@ type SirusAPI interface {
 	FetchGuildMembers(realm string, guildID int) (*[]models.GuildMembers, string, error)
 	FetchCharacter(realm string, id int) (*models.CharacterData, error)
 	FetchActualRaids(realm string) (models.ActualSirusRaids, error)
-	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error)
+	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, bool, error)
 	GetLatestMythicRuns(realm string) (*models.MythicRuns, error)
 	FetchMythicRunDetails(realm string, runID int) (*models.MythicRun, error)
 	FetchChallengeScores(realm string, season, weekID int) ([]models.MythicScorePlayer, error)

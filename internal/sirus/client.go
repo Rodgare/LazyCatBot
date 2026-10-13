@@ -57,30 +57,51 @@ func (c *Client) GetPage(realm string, raidID, bossID, classID, specID int, role
 	return &res, nil
 }
 
-func (c *Client) FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, error) {
+func (c *Client) FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, bool, error) {
 	var allPlayers []models.LeaderboardPlayer
 
 	firstPage, err := c.GetPage(realm, raidID, bossID, classID, specID, role, 1)
 	if err != nil {
 		time.Sleep(15 * time.Second)
-		return nil, err
+		return nil, false, err
 	}
 	time.Sleep(2 * time.Second)
 	allPlayers = append(allPlayers, firstPage.Data...)
 	totalPages := firstPage.Meta.LastPage
+	complete := true
 
 	for p := 2; p <= totalPages; p++ {
-		nextPage, err := c.GetPage(realm, raidID, bossID, classID, specID, role, p)
-
+		nextPage, err := c.fetchPageWithRetry(realm, raidID, bossID, classID, specID, role, p)
 		if err != nil {
 			c.logger.Error("Error fetch leaderboard", "error", err, "page", p)
-			break
+			complete = false
+			time.Sleep(5 * time.Second)
+			continue
 		}
 		allPlayers = append(allPlayers, nextPage.Data...)
 		time.Sleep(2 * time.Second)
 	}
 
-	return allPlayers, nil
+	return allPlayers, complete, nil
+}
+
+// fetchPageWithRetry re-attempts a leaderboard page a few times so a transient
+// API hiccup does not truncate the parse; the last error is returned if all
+// attempts fail.
+func (c *Client) fetchPageWithRetry(realm string, raidID, bossID, classID, specID int, role string, page int) (*models.Leaderboard, error) {
+	backoff := 5 * time.Second
+	var err error
+	for try := 1; try <= 3; try++ {
+		var p *models.Leaderboard
+		p, err = c.GetPage(realm, raidID, bossID, classID, specID, role, page)
+		if err == nil {
+			return p, nil
+		}
+		c.logger.Error("Leaderboard page retry", "error", err, "page", page, "try", try)
+		time.Sleep(backoff)
+		backoff *= 2
+	}
+	return nil, err
 }
 
 func (c *Client) FetchActualRaids(realm string) (models.ActualSirusRaids, error) {
@@ -245,7 +266,7 @@ func (c *Client) calculateSirusDates(now time.Time) (string, string) {
 	if daysSinceThursday < 0 {
 		daysSinceThursday += 7
 	}
-	lastThursday := now.AddDate(0, 0, -daysSinceThursday-7)
+	lastThursday := now.AddDate(0, 0, -daysSinceThursday-14)
 
 	weekFrom := lastThursday.Format("2006-01-02")
 

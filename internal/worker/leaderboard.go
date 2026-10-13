@@ -85,7 +85,7 @@ func (w *Worker) syncRealm(r string, force bool) {
 					l.Info("Start parsing boss leaderboard")
 
 					role := sirus.GetRoleString(classID, specID)
-					players, err := w.sirusClient.FetchLeaderboard(r, raid.Order, bossID, classID, specID, role)
+					players, complete, err := w.sirusClient.FetchLeaderboard(r, raid.Order, bossID, classID, specID, role)
 					if err != nil {
 						l.Error("Fetch leaderboard error", "error", err)
 						time.Sleep(2 * time.Second)
@@ -102,6 +102,11 @@ func (w *Worker) syncRealm(r string, force bool) {
 					if err != nil {
 						l.Error("Error saving to database", "error", err)
 						time.Sleep(5 * time.Second)
+						continue
+					}
+
+					if !complete {
+						l.Warn("Leaderboard parse incomplete, leaving combo unsynced for retry")
 						continue
 					}
 
