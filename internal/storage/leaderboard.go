@@ -48,7 +48,24 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, e
 
 	role := sirus.GetRoleString(classID, specID)
 
+	keep := make(map[string]models.LeaderboardPlayer, len(players))
 	for _, p := range players {
+		prev, ok := keep[p.Name]
+		if !ok {
+			keep[p.Name] = p
+			continue
+		}
+		better := p.Dps > prev.Dps
+		if role == "hps" {
+			better = p.Hps > prev.Hps
+		}
+		if better {
+			keep[p.Name] = p
+		}
+	}
+
+	saved := 0
+	for _, p := range keep {
 		t4 := sirus.GetT4CountForLeaderboard(p.Itemset)
 		setPieces := sirus.GetSetPiecesForLeaderboard(p.Itemset)
 		_, err = stmt.Exec(raidOrder, encounter, p.ClassID, p.SpecID, p.Name, p.Ilvl, p.GuildID, p.Zodiac.ID, p.Category, t4, setPieces, role, p.Dps, p.Hps, realm)
@@ -56,11 +73,14 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, e
 		if err != nil {
 			return err
 		}
+		saved++
 	}
 
 	err = tx.Commit()
 	if err == nil {
-		s.logger.Info("[DB] Successfully saved", "realm", realm, "players_count", len(players), "raid_id", raidOrder, "boss_id", encounter, "class_id", classID, "spec_id", specID)
+		s.logger.Info("[DB] Successfully saved",
+			"realm", realm, "players_count", saved, "parses", len(players), "duplicates", len(players)-saved,
+			"raid_id", raidOrder, "boss_id", encounter, "class_id", classID, "spec_id", specID)
 	}
 	return err
 }

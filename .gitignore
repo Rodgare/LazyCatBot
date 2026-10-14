@@ -12,3 +12,4 @@ bot_test.exe
 .gitignore
 bot.exe~
 bot_linux
+leaderboard.json

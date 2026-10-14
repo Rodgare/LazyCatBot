@@ -46,7 +46,7 @@ func normalizeRealm(realm string) string {
 func (c *Client) GetPage(realm string, raidID, bossID, classID, specID int, role string, page int) (*models.Leaderboard, error) {
 	realm = normalizeRealm(realm)
 	weekFrom, weekTo := c.GetSirusDates()
-	endpoint := fmt.Sprintf("/api/base/%s/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&ilvl_from=100&ilvl_to=300&page=%d&i=%d&boss=%d&specs=%d:%d",
+	endpoint := fmt.Sprintf("/api/base/%s/leaderboard/pve?ladder=players&type=%s&aggregation=max&week_from=%s&week_to=%s&page=%d&i=%d&boss=%d&specs=%d:%d",
 		realm, role, weekFrom, weekTo, page, raidID, bossID, classID, specID)
 
 	var res models.Leaderboard
