@@ -700,7 +700,7 @@ func (w *Worker) getPlayerKills(data map[storage.TrackedPlayerKey][]string) (map
 					continue
 				}
 				for _, ch := range channels {
-					id := kill.FightID
+					id := kill.FightIDValue()
 					if w.subStore.IsKillProcessed(id, ch) {
 						continue
 					}
