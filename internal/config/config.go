@@ -20,6 +20,10 @@ type Config struct {
 	SyncForce       bool
 	MythicSeason    int
 	MythicWeekID    int
+
+	DonateURL       string
+	DonateCryptoURL string
+	DonateTitle     string
 }
 
 func LoadConfig() *Config {
@@ -50,6 +54,10 @@ func LoadConfig() *Config {
 		SyncForce:       os.Getenv("SYNC_LEADERBOARD_FORCE") == "true",
 		MythicSeason:    getIntEnv("SIRUS_MYTHIC_SEASON", 6),
 		MythicWeekID:    getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
+
+		DonateURL:       os.Getenv("DONATE_URL"),
+		DonateCryptoURL: os.Getenv("DONATE_CRYPTO_URL"),
+		DonateTitle:     getStringEnv("DONATE_TITLE", "Поддержать проект"),
 	}
 }
 

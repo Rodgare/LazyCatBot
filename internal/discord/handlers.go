@@ -22,6 +22,7 @@ type BotHandler struct {
 	Logger         *slog.Logger
 	AdminUserID    string
 	ResyncFunc     func(realm string, force bool)
+	Donation       Donation
 }
 
 func NewHandler(
@@ -730,7 +731,8 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 							"**/help** — Показать это сообщение.\n" +
 							"Бот может следить как за гильдиями так и за конкретными игроками. " +
 							"Например  в гильдии есть статик десятки смешанный с пугами, и сирус не засчитывает их килы как гильдейские. " +
-							"Вы можете отслеживать РЛа этого статика по его нику и бот будет присылать отчеты килов этого статика.",
+							"Вы можете отслеживать РЛа этого статика по его нику и бот будет присылать отчеты килов этого статика." +
+							h.Donation.SummaryBlock(),
 						Color: 0xf1c40f,
 						Fields: []*discordgo.MessageEmbedField{
 							{
@@ -740,6 +742,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 						},
 					},
 				},
+				Components: h.Donation.Components(),
 			},
 		})
 
@@ -866,11 +869,15 @@ func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate)
 			"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
 			"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 			"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
-			"**/removechannel** — Полностью убрать этот канал из отслеживания (гильдии, игроки, отчёты). Требует права Управление каналами.\n" +
-			"**/help** — Показать это сообщение.\n",
+			"**/removechannel** — Полностью убрать этот канал из отслеживания (гильдии, игроки, отчёты). Требует права Управления каналами.\n" +
+			"**/help** — Показать это сообщение.\n" +
+			h.Donation.SummaryBlock(),
 
 		Color: 0xf1c40f,
 	}
 
-	s.ChannelMessageSendEmbed(channelID, embed)
+	s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		Embeds:     []*discordgo.MessageEmbed{embed},
+		Components: h.Donation.Components(),
+	})
 }

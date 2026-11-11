@@ -104,7 +104,12 @@ func main() {
 	mythLbStore := storage.NewMythicLeaderboardStorage(db, logger)
 
 	sirusClient := sirus.NewClient(logger, appCfg.GetSirusURLs())
-	discordReporter := discord.NewDiscordReporter(dg)
+	donation := discord.Donation{
+		URL:       appCfg.DonateURL,
+		CryptoURL: appCfg.DonateCryptoURL,
+		Title:     appCfg.DonateTitle,
+	}
+	discordReporter := discord.NewDiscordReporter(dg, donation)
 
 	killWorker := worker.NewWorker(
 		sirusClient,
@@ -137,6 +142,7 @@ func main() {
 	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, arStore, mythLbStore, logger)
 	h.AdminUserID = appCfg.AdminUserID
 	h.ResyncFunc = killWorker.RequestLeaderboardSync
+	h.Donation = donation
 
 	dg.AddHandler(h.InteractionCreate)
 	if !appCfg.IsDebug {
