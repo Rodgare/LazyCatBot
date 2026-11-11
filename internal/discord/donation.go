@@ -60,7 +60,7 @@ func (d Donation) Summary() string {
 	}
 	var b strings.Builder
 	b.WriteString("**🐾 " + d.effectiveTitle() + ":**\n")
-	b.WriteString("Спасибо за поддержку!")
+	b.WriteString("В сообщении доната укажи свой игровой ник — он будет подсвечен в отчётах. Спасибо за поддержку!")
 	if d.URL != "" {
 		b.WriteString("\n[🐾 Оплатить корм](" + d.URL + ")")
 	}

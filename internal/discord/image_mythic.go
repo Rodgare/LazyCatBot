@@ -302,6 +302,10 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	}
 
 	// Name (class color)
+	if IsPremiumName(member.Name) {
+		nameW, _ := dc.MeasureString(member.Name)
+		drawPremiumBackdrop(dc, float64(mColNameX)-6, y+6, nameW+12, mRowHeight-12)
+	}
 	colorHex, ok := classColors[member.ClassID]
 	if !ok {
 		colorHex = "#FFFFFF"

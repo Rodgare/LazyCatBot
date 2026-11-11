@@ -122,6 +122,10 @@ func drawMythicGuildPlayerRow(dc *gg.Context, rank int, p models.GuildMythicPlay
 	}
 
 	// Name (class color)
+	if IsPremiumName(p.Name) {
+		nameW, _ := dc.MeasureString(p.Name)
+		drawPremiumBackdrop(dc, float64(mtColNameX)-6, y+6, nameW+12, mtRowHeight-12)
+	}
 	colorHex, ok := classColors[p.ClassID]
 	if !ok {
 		colorHex = "#FFFFFF"

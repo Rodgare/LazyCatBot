@@ -6,6 +6,7 @@ import (
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"LazyCatBot/internal/storage/migrations"
+	"LazyCatBot/internal/webhook"
 	"LazyCatBot/internal/worker"
 	"context"
 	"database/sql"
@@ -102,6 +103,14 @@ func main() {
 	ccStore := storage.NewCharacterCacheStorage(db)
 	arStore := storage.NewActualRaidsStorage(db)
 	mythLbStore := storage.NewMythicLeaderboardStorage(db, logger)
+	donorStore := storage.NewDonorStorage(db)
+
+	if names, err := donorStore.Names(); err == nil {
+		discord.SetPremiumNames(names)
+		slog.Info("Loaded donors", "count", len(names))
+	} else {
+		slog.Error("Load donors err", "error", err)
+	}
 
 	sirusClient := sirus.NewClient(logger, appCfg.GetSirusURLs())
 	donation := discord.Donation{
@@ -136,6 +145,13 @@ func main() {
 	go killWorker.GuildMembersUpdater(ctx)
 	go killWorker.CharacterCacheUpdater(ctx)
 	go killWorker.CleanupRoutine(ctx)
+
+	if appCfg.TributeAPIKey != "" && appCfg.TributeWebhookAddr != "" {
+		wh := webhook.NewHandler(appCfg.TributeAPIKey, donorStore, discord.AddPremiumName, logger)
+		go webhook.Start(ctx, appCfg.TributeWebhookAddr, appCfg.TributeWebhookPath, wh, logger)
+	} else {
+		slog.Info("Tribute webhook disabled (set TRIBUTE_API_KEY and TRIBUTE_WEBHOOK_ADDR to enable)")
+	}
 
 	dg.Identify.Intents = discordgo.IntentsGuildMessages | discordgo.IntentsGuilds
 

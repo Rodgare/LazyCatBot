@@ -242,6 +242,12 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	dc.SetRGB(0.5, 0.5, 0.5)
 	dc.DrawString(fmt.Sprintf("%d.", rank), colRankX, y+25)
 
+	// donor highlight behind the nickname
+	if IsPremiumName(p.Name) {
+		nameW, _ := dc.MeasureString(p.Name)
+		drawPremiumBackdrop(dc, float64(colNameX)-6, y+5, nameW+12, rowHeight-10)
+	}
+
 	//name
 	colorHex, ok := classColors[p.ClassID]
 	if !ok {

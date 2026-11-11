@@ -24,6 +24,10 @@ type Config struct {
 	DonateURL       string
 	DonateCryptoURL string
 	DonateTitle     string
+
+	TributeAPIKey      string
+	TributeWebhookAddr string
+	TributeWebhookPath string
 }
 
 func LoadConfig() *Config {
@@ -58,6 +62,10 @@ func LoadConfig() *Config {
 		DonateURL:       os.Getenv("DONATE_URL"),
 		DonateCryptoURL: os.Getenv("DONATE_CRYPTO_URL"),
 		DonateTitle:     getStringEnv("DONATE_TITLE", "Поддержать проект"),
+
+		TributeAPIKey:      os.Getenv("TRIBUTE_API_KEY"),
+		TributeWebhookAddr: os.Getenv("TRIBUTE_WEBHOOK_ADDR"),
+		TributeWebhookPath: getStringEnv("TRIBUTE_WEBHOOK_PATH", "/tribute/webhook"),
 	}
 }
 
