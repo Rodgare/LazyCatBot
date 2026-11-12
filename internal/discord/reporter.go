@@ -45,7 +45,7 @@ var ansiColors = map[string]string{
 	"reset": "\033[0m",
 }
 
-func SendKillReport(s *discordgo.Session, channelID string, report models.BossKillReport, donation Donation) error {
+func SendKillReport(s *discordgo.Session, channelID string, report models.BossKillReport) error {
 	embed := &discordgo.MessageEmbed{
 		Author: &discordgo.MessageEmbedAuthor{
 			Name:    report.GuildName,
@@ -67,10 +67,6 @@ func SendKillReport(s *discordgo.Session, channelID string, report models.BossKi
 
 	params := &discordgo.MessageSend{
 		Embeds: []*discordgo.MessageEmbed{embed},
-	}
-
-	if donation.Enabled() {
-		params.Components = donation.Components()
 	}
 
 	imgData, err := RenderReportImage(report)
@@ -213,12 +209,11 @@ func generateJoke() string {
 }
 
 type DiscordReporter struct {
-	session  *discordgo.Session
-	Donation Donation
+	session *discordgo.Session
 }
 
-func NewDiscordReporter(s *discordgo.Session, donation Donation) *DiscordReporter {
-	return &DiscordReporter{session: s, Donation: donation}
+func NewDiscordReporter(s *discordgo.Session) *DiscordReporter {
+	return &DiscordReporter{session: s}
 }
 
 func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKillReport) error {
@@ -229,7 +224,7 @@ func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKil
 			channelID = debugChan
 		}
 	}
-	return SendKillReport(r.session, channelID, report, r.Donation)
+	return SendKillReport(r.session, channelID, report)
 }
 
 func (r *DiscordReporter) GetChannelName(channelID string) string {
@@ -289,9 +284,6 @@ func (r *DiscordReporter) SendWeeklyDigest(channelID string, digest models.Weekl
 				Reader:      bytes.NewReader(img),
 			},
 		},
-	}
-	if r.Donation.Enabled() {
-		params.Components = r.Donation.Components()
 	}
 
 	_, err = r.session.ChannelMessageSendComplex(channelID, params)

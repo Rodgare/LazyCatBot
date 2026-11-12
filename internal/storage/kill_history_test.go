@@ -36,7 +36,18 @@ CREATE TABLE kill_players (
     dps INTEGER NOT NULL DEFAULT 0,
     hps INTEGER NOT NULL DEFAULT 0,
     ilvl INTEGER NOT NULL DEFAULT 0,
+    t4 INTEGER NOT NULL DEFAULT 0,
+    set_pieces TEXT NOT NULL DEFAULT '',
     PRIMARY KEY (realm, kill_id, guild_id, player_name)
+);
+CREATE TABLE character_cache (
+    realm TEXT NOT NULL,
+    name TEXT NOT NULL,
+    title TEXT DEFAULT '',
+    mythic_rating REAL DEFAULT 0,
+    black_diamonds INTEGER DEFAULT 0,
+    updated_at INTEGER DEFAULT 0,
+    PRIMARY KEY (realm, name)
 );`
 
 func newKillHistoryTestStore(t *testing.T) *KillHistoryStorage {
@@ -68,6 +79,11 @@ func killReport(killID, guildID int, killedAt string, players ...models.PlayerRe
 func TestKillHistoryDigestAndProfile(t *testing.T) {
 	store := newKillHistoryTestStore(t)
 
+	if _, err := store.db.Exec(`INSERT INTO character_cache (realm, name, title, black_diamonds)
+		VALUES ('x3', 'Alice', 'Тест', 4)`); err != nil {
+		t.Fatalf("insert cache: %v", err)
+	}
+
 	alice1 := models.PlayerReport{Name: "Alice", GUID: 1, ClassID: 8, SpecID: 1, Ilvl: 250, Dps: 1000, Role: 0}
 	bob1 := models.PlayerReport{Name: "Bob", GUID: 2, ClassID: 5, SpecID: 2, Ilvl: 255, Hps: 800, Role: 1}
 	alice2 := models.PlayerReport{Name: "Alice", GUID: 1, ClassID: 8, SpecID: 1, Ilvl: 260, Dps: 1200, Role: 0}
@@ -98,6 +114,9 @@ func TestKillHistoryDigestAndProfile(t *testing.T) {
 	if len(attendance) != 2 || attendance[0].Name != "Alice" || attendance[0].Kills != 2 {
 		t.Fatalf("attendance = %+v", attendance)
 	}
+	if attendance[0].BlackDiamonds != 4 || attendance[0].Title != "Тест" {
+		t.Fatalf("attendance cache = %+v", attendance[0])
+	}
 
 	digest, err := store.GetWeeklyDigest("x3", 100, weekSince, until)
 	if err != nil {
@@ -111,6 +130,9 @@ func TestKillHistoryDigestAndProfile(t *testing.T) {
 	}
 	if len(digest.TopDps) != 1 || digest.TopDps[0].Name != "Alice" || digest.TopDps[0].Value != 1200 {
 		t.Fatalf("top dps = %+v", digest.TopDps)
+	}
+	if digest.TopDps[0].BlackDiamonds != 4 || digest.TopDps[0].Title != "Тест" {
+		t.Fatalf("top dps cache = %+v", digest.TopDps[0])
 	}
 	if len(digest.TopHps) != 1 || digest.TopHps[0].Name != "Bob" || digest.TopHps[0].Value != 900 {
 		t.Fatalf("top hps = %+v", digest.TopHps)

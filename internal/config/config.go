@@ -21,13 +21,9 @@ type Config struct {
 	MythicSeason    int
 	MythicWeekID    int
 
-	DonateURL       string
-	DonateCryptoURL string
-	DonateTitle     string
+	PremiumURL string
 
-	PremiumMonthlyUSD  int
-	PremiumYearlyUSD   int
-	PremiumLifetimeUSD int
+	PremiumMonthlyUSD int
 
 	TributeAPIKey      string
 	TributeWebhookAddr string
@@ -63,13 +59,8 @@ func LoadConfig() *Config {
 		MythicSeason:    getIntEnv("SIRUS_MYTHIC_SEASON", 0),
 		MythicWeekID:    getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
 
-		DonateURL:       os.Getenv("DONATE_URL"),
-		DonateCryptoURL: os.Getenv("DONATE_CRYPTO_URL"),
-		DonateTitle:     getStringEnv("DONATE_TITLE", "Поддержать проект"),
-
-		PremiumMonthlyUSD:  getIntEnv("PREMIUM_MONTHLY_USD", 3),
-		PremiumYearlyUSD:   getIntEnv("PREMIUM_YEARLY_USD", 30),
-		PremiumLifetimeUSD: getIntEnv("PREMIUM_LIFETIME_USD", 60),
+		PremiumURL:        os.Getenv("DONATE_URL"),
+		PremiumMonthlyUSD: getIntEnv("PREMIUM_MONTHLY_USD", 1),
 
 		TributeAPIKey:      os.Getenv("TRIBUTE_API_KEY"),
 		TributeWebhookAddr: os.Getenv("TRIBUTE_WEBHOOK_ADDR"),

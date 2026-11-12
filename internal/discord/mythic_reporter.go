@@ -29,10 +29,6 @@ func (r *DiscordReporter) SendMythicReport(channelID string, report *models.Myth
 		Embeds: []*discordgo.MessageEmbed{embed},
 	}
 
-	if r.Donation.Enabled() {
-		params.Components = r.Donation.Components()
-	}
-
 	imgData, err := r.RenderMythicReportImage(report)
 	if err == nil {
 		params.Files = []*discordgo.File{

@@ -32,17 +32,16 @@ type tributeEvent struct {
 }
 
 // Handler receives Tribute webhooks, verifies the trbt-signature HMAC and
-// registers the donor nickname typed into the donation message.
+// activates or extends a channel's premium subscription from the code in the
+// payment message.
 type Handler struct {
 	apiKey  string
-	store   *storage.DonorStorage
 	premium *storage.PremiumStore
-	onName  func(string)
 	logger  *slog.Logger
 }
 
-func NewHandler(apiKey string, store *storage.DonorStorage, premium *storage.PremiumStore, onName func(string), logger *slog.Logger) *Handler {
-	return &Handler{apiKey: apiKey, store: store, premium: premium, onName: onName, logger: logger}
+func NewHandler(apiKey string, premium *storage.PremiumStore, logger *slog.Logger) *Handler {
+	return &Handler{apiKey: apiKey, premium: premium, logger: logger}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -73,32 +72,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	switch ev.Name {
-	case "new_donation", "recurrent_donation":
-		code, rest := extractPremiumCode(ev.Payload.Message)
-		if code != "" {
-			h.redeemPremium(ev, code)
-		}
-
-		nick := extractDonorNick(rest)
-		if nick == "" {
-			h.logger.Info("[Tribute] donation skipped: no nickname in message",
-				"amount", ev.Payload.Amount, "currency", ev.Payload.Currency,
-				"tg_user", ev.Payload.TelegramUserID, "tg_username", ev.Payload.TelegramUsername,
-				"premium_code", code != "")
-			break
-		}
-		if err := h.store.Upsert(nick, ev.Payload.Amount, ev.Payload.Currency); err != nil {
-			h.logger.Error("[Tribute] save donor err", "error", err, "nick", nick)
-			break
-		}
-		if h.onName != nil {
-			h.onName(nick)
-		}
-		h.logger.Info("[Tribute] donor registered", "nick", nick,
-			"amount", ev.Payload.Amount, "currency", ev.Payload.Currency,
-			"tg_username", ev.Payload.TelegramUsername)
-	default:
+	if isPaymentEvent(ev.Name) {
+		h.handlePayment(ev)
+	} else {
 		h.logger.Info("[Tribute] webhook ignored", "name", ev.Name)
 	}
 
@@ -130,41 +106,10 @@ func verifySignature(body []byte, sig, key string) bool {
 	return false
 }
 
-// extractDonorNick pulls a character nickname out of the donation message.
-// Donors are asked to type just their nickname, but a leading "ник:" is also
-// tolerated. Only the first token is used because Sirus names have no spaces.
-func extractDonorNick(msg string) string {
-	msg = strings.TrimSpace(msg)
-	if msg == "" {
-		return ""
-	}
-
-	low := strings.ToLower(msg)
-	if idx := strings.Index(low, "ник:"); idx >= 0 {
-		if f := strings.Fields(msg[idx+len("ник:"):]); len(f) > 0 {
-			return cleanNick(f[0])
-		}
-	}
-
-	f := strings.Fields(msg)
-	if len(f) == 0 {
-		return ""
-	}
-	return cleanNick(f[0])
-}
-
-func cleanNick(s string) string {
-	s = strings.TrimSpace(s)
-	s = strings.TrimPrefix(s, "@")
-	s = strings.Trim(s, ".,;:!?()[]{}\"'«»")
-	return s
-}
-
 var premiumCodeRe = regexp.MustCompile(`(?i)\bLZ-[A-Z0-9]{4}-[A-Z0-9]{4}\b`)
 
-// extractPremiumCode finds an activation code in the donation message and
-// returns the code plus the message with the code removed, so the remaining
-// text can still be treated as a donor nickname.
+// extractPremiumCode finds an activation code in the payment message and
+// returns the code plus the message with the code removed.
 func extractPremiumCode(msg string) (string, string) {
 	loc := premiumCodeRe.FindStringIndex(msg)
 	if loc == nil {
@@ -185,11 +130,57 @@ func tributeSubject(ev tributeEvent) string {
 	return ""
 }
 
+func isPaymentEvent(name string) bool {
+	switch name {
+	case "new_donation", "new_subscription":
+		return true
+	case "recurrent_donation", "recurrent_subscription", "subscription_renewed":
+		return true
+	}
+	return false
+}
+
+func isRecurringEvent(name string) bool {
+	switch name {
+	case "recurrent_donation", "recurrent_subscription", "subscription_renewed":
+		return true
+	}
+	return false
+}
+
+// handlePayment activates premium from the code in the payment message, or
+// renews the donor's most recent subscription when Tribute does not repeat the
+// original message on a recurring payment.
+func (h *Handler) handlePayment(ev tributeEvent) {
+	code, _ := extractPremiumCode(ev.Payload.Message)
+	if code != "" {
+		h.redeemPremium(ev, code)
+		return
+	}
+
+	if isRecurringEvent(ev.Name) && h.premium != nil {
+		ent, err := h.premium.RedeemRecurringBySubject(tributeSubject(ev))
+		if err != nil {
+			h.logger.Warn("[Tribute] recurring payment not matched",
+				"error", err, "tg_user", ev.Payload.TelegramUserID)
+			return
+		}
+		h.logger.Info("[Tribute] premium renewed by subject",
+			"channel_id", ent.ChannelID, "plan", ent.Plan,
+			"expires_at", ent.ExpiresAt, "tg_user", ev.Payload.TelegramUserID)
+		return
+	}
+
+	h.logger.Info("[Tribute] payment ignored: no premium code in message",
+		"amount", ev.Payload.Amount, "currency", ev.Payload.Currency,
+		"tg_user", ev.Payload.TelegramUserID, "tg_username", ev.Payload.TelegramUsername)
+}
+
 func (h *Handler) redeemPremium(ev tributeEvent, code string) {
 	if h.premium == nil {
 		return
 	}
-	recurring := ev.Name == "recurrent_donation"
+	recurring := isRecurringEvent(ev.Name)
 	ent, err := h.premium.RedeemCode(code, tributeSubject(ev), recurring)
 	if err != nil {
 		h.logger.Warn("[Tribute] premium code not redeemed", "error", err, "code", code,

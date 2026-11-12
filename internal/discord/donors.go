@@ -2,7 +2,6 @@ package discord
 
 import (
 	"image/color"
-	"math/rand"
 	"strings"
 	"sync"
 
@@ -70,24 +69,11 @@ func shouldHighlight(name, showcase string) bool {
 	return normalizeDonorName(name) == normalizeDonorName(showcase)
 }
 
-// pickShowcaseName chooses a random nickname to highlight as a teaser. If the
-// report already contains a real donor, it returns "" so only actual donors are
-// highlighted and no random player is touched.
+// pickShowcaseName is kept for renderer compatibility. Donor nickname
+// highlighting is not part of the premium-subscription model, so no showcase
+// row is highlighted anymore.
 func pickShowcaseName(names []string) string {
-	candidates := make([]string, 0, len(names))
-	for _, n := range names {
-		if strings.TrimSpace(n) == "" {
-			continue
-		}
-		if IsPremiumName(n) {
-			return ""
-		}
-		candidates = append(candidates, n)
-	}
-	if len(candidates) == 0 {
-		return ""
-	}
-	return candidates[rand.Intn(len(candidates))]
+	return ""
 }
 
 const (

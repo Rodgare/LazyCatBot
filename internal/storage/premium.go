@@ -262,7 +262,7 @@ func (s *PremiumStore) RedeemCode(code, subject string, recurring bool) (*Premiu
 	}
 
 	now := time.Now()
-	if now.Unix() > expiresAt {
+	if !recurring && now.Unix() > expiresAt {
 		return nil, ErrCodeExpired
 	}
 
@@ -297,6 +297,25 @@ func (s *PremiumStore) RedeemCode(code, subject string, recurring bool) (*Premiu
 		return nil, err
 	}
 	return e, nil
+}
+
+// RedeemRecurringBySubject extends the most recently activated subscription
+// for a donor. It is the fallback for Tribute recurring events that do not
+// repeat the original message with the activation code.
+func (s *PremiumStore) RedeemRecurringBySubject(subject string) (*PremiumEntitlement, error) {
+	if subject == "" {
+		return nil, ErrCodeNotFound
+	}
+	var code string
+	err := s.db.QueryRow(`SELECT code FROM premium_codes
+		WHERE used_by = ? ORDER BY used_at DESC LIMIT 1`, subject).Scan(&code)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrCodeNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+	return s.RedeemCode(code, subject, true)
 }
 
 func grantTx(tx *sql.Tx, channelID string, plan PremiumPlan, source, actor, action string) (*PremiumEntitlement, error) {

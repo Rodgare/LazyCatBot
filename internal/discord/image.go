@@ -48,7 +48,6 @@ var classColors = map[int]string{
 	8:  "#69CCF0", // Mage
 	9:  "#9482C9", // Warlock
 	11: "#FF7D0A", // Druid
-	12: "#A330C9", // DH
 }
 
 func hexToRGBA(hex string) color.RGBA {

@@ -22,10 +22,11 @@ type BotHandler struct {
 	Logger         *slog.Logger
 	AdminUserID    string
 	ResyncFunc     func(realm string, force bool)
-	Donation       Donation
 	PremiumStore   *storage.PremiumStore
 	PremiumPricing PremiumPricing
+	PremiumURL     string
 	KillHistory    *storage.KillHistoryStorage
+	CharacterCache *storage.CharacterCacheStorage
 }
 
 func NewHandler(
@@ -761,8 +762,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 							"**/help** — Показать это сообщение.\n" +
 							"Бот может следить как за гильдиями так и за конкретными игроками. " +
 							"Например  в гильдии есть статик десятки смешанный с пугами, и сирус не засчитывает их килы как гильдейские. " +
-							"Вы можете отслеживать РЛа этого статика по его нику и бот будет присылать отчеты килов этого статика." +
-							h.Donation.SummaryBlock(),
+							"Вы можете отслеживать РЛа этого статика по его нику и бот будет присылать отчеты килов этого статика.",
 						Color: 0xf1c40f,
 						Fields: []*discordgo.MessageEmbedField{
 							{
@@ -772,7 +772,6 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 						},
 					},
 				},
-				Components: h.Donation.Components(),
 			},
 		})
 
@@ -897,17 +896,18 @@ func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate)
 			"**/menu** Вызывает меню с настройкой подписок бота, трекинга и т.д. (Требует права Управление каналами.)\n" +
 			"**/top** Открывает меню с кнопками, нажав на которые можно отправить рейтинги по чек боссам среди игроков гильдии.\n" +
 			"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
+			"**/premium** — Премиум для этого канала: статус, активация и подробная инструкция.\n" +
+			"**/attendance** — Посещаемость гильдии за 4 КД (премиум).\n" +
+			"**/profile** — Профиль игрока по киллам и рейдам (премиум).\n" +
 			"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 			"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
 			"**/removechannel** — Полностью убрать этот канал из отслеживания (гильдии, игроки, отчёты). Требует права Управления каналами.\n" +
-			"**/help** — Показать это сообщение.\n" +
-			h.Donation.SummaryBlock(),
+			"**/help** — Показать это сообщение.\n",
 
 		Color: 0xf1c40f,
 	}
 
 	s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-		Embeds:     []*discordgo.MessageEmbed{embed},
-		Components: h.Donation.Components(),
+		Embeds: []*discordgo.MessageEmbed{embed},
 	})
 }

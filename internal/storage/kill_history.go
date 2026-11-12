@@ -65,8 +65,8 @@ func (s *KillHistoryStorage) RecordKill(report models.BossKillReport) error {
 	}
 
 	stmt, err := tx.Prepare(`INSERT INTO kill_players
-		(realm, kill_id, guild_id, player_name, guid, class_id, spec_id, role, dps, hps, ilvl)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
+		(realm, kill_id, guild_id, player_name, guid, class_id, spec_id, role, dps, hps, ilvl, t4, set_pieces)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
@@ -78,7 +78,7 @@ func (s *KillHistoryStorage) RecordKill(report models.BossKillReport) error {
 			role = "hps"
 		}
 		if _, err := stmt.Exec(realm, report.KillID, report.GuildID, p.Name, p.GUID,
-			p.ClassID, p.SpecID, role, p.Dps, p.Hps, p.Ilvl); err != nil {
+			p.ClassID, p.SpecID, role, p.Dps, p.Hps, p.Ilvl, p.T4, p.SetPieces); err != nil {
 			return err
 		}
 	}
@@ -114,9 +114,12 @@ func (s *KillHistoryStorage) GetAttendance(realm string, guildID int, since int6
 		SELECT p.player_name, p.class_id, p.spec_id, p.role,
 		       COUNT(DISTINCT p.kill_id) AS attended,
 		       COALESCE(MAX(h.kills_at), 0) AS last_seen,
-		       COALESCE(MAX(p.ilvl), 0) AS ilvl
+		       COALESCE(MAX(p.ilvl), 0) AS ilvl,
+		       COALESCE(MAX(cc.black_diamonds), 0) AS black_diamonds,
+		       COALESCE(MAX(cc.title), '') AS title
 		FROM kill_players p
 		JOIN kill_history h ON h.realm = p.realm AND h.kill_id = p.kill_id AND h.guild_id = p.guild_id
+		LEFT JOIN character_cache cc ON cc.realm = p.realm AND cc.name = p.player_name
 		WHERE p.realm = ? AND p.guild_id = ? AND h.kills_at >= ?
 		GROUP BY p.player_name
 		ORDER BY attended DESC, p.player_name ASC`, realm, guildID, since)
@@ -128,7 +131,8 @@ func (s *KillHistoryStorage) GetAttendance(realm string, guildID int, since int6
 	var entries []models.AttendanceEntry
 	for rows.Next() {
 		var e models.AttendanceEntry
-		if err := rows.Scan(&e.Name, &e.ClassID, &e.SpecID, &e.Role, &e.Kills, &e.LastSeen, &e.Ilvl); err != nil {
+		if err := rows.Scan(&e.Name, &e.ClassID, &e.SpecID, &e.Role, &e.Kills, &e.LastSeen, &e.Ilvl,
+			&e.BlackDiamonds, &e.Title); err != nil {
 			return 0, nil, err
 		}
 		entries = append(entries, e)
@@ -192,9 +196,12 @@ func (s *KillHistoryStorage) topPlayers(realm string, guildID int, since, until 
 		valueCol = "p.hps"
 	}
 	query := fmt.Sprintf(`
-		SELECT p.player_name, p.class_id, p.spec_id, MAX(%s) AS best
+		SELECT p.player_name, p.class_id, p.spec_id, MAX(%s) AS best,
+		       COALESCE(MAX(cc.black_diamonds), 0) AS black_diamonds,
+		       COALESCE(MAX(cc.title), '') AS title
 		FROM kill_players p
 		JOIN kill_history h ON h.realm = p.realm AND h.kill_id = p.kill_id AND h.guild_id = p.guild_id
+		LEFT JOIN character_cache cc ON cc.realm = p.realm AND cc.name = p.player_name
 		WHERE p.realm = ? AND p.guild_id = ? AND h.kills_at >= ? AND h.kills_at < ?
 		  AND p.role = ? AND %s > 0
 		GROUP BY p.player_name
@@ -210,7 +217,7 @@ func (s *KillHistoryStorage) topPlayers(realm string, guildID int, since, until 
 	var players []models.DigestPlayer
 	for rows.Next() {
 		var p models.DigestPlayer
-		if err := rows.Scan(&p.Name, &p.ClassID, &p.SpecID, &p.Value); err != nil {
+		if err := rows.Scan(&p.Name, &p.ClassID, &p.SpecID, &p.Value, &p.BlackDiamonds, &p.Title); err != nil {
 			return nil, err
 		}
 		players = append(players, p)
@@ -242,12 +249,12 @@ func (s *KillHistoryStorage) GetPlayerProfile(realm string, guildID int, name st
 	}
 
 	err = s.db.QueryRow(`
-		SELECT p.class_id, p.spec_id, p.role FROM kill_players p
+		SELECT p.guid, p.class_id, p.spec_id, p.role, p.t4, p.set_pieces FROM kill_players p
 		JOIN kill_history h ON h.realm = p.realm AND h.kill_id = p.kill_id AND h.guild_id = p.guild_id
 		WHERE p.realm = ? AND p.guild_id = ? AND p.player_name = ? AND h.kills_at >= ?
 		ORDER BY h.kills_at DESC LIMIT 1`,
 		realm, guildID, name, since).
-		Scan(&profile.ClassID, &profile.SpecID, &profile.Role)
+		Scan(&profile.GUID, &profile.ClassID, &profile.SpecID, &profile.Role, &profile.T4, &profile.SetPieces)
 	if err != nil && err != sql.ErrNoRows {
 		return nil, err
 	}

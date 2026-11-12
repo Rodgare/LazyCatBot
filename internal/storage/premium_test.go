@@ -99,6 +99,31 @@ func TestPremiumCodeLifecycle(t *testing.T) {
 	if extended.ExpiresAt <= before.ExpiresAt {
 		t.Fatalf("recurring redemption should extend expiry: before=%d after=%d", before.ExpiresAt, extended.ExpiresAt)
 	}
+
+	// The activation code TTL only gates the first payment. Recurring payments
+	// arrive months later and must still extend the subscription.
+	if _, err := s.db.Exec(`UPDATE premium_codes SET expires_at = ? WHERE code = ?`,
+		time.Now().Add(-time.Hour).Unix(), code); err != nil {
+		t.Fatalf("expire code after activation: %v", err)
+	}
+	renewed, err := s.RedeemCode(code, "tg:1", true)
+	if err != nil {
+		t.Fatalf("recurring after code ttl: %v", err)
+	}
+	if renewed.ExpiresAt <= extended.ExpiresAt {
+		t.Fatalf("recurring after ttl should extend expiry: before=%d after=%d", extended.ExpiresAt, renewed.ExpiresAt)
+	}
+
+	bySubject, err := s.RedeemRecurringBySubject("tg:1")
+	if err != nil {
+		t.Fatalf("recurring by subject: %v", err)
+	}
+	if bySubject.ChannelID != channel || bySubject.ExpiresAt <= renewed.ExpiresAt {
+		t.Fatalf("recurring by subject = %+v, want channel %s with later expiry", bySubject, channel)
+	}
+	if _, err := s.RedeemRecurringBySubject("tg:missing"); !errors.Is(err, ErrCodeNotFound) {
+		t.Fatalf("unknown subject err = %v, want ErrCodeNotFound", err)
+	}
 }
 
 func TestPremiumCodeExpired(t *testing.T) {

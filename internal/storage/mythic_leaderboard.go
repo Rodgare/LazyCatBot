@@ -3,6 +3,7 @@ package storage
 import (
 	"LazyCatBot/internal/models"
 	"database/sql"
+	"fmt"
 	"log/slog"
 	"strings"
 	"time"
@@ -91,6 +92,43 @@ func (s *MythicLeaderboardStorage) GetPlayerMythicRank(realm string, classID, sp
 		}
 	}
 	return rank, total, percentile, nil
+}
+
+// PlayerMythicInfo is the mythic leaderboard row used by the player profile.
+type PlayerMythicInfo struct {
+	Score     float64
+	Position  int
+	TotalRuns int
+	TimedRuns int
+	BestKey   int
+	Zodiac    int
+}
+
+// GetPlayerMythicInfo returns the latest snapshot row for a character.
+func (s *MythicLeaderboardStorage) GetPlayerMythicInfo(realm, name string) (*PlayerMythicInfo, error) {
+	return s.queryMythicInfo(realm, "name", name)
+}
+
+// GetPlayerMythicInfoByGUID is the rename-safe variant used by the profile.
+func (s *MythicLeaderboardStorage) GetPlayerMythicInfoByGUID(realm string, guid int) (*PlayerMythicInfo, error) {
+	return s.queryMythicInfo(realm, "guid", guid)
+}
+
+func (s *MythicLeaderboardStorage) queryMythicInfo(realm, field string, value any) (*PlayerMythicInfo, error) {
+	if realm == "" {
+		realm = "x3"
+	}
+	var info PlayerMythicInfo
+	err := s.db.QueryRow(fmt.Sprintf(`SELECT current_score, position, total_runs, timed_runs, best_key, zodiac
+		FROM mythic_leaderboard WHERE realm = ? AND %s = ? LIMIT 1`, field), realm, value).
+		Scan(&info.Score, &info.Position, &info.TotalRuns, &info.TimedRuns, &info.BestKey, &info.Zodiac)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &info, nil
 }
 
 // GetGuildMythicPlayers returns the latest mythic leaderboard snapshot rows for

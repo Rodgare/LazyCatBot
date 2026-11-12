@@ -1,6 +1,7 @@
 package discord
 
 import (
+	"LazyCatBot/internal/models"
 	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
 	"fmt"
@@ -35,6 +36,17 @@ func formatProfileTime(unix int64) string {
 		return "—"
 	}
 	return time.Unix(unix, 0).In(time.FixedZone("MSK", 3*3600)).Format("02.01.2006 15:04")
+}
+
+func truncateRunes(s string, max int) string {
+	r := []rune(s)
+	if len(r) <= max {
+		return s
+	}
+	if max <= 1 {
+		return string(r[:max])
+	}
+	return string(r[:max-1]) + "…"
 }
 
 // requirePremium replies with an upsell and returns false when the channel has
@@ -136,7 +148,15 @@ func (h *BotHandler) HandleAttendanceCommand(s *discordgo.Session, i *discordgo.
 		if percent > 100 {
 			percent = 100
 		}
-		fmt.Fprintf(&b, "`%2d.` **%s** — %d/%d (%d%%)\n", idx+1, e.Name, e.Kills, total, percent)
+		fmt.Fprintf(&b, "`%2d.` **%s** (%s, %d) — %d/%d (%d%%)",
+			idx+1, e.Name, sirus.GetSpecName(e.ClassID, e.SpecID), e.Ilvl, e.Kills, total, percent)
+		if e.BlackDiamonds > 0 {
+			fmt.Fprintf(&b, " · ЧБ %d", e.BlackDiamonds)
+		}
+		if e.Title != "" {
+			fmt.Fprintf(&b, " · «%s»", truncateRunes(e.Title, 24))
+		}
+		b.WriteString("\n")
 	}
 	if len(entries) > limit {
 		fmt.Fprintf(&b, "…и ещё %d игроков", len(entries)-limit)
@@ -222,10 +242,79 @@ func (h *BotHandler) HandleProfileCommand(s *discordgo.Session, i *discordgo.Int
 	if p.Role == "hps" {
 		role = "Хил"
 	}
+
+	cache := models.CharacterCache{}
+	if h.CharacterCache != nil {
+		if c, err := h.CharacterCache.Get(sub.Realm, p.Name); err == nil {
+			cache = c
+		}
+	}
+
+	var mythicInfo *storage.PlayerMythicInfo
+	if h.MythicStore != nil {
+		var (
+			info *storage.PlayerMythicInfo
+			err  error
+		)
+		if p.GUID > 0 {
+			info, err = h.MythicStore.GetPlayerMythicInfoByGUID(sub.Realm, p.GUID)
+		} else {
+			info, err = h.MythicStore.GetPlayerMythicInfo(sub.Realm, p.Name)
+		}
+		if err == nil {
+			mythicInfo = info
+		}
+	}
+
+	score := cache.MythicRating
+	if mythicInfo != nil && mythicInfo.Score > 0 {
+		score = mythicInfo.Score
+	}
+	mythicValue := "—"
+	if score > 0 {
+		mythicValue = fmt.Sprintf("%.0f", score)
+		if h.MythicStore != nil {
+			if rank, total, pct, err := h.MythicStore.GetPlayerMythicRank(sub.Realm, p.ClassID, p.SpecID, score); err == nil && total > 0 {
+				mythicValue = fmt.Sprintf("%.0f · топ %d%% (%d/%d)", score, pct, rank, total)
+			}
+		}
+	}
+
+	bestKey := "—"
+	runs := "—"
+	position := "—"
+	if mythicInfo != nil {
+		if mythicInfo.BestKey > 0 {
+			bestKey = fmt.Sprintf("+%d", mythicInfo.BestKey)
+		}
+		if mythicInfo.TotalRuns > 0 {
+			runs = fmt.Sprintf("%d/%d", mythicInfo.TimedRuns, mythicInfo.TotalRuns)
+		}
+		if mythicInfo.Position > 0 {
+			position = fmt.Sprintf("#%d", mythicInfo.Position)
+		}
+	}
+
+	title := cache.Title
+	if title == "" {
+		title = "—"
+	}
+	sets := fmt.Sprintf("%d", p.T4)
+	if p.SetPieces != "" {
+		sets = fmt.Sprintf("%d · %s", p.T4, p.SetPieces)
+	}
+
 	fields := []*discordgo.MessageEmbedField{
 		{Name: "Класс и спек", Value: fmt.Sprintf("%s · %s", className(p.ClassID), sirus.GetSpecName(p.ClassID, p.SpecID)), Inline: true},
 		{Name: "Роль", Value: role, Inline: true},
 		{Name: "Илвл", Value: fmt.Sprintf("%d", p.Ilvl), Inline: true},
+		{Name: "Рио (мифик)", Value: mythicValue, Inline: true},
+		{Name: "Лучший ключ", Value: bestKey, Inline: true},
+		{Name: "Мифик-раны (в тайм/всего)", Value: runs, Inline: true},
+		{Name: "Позиция в мифик-ладдере", Value: position, Inline: true},
+		{Name: "Чёрные бриллианты", Value: fmt.Sprintf("%d", cache.BlackDiamonds), Inline: true},
+		{Name: "Титул", Value: title, Inline: true},
+		{Name: "Т4 / сеты", Value: sets, Inline: true},
 		{Name: "Посещаемость", Value: fmt.Sprintf("%d%% (%d килов)", p.AttendedPct, p.TotalKills), Inline: true},
 		{Name: "Лучший DPS", Value: FormatNum(p.BestDps), Inline: true},
 		{Name: "Лучший HPS", Value: FormatNum(p.BestHps), Inline: true},

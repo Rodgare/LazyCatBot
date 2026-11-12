@@ -13,19 +13,12 @@ import (
 // the bot: the donation provider reports the amount, and the code carries the
 // plan. They exist so the instructions can tell the donor what to pay.
 type PremiumPricing struct {
-	MonthlyUSD  int
-	YearlyUSD   int
-	LifetimeUSD int
+	MonthlyUSD int
 }
 
 func (p PremiumPricing) price(plan storage.PremiumPlan) int {
-	switch plan {
-	case storage.PlanMonthly:
+	if plan == storage.PlanMonthly {
 		return p.MonthlyUSD
-	case storage.PlanYearly:
-		return p.YearlyUSD
-	case storage.PlanLifetime:
-		return p.LifetimeUSD
 	}
 	return 0
 }
@@ -114,21 +107,22 @@ func (h *BotHandler) HandlePremiumCommand(s *discordgo.Session, i *discordgo.Int
 		"Что входит:\n" +
 		"— отчёты без очереди в пик рейдов;\n" +
 		"— рейтинги за 4 КД и за всё время;\n" +
+		"— еженедельный дайджест;\n" +
+		"— посещаемость и профили игроков;\n" +
 		"— приоритетная поддержка.\n\n" +
-		"Новые аналитические функции добавляются по мере выхода.\n" +
+		fmt.Sprintf("Подписка: **$%d/мес**. Отменить можно в любой момент.\n", h.PremiumPricing.MonthlyUSD) +
 		"Премиум привязан к каналу: остальные каналы сервера остаются бесплатными."
 
-	buttons := []discordgo.MessageComponent{}
-	for _, plan := range []storage.PremiumPlan{storage.PlanMonthly, storage.PlanYearly, storage.PlanLifetime} {
-		label := plan.Title()
-		if price := h.PremiumPricing.price(plan); price > 0 {
-			label = fmt.Sprintf("%s — $%d", label, price)
-		}
-		buttons = append(buttons, discordgo.Button{
+	label := storage.PlanMonthly.Title()
+	if price := h.PremiumPricing.price(storage.PlanMonthly); price > 0 {
+		label = fmt.Sprintf("%s — $%d/мес", label, price)
+	}
+	buttons := []discordgo.MessageComponent{
+		discordgo.Button{
 			Label:    label,
 			Style:    discordgo.PrimaryButton,
-			CustomID: "premium_buy_" + string(plan),
-		})
+			CustomID: "premium_buy_" + string(storage.PlanMonthly),
+		},
 	}
 
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -186,29 +180,29 @@ func (h *BotHandler) HandlePremiumButton(s *discordgo.Session, i *discordgo.Inte
 	price := h.PremiumPricing.price(plan)
 	priceLine := ""
 	if price > 0 {
-		priceLine = fmt.Sprintf("**$%d**", price)
+		priceLine = fmt.Sprintf("**$%d/мес**", price)
 	} else {
-		priceLine = "сумму, указанную на странице доната"
+		priceLine = "сумму подписки"
 	}
 
 	var b strings.Builder
 	fmt.Fprintf(&b, "🎟 Код активации: **%s**\n\n", code)
 	b.WriteString("**Как активировать премиум:**\n")
-	b.WriteString("1. Откройте страницу доната")
-	if h.Donation.URL != "" {
-		fmt.Fprintf(&b, ": <%s>", h.Donation.URL)
+	b.WriteString("1. Откройте страницу подписки")
+	if h.PremiumURL != "" {
+		fmt.Fprintf(&b, ": <%s>", h.PremiumURL)
 	}
 	b.WriteString("\n")
 	fmt.Fprintf(&b, "2. В поле «Сообщение» вставьте код **%s**.\n", code)
-	b.WriteString("   Можно добавить свой игровой ник — он получит премиум-подсветку в отчётах.\n")
-	fmt.Fprintf(&b, "3. Отправьте донат: %s (план «%s»).\n", priceLine, plan.Title())
+	fmt.Fprintf(&b, "3. Оформите подписку: %s (план «%s»).\n", priceLine, plan.Title())
 	fmt.Fprintf(&b, "4. Бот активирует премиум в канале <#%s> автоматически в течение нескольких минут.\n\n", i.ChannelID)
 	fmt.Fprintf(&b, "Код одноразовый и действует до **%s** (МСК). Не передавайте его другим.\n",
 		expires.In(time.FixedZone("MSK", 3*3600)).Format("02.01.2006 15:04"))
+	b.WriteString("При продлении Tribute пришлёт повторный платёж — премиум продлится автоматически.\n")
 
 	content := b.String()
-	if h.Donation.URL == "" {
-		content += "\n⚠️ Оплата на этом инстансе ещё не настроена — сообщите администратору бота."
+	if h.PremiumURL == "" {
+		content += "\n⚠️ Страница подписки на этом инстансе не настроена — сообщите администратору бота."
 	}
 
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{

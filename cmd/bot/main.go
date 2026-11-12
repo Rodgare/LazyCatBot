@@ -103,24 +103,11 @@ func main() {
 	ccStore := storage.NewCharacterCacheStorage(db)
 	arStore := storage.NewActualRaidsStorage(db)
 	mythLbStore := storage.NewMythicLeaderboardStorage(db, logger)
-	donorStore := storage.NewDonorStorage(db)
 	premiumStore := storage.NewPremiumStore(db)
 	killHistoryStore := storage.NewKillHistoryStorage(db, logger)
 
-	if names, err := donorStore.Names(); err == nil {
-		discord.SetPremiumNames(names)
-		slog.Info("Loaded donors", "count", len(names))
-	} else {
-		slog.Error("Load donors err", "error", err)
-	}
-
 	sirusClient := sirus.NewClient(logger, appCfg.GetSirusURLs())
-	donation := discord.Donation{
-		URL:       appCfg.DonateURL,
-		CryptoURL: appCfg.DonateCryptoURL,
-		Title:     appCfg.DonateTitle,
-	}
-	discordReporter := discord.NewDiscordReporter(dg, donation)
+	discordReporter := discord.NewDiscordReporter(dg)
 
 	killWorker := worker.NewWorker(
 		sirusClient,
@@ -151,7 +138,7 @@ func main() {
 	go killWorker.CleanupRoutine(ctx)
 
 	if appCfg.TributeAPIKey != "" && appCfg.TributeWebhookAddr != "" {
-		wh := webhook.NewHandler(appCfg.TributeAPIKey, donorStore, premiumStore, discord.AddPremiumName, logger)
+		wh := webhook.NewHandler(appCfg.TributeAPIKey, premiumStore, logger)
 		go webhook.Start(ctx, appCfg.TributeWebhookAddr, appCfg.TributeWebhookPath, wh, logger)
 	} else {
 		slog.Info("Tribute webhook disabled (set TRIBUTE_API_KEY and TRIBUTE_WEBHOOK_ADDR to enable)")
@@ -162,13 +149,12 @@ func main() {
 	h := discord.NewHandler(sirusClient, lbStore, subStore, pSubStore, gmStore, arStore, mythLbStore, logger)
 	h.AdminUserID = appCfg.AdminUserID
 	h.ResyncFunc = killWorker.RequestLeaderboardSync
-	h.Donation = donation
+	h.PremiumURL = appCfg.PremiumURL
 	h.PremiumStore = premiumStore
 	h.KillHistory = killHistoryStore
+	h.CharacterCache = ccStore
 	h.PremiumPricing = discord.PremiumPricing{
-		MonthlyUSD:  appCfg.PremiumMonthlyUSD,
-		YearlyUSD:   appCfg.PremiumYearlyUSD,
-		LifetimeUSD: appCfg.PremiumLifetimeUSD,
+		MonthlyUSD: appCfg.PremiumMonthlyUSD,
 	}
 
 	dg.AddHandler(h.InteractionCreate)

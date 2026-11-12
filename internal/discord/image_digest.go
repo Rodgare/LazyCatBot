@@ -109,8 +109,12 @@ func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 			dc.DrawString(e.Name, digestPad+32, y+20)
 			loadCyrillicFontFace(dc, 18)
 			dc.SetRGB(0.80, 0.83, 0.88)
-			dc.DrawString(fmt.Sprintf("%d / %d  ·  %d%%", e.Kills, d.TotalKills, percent),
-				float64(digestWidth-digestPad-190), y+20)
+			dc.DrawString(fmt.Sprintf("%d / %d · %d%%", e.Kills, d.TotalKills, percent),
+				600, y+20)
+			if e.BlackDiamonds > 0 {
+				dc.SetRGB(0.55, 0.58, 0.64)
+				dc.DrawString(fmt.Sprintf("ЧБ %d", e.BlackDiamonds), 790, y+20)
+			}
 			y += digestRowH
 		}
 	}
@@ -160,6 +164,10 @@ func digestPlayerRow(dc *gg.Context, x, y float64, p models.DigestPlayer, rank i
 	dc.DrawString(p.Name, x+28, y+20)
 	dc.SetRGB(0.82, 0.85, 0.90)
 	dc.DrawString(FormatNum(p.Value), x+250, y+20)
+	if p.BlackDiamonds > 0 {
+		dc.SetRGB(0.55, 0.58, 0.64)
+		dc.DrawString(fmt.Sprintf("ЧБ %d", p.BlackDiamonds), x+330, y+20)
+	}
 }
 
 func formatDigestDate(unix int64) string {
