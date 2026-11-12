@@ -105,6 +105,7 @@ func main() {
 	mythLbStore := storage.NewMythicLeaderboardStorage(db, logger)
 	donorStore := storage.NewDonorStorage(db)
 	premiumStore := storage.NewPremiumStore(db)
+	killHistoryStore := storage.NewKillHistoryStorage(db, logger)
 
 	if names, err := donorStore.Names(); err == nil {
 		discord.SetPremiumNames(names)
@@ -134,6 +135,7 @@ func main() {
 	)
 	killWorker.SetMythicLeaderboardStore(mythLbStore)
 	killWorker.SetPremiumGate(premiumStore)
+	killWorker.SetKillHistoryStore(killHistoryStore)
 
 	killWorker.StartCronScheduler()
 	if appCfg.SyncOnStart {
@@ -162,6 +164,7 @@ func main() {
 	h.ResyncFunc = killWorker.RequestLeaderboardSync
 	h.Donation = donation
 	h.PremiumStore = premiumStore
+	h.KillHistory = killHistoryStore
 	h.PremiumPricing = discord.PremiumPricing{
 		MonthlyUSD:  appCfg.PremiumMonthlyUSD,
 		YearlyUSD:   appCfg.PremiumYearlyUSD,
@@ -202,6 +205,22 @@ func main() {
 			Name:                     "premium",
 			Description:              "Премиум для этого канала: статус, активация и инструкция",
 			DefaultMemberPermissions: &manageChannelsPerm,
+		},
+		{
+			Name:        "attendance",
+			Description: "Посещаемость гильдии за 4 КД (премиум)",
+		},
+		{
+			Name:        "profile",
+			Description: "Профиль игрока по киллам и рейдам (премиум)",
+			Options: []*discordgo.ApplicationCommandOption{
+				{
+					Name:        "name",
+					Description: "Ник персонажа",
+					Type:        discordgo.ApplicationCommandOptionString,
+					Required:    true,
+				},
+			},
 		},
 		{
 			Name:        "help",

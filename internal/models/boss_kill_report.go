@@ -4,6 +4,7 @@ type BossKillReport struct {
 	MapName   string
 	BossName  string
 	RaidOrder int
+	BossID    int
 	KillID    int
 	Duration  string
 	Attempts  int

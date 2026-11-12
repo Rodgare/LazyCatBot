@@ -169,6 +169,16 @@ func (w *Worker) StartCronScheduler() {
 		return
 	}
 
+	_, err = c.AddFunc("0 10 * * 4", func() {
+		w.logger.Info("[Cron] Thursday 10:00: weekly digest started")
+		w.SendWeeklyDigests()
+	})
+
+	if err != nil {
+		w.logger.Error("Cron error", "error", err)
+		return
+	}
+
 	c.Start()
 	w.logger.Info("Cron task started successfully")
 }

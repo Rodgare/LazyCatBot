@@ -25,6 +25,7 @@ type BotHandler struct {
 	Donation       Donation
 	PremiumStore   *storage.PremiumStore
 	PremiumPricing PremiumPricing
+	KillHistory    *storage.KillHistoryStorage
 }
 
 func NewHandler(
@@ -699,6 +700,12 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 	case "premium":
 		h.HandlePremiumCommand(s, i)
 
+	case "attendance":
+		h.HandleAttendanceCommand(s, i)
+
+	case "profile":
+		h.HandleProfileCommand(s, i)
+
 	case "listcats":
 		characters, err := h.PlayerSubStore.GetPlayersByChannel(channelID)
 		if err != nil {
@@ -746,6 +753,8 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 							"**/top** Открывает меню с кнопками, нажав на которые можно отправить рейтинги по чек боссам среди игроков гильдии.\n" +
 							"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
 							"**/premium** — Премиум для этого канала: статус, активация и подробная инструкция.\n" +
+							"**/attendance** — Посещаемость гильдии за 4 КД (премиум).\n" +
+							"**/profile** — Профиль игрока по киллам и рейдам (премиум).\n" +
 							"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 							"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
 							"**/removechannel** — Полностью убрать этот канал из отслеживания (гильдии, игроки, отчёты). Требует права Управление каналами.\n" +

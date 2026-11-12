@@ -263,3 +263,37 @@ func (r *DiscordReporter) DeleteNotice(channelID, messageID string) error {
 	}
 	return r.session.ChannelMessageDelete(channelID, messageID)
 }
+
+// SendWeeklyDigest renders and posts the weekly premium image.
+func (r *DiscordReporter) SendWeeklyDigest(channelID string, digest models.WeeklyDigest) error {
+	img, err := RenderWeeklyDigest(digest)
+	if err != nil {
+		return err
+	}
+
+	embed := &discordgo.MessageEmbed{
+		Title: fmt.Sprintf("🐾 %s — итоги недели", digest.GuildName),
+		Color: 0xf1c40f,
+		Image: &discordgo.MessageEmbedImage{URL: "attachment://digest.png"},
+		Footer: &discordgo.MessageEmbedFooter{
+			Text: "LazyCatBot · премиум-дайджест",
+		},
+	}
+
+	params := &discordgo.MessageSend{
+		Embeds: []*discordgo.MessageEmbed{embed},
+		Files: []*discordgo.File{
+			{
+				Name:        "digest.png",
+				ContentType: "image/png",
+				Reader:      bytes.NewReader(img),
+			},
+		},
+	}
+	if r.Donation.Enabled() {
+		params.Components = r.Donation.Components()
+	}
+
+	_, err = r.session.ChannelMessageSendComplex(channelID, params)
+	return err
+}

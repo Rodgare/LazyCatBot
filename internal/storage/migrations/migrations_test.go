@@ -29,6 +29,8 @@ func TestMigrationsApply(t *testing.T) {
 		"premium_codes",
 		"premium_audit",
 		"leaderboard_history",
+		"kill_history",
+		"kill_players",
 	} {
 		var name string
 		if err := db.QueryRow(`SELECT name FROM sqlite_master WHERE type = 'table' AND name = ?`, table).Scan(&name); err != nil {

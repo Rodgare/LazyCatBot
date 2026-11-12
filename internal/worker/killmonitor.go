@@ -24,6 +24,7 @@ type Reporter interface {
 	SendChannelNotice(channelID, text string) error
 	SendQueueNotice(channelID string, position int) (string, error)
 	DeleteNotice(channelID, messageID string) error
+	SendWeeklyDigest(channelID string, digest models.WeeklyDigest) error
 }
 
 // PremiumGate reports whether a Discord channel has an active premium
@@ -122,6 +123,7 @@ type Worker struct {
 	sirusClient             SirusAPI
 	lbStore                 *storage.LeaderboardStorage
 	mythLbStore             *storage.MythicLeaderboardStorage
+	killHistory             *storage.KillHistoryStorage
 	subStore                SubscribeStore
 	pSubStore               *storage.PlayerSubscribeStorage
 	gmStore                 *storage.GuildMembersStorage
@@ -172,6 +174,11 @@ func NewWorker(
 
 func (w *Worker) SetMythicLeaderboardStore(ml *storage.MythicLeaderboardStorage) {
 	w.mythLbStore = ml
+}
+
+// SetKillHistoryStore wires persistence for attendance, digests and profiles.
+func (w *Worker) SetKillHistoryStore(kh *storage.KillHistoryStorage) {
+	w.killHistory = kh
 }
 
 // SetPremiumGate wires the premium entitlement lookup used to prioritize report
@@ -551,6 +558,12 @@ func (w *Worker) processRaids(job KillJob) {
 			w.enrichRaidCharacters(&rep, job.Realm)
 			report = &rep
 
+			if w.killHistory != nil {
+				if err := w.killHistory.RecordKill(rep); err != nil {
+					w.logger.Error("[Processor] Record kill history err", "error", err, "kill_id", job.KillID)
+				}
+			}
+
 			for _, p := range enrichedKill.Data.Players {
 				w.enqueueCharRefreshIfStale(job.Realm, p.Name, p.GUID)
 			}
@@ -797,6 +810,7 @@ func (w *Worker) createReport(fight *models.BossFight, killID int, realm string)
 		MapName:   fight.Data.MapName,
 		BossName:  sirus.GetBossName(fight.Order, fight.Encounter),
 		RaidOrder: fight.Order,
+		BossID:    fight.Encounter,
 		KillID:    killID,
 		Duration:  fight.Data.FightLength,
 		Attempts:  fight.Data.Attempts,
@@ -830,8 +844,9 @@ func (w *Worker) createReport(fight *models.BossFight, killID int, realm string)
 		}
 
 		playerReport := models.PlayerReport{
-			Name:     p.Name,
-			Dps:      p.Dps,
+			Name:      p.Name,
+			GUID:      p.GUID,
+			Dps:       p.Dps,
 			Hps:      p.Hps,
 			Ilvl:     p.Ilvl,
 			SpecID:   p.Spec,

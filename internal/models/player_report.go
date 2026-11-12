@@ -2,6 +2,7 @@ package models
 
 type PlayerReport struct {
 	Name              string
+	GUID              int
 	Dps               int
 	Hps               int
 	Ilvl              int
