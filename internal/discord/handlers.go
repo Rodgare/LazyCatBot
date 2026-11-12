@@ -127,6 +127,8 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 		if err != nil {
 			content = "❌ Ошибка при добавлении игрока."
 			l.Error("Add player in modal window error", "error", err)
+		} else if !h.isPremiumChannel(i) {
+			content += "\n\n🐾 Отчёты без очереди и рейтинги за 4 КД — премиум для всего сервера: `/premium`."
 		}
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
@@ -154,6 +156,8 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 		if err != nil {
 			content = "❌ Ошибка при добавлении гильдии."
 			l.Error("Add guild in modal window error", "error", err)
+		} else if !h.isPremiumChannel(i) {
+			content += "\n\n🐾 Отчёты без очереди и рейтинги за 4 КД — премиум для всего сервера: `/premium`."
 		}
 
 		go func(id int, r string) {
@@ -188,6 +192,11 @@ func (h *BotHandler) HandleButtons(s *discordgo.Session, i *discordgo.Interactio
 
 	if data.CustomID == "premium_open" {
 		h.HandlePremiumCommand(s, i)
+		return
+	}
+
+	if data.CustomID == "open_menu" {
+		h.HandleMenuCommand(s, i)
 		return
 	}
 
@@ -386,6 +395,17 @@ func (h *BotHandler) handleAddPlayerModalWithRealm(s *discordgo.Session, i *disc
 }
 
 func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if !hasManageChannels(i) {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "⛔ Управление трекингом доступно участникам с правом «Управление каналами».",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
 	guilds, _ := h.SubStore.GetGuildsByChannel(i.ChannelID)
 	players, _ := h.PlayerSubStore.GetPlayersByChannel(i.ChannelID)
 
@@ -453,10 +473,17 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 		}
 	}
 
+	menuContent := "⚙️ **Управление трекингом в этом канале**"
+	if h.isPremiumChannel(i) {
+		menuContent += "\n✅ Премиум активен для всего сервера."
+	} else {
+		menuContent += "\n🐾 Премиум для всего сервера: отчёты без очереди, рейтинги за 4 КД, дайджест и профили."
+	}
+
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content:    "⚙️ **Управление трекингом в этом канале**",
+			Content:    menuContent,
 			Components: rows,
 			Flags:      discordgo.MessageFlagsEphemeral,
 		},
@@ -901,29 +928,30 @@ func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate)
 		return
 	}
 
+	premium := "**🐾 Премиум для всего сервера**\n" +
+		"Отчёты без очереди, рейтинги за 4 КД, еженедельный дайджест, посещаемость и профили игроков. Один раз на весь сервер — все каналы."
+	if h.PremiumPricing.MonthlyUSD > 0 {
+		premium += fmt.Sprintf(" Стоимость: **$%d/мес**.", h.PremiumPricing.MonthlyUSD)
+	}
+
 	embed := &discordgo.MessageEmbed{
-		Title: "🐈 Справка LazyCatBot",
-		Description: "**Настройка бота:**\n" +
-			"1. Создайте текстовый канал (например, #raid-alerts) и **выдайте боту права на чтение и отправку сообщений в него**.\n" +
-			"2. В этом канале введите /menu — откроется меню с кнопками.\n" +
-			"3. Нажмите «Добавить гильдию», выберите сервер и введите ID гильдии. Аналогично можно добавить игрока через «Добавить игрока».\n\n" +
-
-			"**Команды:**\n" +
-			"**/menu** Вызывает меню с настройкой подписок бота, трекинга и т.д. (Требует права Управление каналами.)\n" +
-			"**/top** Открывает меню с кнопками, нажав на которые можно отправить рейтинги по чек боссам среди игроков гильдии.\n" +
-			"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
-			"**/premium** — Премиум для всего сервера: статус, активация и подробная инструкция.\n" +
-			"**/attendance** — Посещаемость гильдии за 4 КД (премиум).\n" +
-			"**/profile** — Профиль игрока по киллам и рейдам (премиум).\n" +
-			"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
-			"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
-			"**/removechannel** — Полностью убрать этот канал из отслеживания (гильдии, игроки, отчёты). Требует права Управления каналами.\n" +
-			"**/help** — Показать это сообщение.\n",
-
+		Title: "🐈 LazyCatBot подключён",
+		Description: "**Быстрый старт**\n" +
+			"1. Выдайте боту права **Просмотр канала** и **Отправка сообщений** в канале для отчётов.\n" +
+			"2. Нажмите **⚙️ Настроить** и добавьте гильдию или игрока.\n" +
+			"3. Отчёты о киллах, рейтинги и мифик-раны придут автоматически.\n\n" +
+			premium + "\n\n" +
+			"Подробная справка и все команды: `/help`.",
 		Color: 0xf1c40f,
 	}
 
 	s.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
 		Embeds: []*discordgo.MessageEmbed{embed},
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+				discordgo.Button{Label: "⚙️ Настроить", Style: discordgo.PrimaryButton, CustomID: "open_menu"},
+				discordgo.Button{Label: "🐾 Премиум", Style: discordgo.SecondaryButton, CustomID: "premium_open"},
+			}},
+		},
 	})
 }

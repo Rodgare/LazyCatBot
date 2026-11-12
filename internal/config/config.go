@@ -61,7 +61,7 @@ func LoadConfig() *Config {
 		MythicSeason:    getIntEnv("SIRUS_MYTHIC_SEASON", 0),
 		MythicWeekID:    getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
 
-		PremiumURL:        os.Getenv("DONATE_URL"),
+		PremiumURL:        getStringEnv("PREMIUM_URL", os.Getenv("DONATE_URL")),
 		PremiumMonthlyUSD: getIntEnv("PREMIUM_MONTHLY_USD", 1),
 		FreeGuildLimit:    getIntEnv("FREE_GUILD_LIMIT", 1),
 		FreePlayerLimit:   getIntEnv("FREE_PLAYER_LIMIT", 5),

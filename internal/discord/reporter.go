@@ -283,8 +283,15 @@ func (r *DiscordReporter) SendChannelNotice(channelID, text string) error {
 // and returns its message ID so the caller can delete it once the report is out.
 func (r *DiscordReporter) SendQueueNotice(channelID string, position int) (string, error) {
 	text := fmt.Sprintf("⏳ Отчёт готовится к отправке. Позиция в очереди: **%d**.\n"+
-		"Сервер с **премиумом** получает отчёты без очереди во всех каналах.", position)
-	msg, err := r.session.ChannelMessageSend(channelID, text)
+		"Сервер с **премиумом** получает отчёты без очереди во всех каналах. Подробнее — кнопка ниже.", position)
+	msg, err := r.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		Content: text,
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+				discordgo.Button{Label: "🐾 Премиум", Style: discordgo.SecondaryButton, CustomID: "premium_open"},
+			}},
+		},
+	})
 	if err != nil {
 		return "", err
 	}
