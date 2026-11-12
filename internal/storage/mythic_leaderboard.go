@@ -58,17 +58,22 @@ func (s *MythicLeaderboardStorage) UpdateMythicLeaderboard(realm string, season,
 }
 
 // GetPlayerMythicRank computes the player's rank and percentile among the same
-// class+spec by current_score, mirroring the raid GetPlayerRank logic.
-func (s *MythicLeaderboardStorage) GetPlayerMythicRank(realm string, season, weekID, classID, specID int, score float64) (rank, total, percentile int, err error) {
+// class+spec by current_score, mirroring the raid GetPlayerRank logic. It
+// always uses the most recently synced snapshot, so it does not need to know
+// which season is current.
+func (s *MythicLeaderboardStorage) GetPlayerMythicRank(realm string, classID, specID int, score float64) (rank, total, percentile int, err error) {
 	if realm == "" {
 		realm = "x3"
 	}
 
-	err = s.db.QueryRow(`SELECT
-		(SELECT COUNT(*) + 1 FROM mythic_leaderboard WHERE realm=? AND season=? AND week_id=? AND class_id=? AND spec_id=? AND current_score > ?) as rank,
-		(SELECT COUNT(*) FROM mythic_leaderboard WHERE realm=? AND season=? AND week_id=? AND class_id=? AND spec_id=?) as total`,
-		realm, season, weekID, classID, specID, score,
-		realm, season, weekID, classID, specID,
+	const latest = `updated_at = (SELECT MAX(updated_at) FROM mythic_leaderboard WHERE realm = ?)`
+	query := `SELECT
+		(SELECT COUNT(*) + 1 FROM mythic_leaderboard WHERE realm=? AND class_id=? AND spec_id=? AND current_score > ? AND ` + latest + `) as rank,
+		(SELECT COUNT(*) FROM mythic_leaderboard WHERE realm=? AND class_id=? AND spec_id=? AND ` + latest + `) as total`
+
+	err = s.db.QueryRow(query,
+		realm, classID, specID, score, realm,
+		realm, classID, specID, realm,
 	).Scan(&rank, &total)
 	if err != nil {
 		return 0, 0, 0, err

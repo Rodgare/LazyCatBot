@@ -7,34 +7,42 @@ import (
 // StartMythicLeaderboardSync downloads the challenge scores leaderboard for each
 // realm and stores it in the mythic_leaderboard table. Used for coloring Rio in
 // mythic reports by spec percentile.
+//
+// The season is auto-detected from the latest runs unless it is pinned with
+// SIRUS_MYTHIC_SEASON, so a new season does not require a config change.
 func (w *Worker) StartMythicLeaderboardSync() {
 	if w.mythLbStore == nil {
 		w.logger.Warn("Mythic leaderboard store is not wired, skipping sync")
 		return
 	}
 
-	season := w.cfg.MythicSeason
+	configuredSeason := w.cfg.MythicSeason
 	weekID := w.cfg.MythicWeekID
 
-	realms := []string{"x3", "x5"}
+	realms := w.cfg.Realms
+	if len(realms) == 0 {
+		realms = []string{"x3", "x5"}
+	}
 	for _, realm := range realms {
-		w.logger.Info("Start parsing mythic challenge scores leaderboard", "realm", realm, "season", season, "week_id", weekID)
+		w.logger.Info("Start parsing mythic challenge scores leaderboard", "realm", realm, "season", configuredSeason, "week_id", weekID)
 
-		players, err := w.sirusClient.FetchChallengeScores(realm, season, weekID)
+		players, season, err := w.sirusClient.FetchChallengeScores(realm, configuredSeason, weekID)
 		if err != nil {
 			w.logger.Error("Fetch challenge scores error", "error", err, "realm", realm)
 			continue
 		}
 
 		if len(players) == 0 {
-			w.logger.Error("No mythic leaderboard data", "realm", realm)
+			w.logger.Warn("No mythic leaderboard data", "realm", realm, "season", season)
 			continue
 		}
 
 		if err := w.mythLbStore.UpdateMythicLeaderboard(realm, season, weekID, players); err != nil {
-			w.logger.Error("Error saving mythic leaderboard", "error", err, "realm", realm)
+			w.logger.Error("Error saving mythic leaderboard", "error", err, "realm", realm, "season", season)
 			continue
 		}
+
+		w.logger.Info("Mythic leaderboard synced", "realm", realm, "season", season, "week_id", weekID, "players", len(players))
 
 		time.Sleep(5 * time.Second)
 	}

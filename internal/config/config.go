@@ -56,7 +56,7 @@ func LoadConfig() *Config {
 		SyncOnStart:     os.Getenv("SYNC_LEADERBOARD_ON_START") == "false",
 		SyncRealms:      getStringListEnv("SYNC_LEADERBOARD_REALMS", nil),
 		SyncForce:       os.Getenv("SYNC_LEADERBOARD_FORCE") == "true",
-		MythicSeason:    getIntEnv("SIRUS_MYTHIC_SEASON", 6),
+		MythicSeason:    getIntEnv("SIRUS_MYTHIC_SEASON", 0),
 		MythicWeekID:    getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
 
 		DonateURL:       os.Getenv("DONATE_URL"),

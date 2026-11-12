@@ -95,7 +95,7 @@ type SirusAPI interface {
 	FetchLeaderboard(realm string, raidID, bossID, classID, specID int, role string) ([]models.LeaderboardPlayer, bool, error)
 	GetLatestMythicRuns(realm string) (*models.MythicRuns, error)
 	FetchMythicRunDetails(realm string, runID int) (*models.MythicRun, error)
-	FetchChallengeScores(realm string, season, weekID int) ([]models.MythicScorePlayer, error)
+	FetchChallengeScores(realm string, season, weekID int) ([]models.MythicScorePlayer, int, error)
 }
 
 type KillJob struct {
@@ -584,8 +584,7 @@ func (w *Worker) enrichMythicCharacters(job KillJob) {
 
 		if w.mythLbStore != nil {
 			if _, _, percentile, err := w.mythLbStore.GetPlayerMythicRank(
-				job.Realm, w.cfg.MythicSeason, w.cfg.MythicWeekID,
-				m.ClassID, m.SpecID, m.MythicRating,
+				job.Realm, m.ClassID, m.SpecID, m.MythicRating,
 			); err == nil {
 				m.MythicRatingPercentile = percentile
 			}

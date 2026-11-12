@@ -162,16 +162,48 @@ func (c *Client) FetchChallengeScoresPage(realm string, season, weekID, page int
 	return &res, nil
 }
 
-// FetchChallengeScores fetches the whole challenge scores leaderboard by paging
-// through meta.last_page.
-func (c *Client) FetchChallengeScores(realm string, season, weekID int) ([]models.MythicScorePlayer, error) {
+// FetchCurrentMythicSeason detects the current challenge season from the most
+// recent runs. The scores endpoint needs an explicit season number, and the
+// API exposes no dedicated "current season" field, but every run carries its
+// seasonId. Returns 0 when a realm has no recent runs.
+func (c *Client) FetchCurrentMythicSeason(realm string) (int, error) {
 	realm = normalizeRealm(realm)
+	var res models.MythicRuns
+	if err := c.makeRequest(fmt.Sprintf("/api/base/%s/leaderboard/challenge/latest-runs", realm), &res); err != nil {
+		return 0, err
+	}
+	season := 0
+	for _, run := range res.Data {
+		if run.SeasonID > season {
+			season = run.SeasonID
+		}
+	}
+	return season, nil
+}
+
+// FetchChallengeScores fetches the whole challenge scores leaderboard by paging
+// through meta.last_page. Pass season <= 0 to auto-detect the current season;
+// the resolved season is returned alongside the players.
+func (c *Client) FetchChallengeScores(realm string, season, weekID int) ([]models.MythicScorePlayer, int, error) {
+	realm = normalizeRealm(realm)
+
+	if season <= 0 {
+		detected, err := c.FetchCurrentMythicSeason(realm)
+		if err != nil {
+			return nil, 0, err
+		}
+		if detected == 0 {
+			return nil, 0, nil
+		}
+		season = detected
+	}
+
 	var all []models.MythicScorePlayer
 
 	first, err := c.FetchChallengeScoresPage(realm, season, weekID, 1)
 	if err != nil {
 		time.Sleep(15 * time.Second)
-		return nil, err
+		return nil, season, err
 	}
 	all = append(all, first.Data...)
 	totalPages := first.Meta.LastPage
@@ -187,7 +219,7 @@ func (c *Client) FetchChallengeScores(realm string, season, weekID int) ([]model
 		time.Sleep(2 * time.Second)
 	}
 
-	return all, nil
+	return all, season, nil
 }
 
 func (c *Client) FetchGuildLatestBossKills(realm string, guildID int) (*models.LatestBossKills, error) {
