@@ -27,6 +27,9 @@ func TestRenderWeeklyDigest(t *testing.T) {
 			{Name: "Alice", ClassID: 8, Kills: 9, Ilvl: 260},
 			{Name: "Bob", ClassID: 5, Kills: 8, Ilvl: 255},
 		},
+		MythicTop: []models.GuildMythicPlayer{
+			{Name: "Alice", ClassID: 8, BestKey: 10, Score: 3200, BlackDiamonds: 1},
+		},
 	}
 
 	img, err := RenderWeeklyDigest(digest)

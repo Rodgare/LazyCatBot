@@ -38,6 +38,11 @@ CREATE TABLE premium_audit (
     actor TEXT NOT NULL DEFAULT '',
     details TEXT NOT NULL DEFAULT '',
     created_at INTEGER NOT NULL
+);
+CREATE TABLE premium_events (
+    event_key TEXT PRIMARY KEY,
+    event_name TEXT NOT NULL DEFAULT '',
+    created_at INTEGER NOT NULL
 );`
 
 func newPremiumTestStore(t *testing.T) *PremiumStore {
@@ -203,5 +208,24 @@ func TestNormalizePremiumCode(t *testing.T) {
 	got := NormalizePremiumCode("  lz-abcd-2345 ")
 	if got != "LZ-ABCD-2345" {
 		t.Fatalf("NormalizePremiumCode = %q", got)
+	}
+}
+
+func TestClaimPremiumEvent(t *testing.T) {
+	s := newPremiumTestStore(t)
+
+	fresh, err := s.ClaimEvent("payment:1", "new_donation")
+	if err != nil || !fresh {
+		t.Fatalf("first claim = %v, %v; want true", fresh, err)
+	}
+	fresh, err = s.ClaimEvent("payment:1", "new_donation")
+	if err != nil || fresh {
+		t.Fatalf("duplicate claim = %v, %v; want false", fresh, err)
+	}
+
+	// Without a provider event id there is nothing to deduplicate safely.
+	fresh, err = s.ClaimEvent("", "recurrent_donation")
+	if err != nil || !fresh {
+		t.Fatalf("empty key claim = %v, %v; want true", fresh, err)
 	}
 }

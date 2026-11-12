@@ -196,6 +196,26 @@ func (s *PremiumStore) Revoke(channelID, actor string) error {
 	return s.audit(channelID, "revoke", "", "manual", actor, "")
 }
 
+// ClaimEvent records a payment webhook event key and reports whether this is
+// the first delivery. Empty keys are always accepted: without a provider event
+// id there is nothing safe to deduplicate on, and a hash of amount+user would
+// wrongly drop legitimate monthly renewals.
+func (s *PremiumStore) ClaimEvent(key, name string) (bool, error) {
+	if key == "" {
+		return true, nil
+	}
+	res, err := s.db.Exec(`INSERT OR IGNORE INTO premium_events (event_key, event_name, created_at)
+		VALUES (?, ?, ?)`, key, name, time.Now().Unix())
+	if err != nil {
+		return false, err
+	}
+	affected, err := res.RowsAffected()
+	if err != nil {
+		return false, err
+	}
+	return affected == 1, nil
+}
+
 // CreateCode generates a single-use activation code for a channel. Codes are
 // short enough to type into a donation message and valid for 24 hours. They are
 // bound to the channel where /premium was called.

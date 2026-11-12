@@ -25,6 +25,8 @@ type BotHandler struct {
 	PremiumStore   *storage.PremiumStore
 	PremiumPricing PremiumPricing
 	PremiumURL     string
+	FreeGuildLimit  int
+	FreePlayerLimit int
 	KillHistory    *storage.KillHistoryStorage
 	CharacterCache *storage.CharacterCacheStorage
 }
@@ -111,6 +113,11 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 			return
 		}
 
+		if ok, reason := h.canAddPlayer(i, id, realm); !ok {
+			h.freeLimitUpsell(s, i, reason)
+			return
+		}
+
 		err = h.PlayerSubStore.Subscribe(id, playerName, i.ChannelID, i.GuildID, realm)
 		content := fmt.Sprintf("✅ Игрок **%s** (ID: %d) [%s] успешно добавлен!", playerName, id, strings.ToUpper(realm))
 		if err != nil {
@@ -132,6 +139,11 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 		guildIDStr := data.Components[0].(*discordgo.ActionsRow).Components[0].(*discordgo.TextInput).Value
 		var guildID int
 		fmt.Sscanf(guildIDStr, "%d", &guildID)
+
+		if ok, reason := h.canAddGuild(i, guildID, realm); !ok {
+			h.freeLimitUpsell(s, i, reason)
+			return
+		}
 
 		err := h.SubStore.Subscribe(guildID, i.ChannelID, i.GuildID, realm)
 		content := fmt.Sprintf("✅ Гильдия **%d** [%s] успешно добавлена!", guildID, strings.ToUpper(realm))

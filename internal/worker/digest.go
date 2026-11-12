@@ -32,7 +32,22 @@ func (w *Worker) SendWeeklyDigests() {
 				"realm", key.Realm, "guild_id", key.GuildID)
 			continue
 		}
-		if digest.TotalKills == 0 {
+
+		if w.gmStore != nil && w.mythLbStore != nil {
+			if guids, err := w.gmStore.GetPlayersByGuildID(key.Realm, key.GuildID); err == nil && len(guids) > 0 {
+				if mythic, err := w.mythLbStore.GetGuildMythicPlayers(key.Realm, guids); err == nil {
+					if len(mythic) > 5 {
+						mythic = mythic[:5]
+					}
+					digest.MythicTop = mythic
+				} else {
+					w.logger.Error("[Digest] GetGuildMythicPlayers err", "error", err,
+						"realm", key.Realm, "guild_id", key.GuildID)
+				}
+			}
+		}
+
+		if digest.TotalKills == 0 && len(digest.MythicTop) == 0 {
 			continue
 		}
 

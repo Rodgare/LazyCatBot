@@ -78,6 +78,39 @@ func (s *PlayerSubscribeStorage) GetPlayersByChannel(channelID string) (map[int]
 	return players, nil
 }
 
+type PlayerSub struct {
+	PlayerID int
+	Name     string
+	Realm    string
+}
+
+func (s *PlayerSubscribeStorage) GetPlayerSubsByChannel(channelID string) ([]PlayerSub, error) {
+	rows, err := s.db.Query(`SELECT id, name, COALESCE(realm, 'x3')
+		FROM player_subscribe WHERE channel_id = ?`, channelID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var subs []PlayerSub
+	for rows.Next() {
+		var p PlayerSub
+		if err := rows.Scan(&p.PlayerID, &p.Name, &p.Realm); err != nil {
+			return nil, err
+		}
+		subs = append(subs, p)
+	}
+	return subs, rows.Err()
+}
+
+// HasPlayer reports whether the channel already tracks the player.
+func (s *PlayerSubscribeStorage) HasPlayer(playerID int, channelID string) bool {
+	var one int
+	err := s.db.QueryRow(`SELECT 1 FROM player_subscribe WHERE id = ? AND channel_id = ? LIMIT 1`,
+		playerID, channelID).Scan(&one)
+	return err == nil
+}
+
 type TrackedPlayerName struct {
 	ID    int
 	Name  string

@@ -125,6 +125,15 @@ func (s *SubscribeStorage) GetGuildSubsByChannel(channelID string) ([]GuildSub, 
 	return subs, nil
 }
 
+// HasGuild reports whether the channel already tracks the guild. Used by the
+// free-tier limit checks so re-adding an existing guild is always allowed.
+func (s *SubscribeStorage) HasGuild(guildID int, channelID string) bool {
+	var one int
+	err := s.db.QueryRow(`SELECT 1 FROM subscribe WHERE guild_id = ? AND channel_id = ? LIMIT 1`,
+		guildID, channelID).Scan(&one)
+	return err == nil
+}
+
 func (s *SubscribeStorage) GetGuildsByChannel(channelID string) ([]int, error) {
 	query := `SELECT guild_id FROM subscribe WHERE channel_id = ?`
 	rows, err := s.db.Query(query, channelID)

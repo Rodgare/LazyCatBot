@@ -28,10 +28,17 @@ func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 	if len(firstKills) > 6 {
 		firstKills = firstKills[:6]
 	}
+	mythic := d.MythicTop
+	if len(mythic) > 5 {
+		mythic = mythic[:5]
+	}
 
 	height := 150 + 20
 	height += digestSectH + maxInt(1, len(firstKills))*digestRowH
 	height += digestSectH + 5*digestRowH
+	if len(mythic) > 0 {
+		height += digestSectH + len(mythic)*digestRowH
+	}
 	height += digestSectH + maxInt(1, len(attendance))*digestRowH
 	height += 50
 
@@ -89,6 +96,15 @@ func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 		rightY += digestRowH
 	}
 	y += 5*digestRowH + 14
+
+	if len(mythic) > 0 {
+		y = digestSection(dc, "Мифик", y)
+		for i, p := range mythic {
+			digestMythicRow(dc, digestPad, y, p, i+1)
+			y += digestRowH
+		}
+		y += 14
+	}
 
 	y = digestSection(dc, "Посещаемость", y)
 	if len(attendance) == 0 {
@@ -167,6 +183,24 @@ func digestPlayerRow(dc *gg.Context, x, y float64, p models.DigestPlayer, rank i
 	if p.BlackDiamonds > 0 {
 		dc.SetRGB(0.55, 0.58, 0.64)
 		dc.DrawString(fmt.Sprintf("ЧБ %d", p.BlackDiamonds), x+330, y+20)
+	}
+}
+
+func digestMythicRow(dc *gg.Context, x, y float64, p models.GuildMythicPlayer, rank int) {
+	loadCyrillicFontFace(dc, 18)
+	dc.SetRGB(0.55, 0.58, 0.64)
+	dc.DrawString(fmt.Sprintf("%d.", rank), x, y+20)
+	dc.SetColor(classColorRGBA(p.ClassID))
+	dc.DrawString(p.Name, x+28, y+20)
+	dc.SetRGB(0.82, 0.85, 0.90)
+	key := "—"
+	if p.BestKey > 0 {
+		key = fmt.Sprintf("+%d", p.BestKey)
+	}
+	dc.DrawString(fmt.Sprintf("%s  ·  %s", key, FormatNum(int(p.Score))), x+250, y+20)
+	if p.BlackDiamonds > 0 {
+		dc.SetRGB(0.55, 0.58, 0.64)
+		dc.DrawString(fmt.Sprintf("ЧБ %d", p.BlackDiamonds), x+420, y+20)
 	}
 }
 

@@ -24,6 +24,8 @@ type Config struct {
 	PremiumURL string
 
 	PremiumMonthlyUSD int
+	FreeGuildLimit    int
+	FreePlayerLimit   int
 
 	TributeAPIKey      string
 	TributeWebhookAddr string
@@ -61,6 +63,8 @@ func LoadConfig() *Config {
 
 		PremiumURL:        os.Getenv("DONATE_URL"),
 		PremiumMonthlyUSD: getIntEnv("PREMIUM_MONTHLY_USD", 1),
+		FreeGuildLimit:    getIntEnv("FREE_GUILD_LIMIT", 1),
+		FreePlayerLimit:   getIntEnv("FREE_PLAYER_LIMIT", 5),
 
 		TributeAPIKey:      os.Getenv("TRIBUTE_API_KEY"),
 		TributeWebhookAddr: os.Getenv("TRIBUTE_WEBHOOK_ADDR"),

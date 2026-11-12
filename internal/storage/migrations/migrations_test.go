@@ -28,6 +28,7 @@ func TestMigrationsApply(t *testing.T) {
 		"premium_entitlements",
 		"premium_codes",
 		"premium_audit",
+		"premium_events",
 		"leaderboard_history",
 		"kill_history",
 		"kill_players",

@@ -19,15 +19,20 @@ import (
 )
 
 type tributeEvent struct {
-	Name    string `json:"name"`
+	Name    string          `json:"name"`
+	ID      json.RawMessage `json:"id"`
 	Payload struct {
-		Message          string `json:"message"`
-		Amount           int64  `json:"amount"`
-		Currency         string `json:"currency"`
-		Anonymously      bool   `json:"anonymously"`
-		DonationName     string `json:"donation_name"`
-		TelegramUserID   int64  `json:"telegram_user_id"`
-		TelegramUsername string `json:"telegram_username"`
+		Message          string          `json:"message"`
+		Amount           int64           `json:"amount"`
+		Currency         string          `json:"currency"`
+		Anonymously      bool            `json:"anonymously"`
+		DonationName     string          `json:"donation_name"`
+		TelegramUserID   int64           `json:"telegram_user_id"`
+		TelegramUsername string          `json:"telegram_username"`
+		ID               json.RawMessage `json:"id"`
+		DonationID       json.RawMessage `json:"donation_id"`
+		PaymentID        json.RawMessage `json:"payment_id"`
+		SubscriptionID   json.RawMessage `json:"subscription_id"`
 	} `json:"payload"`
 }
 
@@ -73,6 +78,20 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if isPaymentEvent(ev.Name) {
+		if h.premium != nil {
+			if key := paymentEventKey(ev); key != "" {
+				fresh, err := h.premium.ClaimEvent(key, ev.Name)
+				if err != nil {
+					h.logger.Error("[Tribute] claim event err", "error", err, "key", key)
+				} else if !fresh {
+					h.logger.Info("[Tribute] duplicate event ignored", "key", key, "name", ev.Name)
+					w.Header().Set("Content-Type", "application/json")
+					w.WriteHeader(http.StatusOK)
+					_, _ = w.Write([]byte(`{"status":"ok"}`))
+					return
+				}
+			}
+		}
 		h.handlePayment(ev)
 	} else {
 		h.logger.Info("[Tribute] webhook ignored", "name", ev.Name)
@@ -126,6 +145,39 @@ func tributeSubject(ev tributeEvent) string {
 	}
 	if u := strings.ToLower(strings.TrimSpace(ev.Payload.TelegramUsername)); u != "" {
 		return "tgname:" + u
+	}
+	return ""
+}
+
+// paymentEventKey returns a stable provider event id when one is present. It
+// accepts string and numeric ids from any of the fields Tribute may use.
+func paymentEventKey(ev tributeEvent) string {
+	ids := []json.RawMessage{
+		ev.Payload.PaymentID,
+		ev.Payload.SubscriptionID,
+		ev.Payload.DonationID,
+		ev.Payload.ID,
+		ev.ID,
+	}
+	for _, raw := range ids {
+		if id := rawJSONID(raw); id != "" {
+			return ev.Name + ":" + id
+		}
+	}
+	return ""
+}
+
+func rawJSONID(raw json.RawMessage) string {
+	if len(raw) == 0 {
+		return ""
+	}
+	var s string
+	if json.Unmarshal(raw, &s) == nil {
+		return strings.TrimSpace(s)
+	}
+	var n json.Number
+	if json.Unmarshal(raw, &n) == nil {
+		return n.String()
 	}
 	return ""
 }

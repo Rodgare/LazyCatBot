@@ -151,6 +151,8 @@ func main() {
 	h.ResyncFunc = killWorker.RequestLeaderboardSync
 	h.PremiumURL = appCfg.PremiumURL
 	h.PremiumStore = premiumStore
+	h.FreeGuildLimit = appCfg.FreeGuildLimit
+	h.FreePlayerLimit = appCfg.FreePlayerLimit
 	h.KillHistory = killHistoryStore
 	h.CharacterCache = ccStore
 	h.PremiumPricing = discord.PremiumPricing{

@@ -42,6 +42,7 @@ type WeeklyDigest struct {
 	TopDps     []DigestPlayer
 	TopHps     []DigestPlayer
 	Attendance []AttendanceEntry
+	MythicTop  []GuildMythicPlayer
 }
 
 // PlayerKillProfile is the kill-history part of a player card. Character data
