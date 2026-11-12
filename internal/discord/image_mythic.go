@@ -184,8 +184,14 @@ func (r *DiscordReporter) RenderMythicReportImage(report *models.MythicReport) (
 		combatByGUID[c.GUID] = c
 	}
 
+	memberNames := make([]string, 0, len(report.Members))
+	for _, m := range report.Members {
+		memberNames = append(memberNames, m.Name)
+	}
+	showcase := pickShowcaseName(memberNames)
+
 	for i, member := range report.Members {
-		y = drawMythicPlayerRow(dc, i+1, member, combatByGUID[member.MemberGUID], y, report.HasCombat)
+		y = drawMythicPlayerRow(dc, i+1, member, combatByGUID[member.MemberGUID], y, report.HasCombat, showcase)
 	}
 
 	// if report.RewardLevel <= 0 {
@@ -277,7 +283,7 @@ func drawMythicTableHeader(dc *gg.Context, y float64, combat bool) {
 	}
 }
 
-func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, combat models.MythicMemberCombat, y float64, hasCombat bool) float64 {
+func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, combat models.MythicMemberCombat, y float64, hasCombat bool, showcase string) float64 {
 	if rank%2 == 0 {
 		dc.SetRGBA(1, 1, 1, 0.03)
 		dc.DrawRectangle(0, y, float64(mWidth), mRowHeight)
@@ -302,7 +308,7 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	}
 
 	// Name (class color)
-	if IsPremiumName(member.Name) {
+	if shouldHighlight(member.Name, showcase) {
 		nameW, _ := dc.MeasureString(member.Name)
 		drawPremiumBackdrop(dc, float64(mColNameX)-6, y+6, nameW+12, mRowHeight-12)
 	}

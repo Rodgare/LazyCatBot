@@ -2,6 +2,7 @@ package discord
 
 import (
 	"image/color"
+	"math/rand"
 	"strings"
 	"sync"
 
@@ -54,6 +55,39 @@ func IsPremiumName(name string) bool {
 	_, ok := premiumNames[k]
 	premiumMu.RUnlock()
 	return ok
+}
+
+// shouldHighlight reports whether a row is drawn with the premium backdrop:
+// real donors always are, plus one "showcase" player per report so everyone can
+// see what the premium nickname looks like.
+func shouldHighlight(name, showcase string) bool {
+	if IsPremiumName(name) {
+		return true
+	}
+	if showcase == "" {
+		return false
+	}
+	return normalizeDonorName(name) == normalizeDonorName(showcase)
+}
+
+// pickShowcaseName chooses a random nickname to highlight as a teaser. If the
+// report already contains a real donor, it returns "" so only actual donors are
+// highlighted and no random player is touched.
+func pickShowcaseName(names []string) string {
+	candidates := make([]string, 0, len(names))
+	for _, n := range names {
+		if strings.TrimSpace(n) == "" {
+			continue
+		}
+		if IsPremiumName(n) {
+			return ""
+		}
+		candidates = append(candidates, n)
+	}
+	if len(candidates) == 0 {
+		return ""
+	}
+	return candidates[rand.Intn(len(candidates))]
 }
 
 // drawPremiumBackdrop paints a gold→purple gradient rounded rectangle behind a

@@ -63,8 +63,14 @@ func RenderMythicGuildTopImage(guildName, realm string, players []models.GuildMy
 	drawMythicGuildTableHeader(dc, y)
 	y += mtTableHeader
 
+	names := make([]string, 0, len(players))
+	for _, p := range players {
+		names = append(names, p.Name)
+	}
+	showcase := pickShowcaseName(names)
+
 	for i := range players {
-		y = drawMythicGuildPlayerRow(dc, i+1, players[i], len(players), y)
+		y = drawMythicGuildPlayerRow(dc, i+1, players[i], len(players), y, showcase)
 	}
 
 	buf := new(bytes.Buffer)
@@ -97,7 +103,7 @@ func drawMythicGuildTableHeader(dc *gg.Context, y float64) {
 	dc.DrawString("Забегов", mtColRunsX-15, y+20)
 }
 
-func drawMythicGuildPlayerRow(dc *gg.Context, rank int, p models.GuildMythicPlayer, total int, y float64) float64 {
+func drawMythicGuildPlayerRow(dc *gg.Context, rank int, p models.GuildMythicPlayer, total int, y float64, showcase string) float64 {
 	if rank%2 == 0 {
 		dc.SetRGBA(1, 1, 1, 0.03)
 		dc.DrawRectangle(0, y, float64(mtWidth), mtRowHeight)
@@ -122,7 +128,7 @@ func drawMythicGuildPlayerRow(dc *gg.Context, rank int, p models.GuildMythicPlay
 	}
 
 	// Name (class color)
-	if IsPremiumName(p.Name) {
+	if shouldHighlight(p.Name, showcase) {
 		nameW, _ := dc.MeasureString(p.Name)
 		drawPremiumBackdrop(dc, float64(mtColNameX)-6, y+6, nameW+12, mtRowHeight-12)
 	}

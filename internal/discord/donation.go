@@ -35,14 +35,14 @@ func (d Donation) Components() []discordgo.MessageComponent {
 	var buttons []discordgo.MessageComponent
 	if d.URL != "" {
 		buttons = append(buttons, discordgo.Button{
-			Label: "🐾 Закинуть на корм",
+			Label: "🐾 Поддержать бота · премиум-ник",
 			Style: discordgo.LinkButton,
 			URL:   d.URL,
 		})
 	}
 	if d.CryptoURL != "" {
 		buttons = append(buttons, discordgo.Button{
-			Label: "💎 Крипта",
+			Label: "💎 Поддержать (крипта)",
 			Style: discordgo.LinkButton,
 			URL:   d.CryptoURL,
 		})

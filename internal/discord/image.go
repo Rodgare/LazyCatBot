@@ -122,6 +122,14 @@ func getRaidColor(raidID int) string {
 //go:embed assets/images assets/fonts
 var imagesFS embed.FS
 
+func reportPlayerNames(players []models.PlayerReport) []string {
+	names := make([]string, 0, len(players))
+	for _, p := range players {
+		names = append(names, p.Name)
+	}
+	return names
+}
+
 func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 	var dds, healers []models.PlayerReport
 	for _, p := range report.Players {
@@ -144,6 +152,8 @@ func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 		roleHeaders++
 	}
 	height := headerH + footerH + (totalRows+roleHeaders)*rowHeight + margin*2
+
+	showcase := pickShowcaseName(reportPlayerNames(report.Players))
 
 	dc := gg.NewContext(width, int(height))
 
@@ -173,7 +183,7 @@ func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 		dc.DrawString("Дпс", colDpsX, y+20)
 		y = drawRoleHeader(dc, "Дамагеры", y, width)
 		for i, p := range dds {
-			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, true)
+			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, true, showcase)
 		}
 
 	}
@@ -184,7 +194,7 @@ func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 		dc.DrawString("Хпс", colDpsX, y+20)
 		y = drawRoleHeader(dc, "Хилы", y, width)
 		for i, p := range healers {
-			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, false)
+			y = drawPlayerRow(dc, i+1, p, y, width, rowHeight, false, showcase)
 		}
 
 	}
@@ -231,7 +241,7 @@ func drawRoleHeader(dc *gg.Context, title string, y float64, width int) float64 
 	return y + 35
 }
 
-func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, width int, rowHeight float64, isDD bool) float64 {
+func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, width int, rowHeight float64, isDD bool, showcase string) float64 {
 	//rank
 	if rank%2 == 0 {
 		dc.SetRGBA(1, 1, 1, 0.03)
@@ -243,7 +253,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	dc.DrawString(fmt.Sprintf("%d.", rank), colRankX, y+25)
 
 	// donor highlight behind the nickname
-	if IsPremiumName(p.Name) {
+	if shouldHighlight(p.Name, showcase) {
 		nameW, _ := dc.MeasureString(p.Name)
 		drawPremiumBackdrop(dc, float64(colNameX)-6, y+5, nameW+12, rowHeight-10)
 	}
