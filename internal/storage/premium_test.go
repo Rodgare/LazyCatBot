@@ -34,6 +34,7 @@ CREATE TABLE premium_codes (
 CREATE TABLE premium_audit (
     id INTEGER PRIMARY KEY,
     guild_id TEXT NOT NULL DEFAULT '',
+    channel_id TEXT NOT NULL,
     action TEXT NOT NULL,
     plan TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT '',
@@ -222,6 +223,21 @@ func TestPremiumGrantLifetimeAndRevoke(t *testing.T) {
 	}
 	if !s.IsPremium(guild) {
 		t.Fatalf("regranted guild should be premium")
+	}
+}
+
+func TestPremiumGrantTrialWithoutChannel(t *testing.T) {
+	s := newPremiumTestStore(t)
+
+	ent, err := s.Grant("guild-trial", "", PlanTrial, "trial", "admin")
+	if err != nil {
+		t.Fatalf("grant trial without channel: %v", err)
+	}
+	if ent.Plan != PlanTrial || !ent.Active(time.Now()) {
+		t.Fatalf("unexpected trial entitlement: %+v", ent)
+	}
+	if !s.IsPremium("guild-trial") {
+		t.Fatalf("trial guild should be premium")
 	}
 }
 

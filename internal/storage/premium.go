@@ -334,9 +334,9 @@ func (s *PremiumStore) RedeemCode(code, subject string, recurring bool) (*Premiu
 		return nil, err
 	}
 	if _, err := tx.Exec(`INSERT INTO premium_audit
-		(guild_id, action, plan, source, actor, details, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		guildID, "redeem", string(plan), "tribute", subject, code, now.Unix()); err != nil {
+		(guild_id, channel_id, action, plan, source, actor, details, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		guildID, channelID, "redeem", string(plan), "tribute", subject, code, now.Unix()); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -420,9 +420,9 @@ func grantTx(tx *sql.Tx, guildID, channelID string, plan PremiumPlan, source, ac
 	}
 
 	if _, err := tx.Exec(`INSERT INTO premium_audit
-		(guild_id, action, plan, source, actor, details, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		guildID, action, string(plan), source, actor, channelID, nowUnix); err != nil {
+		(guild_id, channel_id, action, plan, source, actor, details, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		guildID, channelID, action, string(plan), source, actor, "", nowUnix); err != nil {
 		return nil, err
 	}
 
@@ -440,8 +440,8 @@ func grantTx(tx *sql.Tx, guildID, channelID string, plan PremiumPlan, source, ac
 
 func (s *PremiumStore) audit(guildID, action, plan, source, actor, details string) error {
 	_, err := s.db.Exec(`INSERT INTO premium_audit
-		(guild_id, action, plan, source, actor, details, created_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		(guild_id, channel_id, action, plan, source, actor, details, created_at)
+		VALUES (?, '', ?, ?, ?, ?, ?, ?)`,
 		guildID, action, plan, source, actor, details, time.Now().Unix())
 	return err
 }
