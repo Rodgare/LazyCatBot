@@ -272,7 +272,8 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	}
 
 	// donor highlight across the whole row, behind all text and icons
-	if shouldHighlight(p.Name, showcase) {
+	premium := shouldHighlight(p.Name, showcase)
+	if premium {
 		drawPremiumRow(dc, y, rowHeight, float64(width), classColorRGBA(p.ClassID))
 	}
 
@@ -283,6 +284,9 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 	colorHex, ok := classColors[p.ClassID]
 	if !ok {
 		colorHex = "#FFFFFF"
+	}
+	if premium {
+		drawNameShadow(dc, p.Name, colNameX, y+25)
 	}
 	dc.SetHexColor(colorHex)
 	dc.DrawString(p.Name, colNameX, y+25)

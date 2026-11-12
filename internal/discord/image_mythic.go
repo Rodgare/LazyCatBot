@@ -293,7 +293,8 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	loadMythicFontFace(dc, 16)
 
 	// Donor highlight across the whole row, behind all text and icons
-	if shouldHighlight(member.Name, showcase) {
+	premium := shouldHighlight(member.Name, showcase)
+	if premium {
 		drawPremiumRow(dc, y, mRowHeight, float64(mWidth), classColorRGBA(member.ClassID))
 	}
 
@@ -316,6 +317,9 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 	colorHex, ok := classColors[member.ClassID]
 	if !ok {
 		colorHex = "#FFFFFF"
+	}
+	if premium {
+		drawNameShadow(dc, member.Name, mColNameX, y+28)
 	}
 	dc.SetHexColor(colorHex)
 	dc.DrawString(member.Name, mColNameX, y+28)

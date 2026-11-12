@@ -96,28 +96,29 @@ const (
 	premiumRowAccent = 3.0
 )
 
-// premiumTint keeps the row tint close to the class color, but darkens very
-// light colors (priest white, rogue yellow) so the translucent backdrop never
-// washes out the nickname drawn on top of it.
+// premiumTint keeps the row tint a darker, slightly richer version of the
+// class color so the bright nickname drawn on top never blends into its own
+// backdrop. Very light colors are pulled down further.
 func premiumTint(c color.RGBA) color.RGBA {
-	lum := 0.299*float64(c.R) + 0.587*float64(c.G) + 0.114*float64(c.B)
-	if lum <= 200 {
-		return c
+	const base = 0.70
+	r := float64(c.R) * base
+	g := float64(c.G) * base
+	b := float64(c.B) * base
+
+	lum := 0.299*r + 0.587*g + 0.114*b
+	if lum > 150 {
+		f := 150 / lum
+		r, g, b = r*f, g*f, b*f
 	}
-	const f = 0.55
-	return color.RGBA{
-		R: uint8(float64(c.R) * f),
-		G: uint8(float64(c.G) * f),
-		B: uint8(float64(c.B) * f),
-		A: 255,
-	}
+	return color.RGBA{R: uint8(r), G: uint8(g), B: uint8(b), A: 255}
 }
 
 // drawPremiumRow paints the donor highlight across the whole table row using
-// the player's class color. The gradient is strongest around the rank and
-// nickname, fades through the middle and reaches full transparency at the
-// right edge, so numbers and icons stay readable. A thin left accent bar and a
-// hairline inner border separate the row from its neighbours; the small inset
+// the player's class color. The gradient is a soft smoky glow: it peaks around
+// the rank and nickname at ~18% opacity, fades to ~4% by the middle and is
+// fully transparent before the right-side columns, so numbers and icons keep
+// their own colors. A 3px accent bar in the pure class color marks the row and
+// a hairline inner border separates it from its neighbours; the small inset
 // keeps stacked donor rows from merging.
 func drawPremiumRow(dc *gg.Context, y, h, width float64, classColor color.RGBA) {
 	x := premiumRowInset
@@ -134,23 +135,33 @@ func drawPremiumRow(dc *gg.Context, y, h, width float64, classColor color.RGBA) 
 	}
 
 	grad := gg.NewLinearGradient(x, 0, x+w, 0)
-	grad.AddColorStop(0, stop(64))
-	grad.AddColorStop(0.25, stop(46))
-	grad.AddColorStop(0.55, stop(22))
-	grad.AddColorStop(1, stop(0))
+	grad.AddColorStop(0, stop(46))
+	grad.AddColorStop(0.22, stop(30))
+	grad.AddColorStop(0.50, stop(12))
+	grad.AddColorStop(0.80, stop(0))
 	dc.SetFillStyle(grad)
 	dc.DrawRoundedRectangle(x, yy, w, hh, premiumRowRadius)
 	dc.Fill()
 
-	br := float64(classColor.R) + (255-float64(classColor.R))*0.35
-	bg := float64(classColor.G) + (255-float64(classColor.G))*0.35
-	bb := float64(classColor.B) + (255-float64(classColor.B))*0.35
-	dc.SetLineWidth(1)
-	dc.SetRGBA(br/255, bg/255, bb/255, 0.20)
-	dc.DrawRoundedRectangle(x+0.5, yy+0.5, w-1, hh-1, premiumRowRadius)
-	dc.Stroke()
-
-	dc.SetRGBA(float64(tint.R)/255, float64(tint.G)/255, float64(tint.B)/255, 0.90)
-	dc.DrawRoundedRectangle(x+1, yy+5, premiumRowAccent, hh-10, 1.5)
+	br := float64(classColor.R) + (255-float64(classColor.R))*0.30
+	bg := float64(classColor.G) + (255-float64(classColor.G))*0.30
+	bb := float64(classColor.B) + (255-float64(classColor.B))*0.30
+	dc.SetRGBA(br/255, bg/255, bb/255, 0.16)
+	dc.DrawRectangle(x+6, yy+0.5, w-12, 1)
 	dc.Fill()
+	dc.DrawRectangle(x+6, yy+hh-1.5, w-12, 1)
+	dc.Fill()
+
+	dc.SetRGBA(float64(classColor.R)/255, float64(classColor.G)/255, float64(classColor.B)/255, 1)
+	dc.DrawRoundedRectangle(x+1, yy+4, premiumRowAccent, hh-8, 1.5)
+	dc.Fill()
+}
+
+// drawNameShadow draws a soft dark drop shadow under a nickname so the
+// class-colored text stays readable on top of the class-tinted row.
+func drawNameShadow(dc *gg.Context, s string, x, y float64) {
+	dc.SetRGBA(0, 0, 0, 0.90)
+	dc.DrawString(s, x, y+1.5)
+	dc.SetRGBA(0, 0, 0, 0.35)
+	dc.DrawString(s, x, y+2.5)
 }
