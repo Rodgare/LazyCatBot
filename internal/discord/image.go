@@ -10,6 +10,7 @@ import (
 	_ "image/png"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 
 	"github.com/fogleman/gg"
@@ -48,6 +49,27 @@ var classColors = map[int]string{
 	9:  "#9482C9", // Warlock
 	11: "#FF7D0A", // Druid
 	12: "#A330C9", // DH
+}
+
+func hexToRGBA(hex string) color.RGBA {
+	hex = strings.TrimPrefix(hex, "#")
+	if len(hex) != 6 {
+		return color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	}
+	v, err := strconv.ParseUint(hex, 16, 32)
+	if err != nil {
+		return color.RGBA{R: 255, G: 255, B: 255, A: 255}
+	}
+	return color.RGBA{R: uint8(v >> 16), G: uint8(v >> 8), B: uint8(v), A: 255}
+}
+
+// classColorRGBA returns the class color used both for the nickname and for the
+// per-player premium row tint.
+func classColorRGBA(classID int) color.RGBA {
+	if hex, ok := classColors[classID]; ok {
+		return hexToRGBA(hex)
+	}
+	return color.RGBA{R: 255, G: 255, B: 255, A: 255}
 }
 
 var specIcons = map[int]map[string]string{
@@ -251,7 +273,7 @@ func drawPlayerRow(dc *gg.Context, rank int, p models.PlayerReport, y float64, w
 
 	// donor highlight across the whole row, behind all text and icons
 	if shouldHighlight(p.Name, showcase) {
-		drawPremiumRow(dc, y, rowHeight, float64(width))
+		drawPremiumRow(dc, y, rowHeight, float64(width), classColorRGBA(p.ClassID))
 	}
 
 	dc.SetRGB(0.5, 0.5, 0.5)

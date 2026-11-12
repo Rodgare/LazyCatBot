@@ -114,7 +114,7 @@ func drawMythicGuildPlayerRow(dc *gg.Context, rank int, p models.GuildMythicPlay
 
 	// Donor highlight across the whole row, behind all text and icons
 	if shouldHighlight(p.Name, showcase) {
-		drawPremiumRow(dc, y, mtRowHeight, float64(mtWidth))
+		drawPremiumRow(dc, y, mtRowHeight, float64(mtWidth), classColorRGBA(p.ClassID))
 	}
 
 	// Rank

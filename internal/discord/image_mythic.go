@@ -294,7 +294,7 @@ func drawMythicPlayerRow(dc *gg.Context, rank int, member models.ReportMember, c
 
 	// Donor highlight across the whole row, behind all text and icons
 	if shouldHighlight(member.Name, showcase) {
-		drawPremiumRow(dc, y, mRowHeight, float64(mWidth))
+		drawPremiumRow(dc, y, mRowHeight, float64(mWidth), classColorRGBA(member.ClassID))
 	}
 
 	// Rank

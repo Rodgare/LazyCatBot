@@ -96,13 +96,30 @@ const (
 	premiumRowAccent = 3.0
 )
 
-// drawPremiumRow paints the donor highlight across the whole table row. The
-// gold gradient is strongest around the rank and nickname, fades through the
-// middle and reaches full transparency at the right edge, so class colors and
-// numbers stay readable. A thin left accent bar and a hairline inner border
-// separate the row from its neighbours; the small inset keeps stacked donor
-// rows from merging.
-func drawPremiumRow(dc *gg.Context, y, h, width float64) {
+// premiumTint keeps the row tint close to the class color, but darkens very
+// light colors (priest white, rogue yellow) so the translucent backdrop never
+// washes out the nickname drawn on top of it.
+func premiumTint(c color.RGBA) color.RGBA {
+	lum := 0.299*float64(c.R) + 0.587*float64(c.G) + 0.114*float64(c.B)
+	if lum <= 200 {
+		return c
+	}
+	const f = 0.55
+	return color.RGBA{
+		R: uint8(float64(c.R) * f),
+		G: uint8(float64(c.G) * f),
+		B: uint8(float64(c.B) * f),
+		A: 255,
+	}
+}
+
+// drawPremiumRow paints the donor highlight across the whole table row using
+// the player's class color. The gradient is strongest around the rank and
+// nickname, fades through the middle and reaches full transparency at the
+// right edge, so numbers and icons stay readable. A thin left accent bar and a
+// hairline inner border separate the row from its neighbours; the small inset
+// keeps stacked donor rows from merging.
+func drawPremiumRow(dc *gg.Context, y, h, width float64, classColor color.RGBA) {
 	x := premiumRowInset
 	w := width - premiumRowInset*2
 	yy := y + premiumRowInset
@@ -111,21 +128,29 @@ func drawPremiumRow(dc *gg.Context, y, h, width float64) {
 		return
 	}
 
+	tint := premiumTint(classColor)
+	stop := func(a uint8) color.RGBA {
+		return color.RGBA{R: tint.R, G: tint.G, B: tint.B, A: a}
+	}
+
 	grad := gg.NewLinearGradient(x, 0, x+w, 0)
-	grad.AddColorStop(0, color.RGBA{R: 245, G: 158, B: 11, A: 59})
-	grad.AddColorStop(0.25, color.RGBA{R: 245, G: 158, B: 11, A: 42})
-	grad.AddColorStop(0.55, color.RGBA{R: 245, G: 158, B: 11, A: 20})
-	grad.AddColorStop(1, color.RGBA{R: 245, G: 158, B: 11, A: 0})
+	grad.AddColorStop(0, stop(64))
+	grad.AddColorStop(0.25, stop(46))
+	grad.AddColorStop(0.55, stop(22))
+	grad.AddColorStop(1, stop(0))
 	dc.SetFillStyle(grad)
 	dc.DrawRoundedRectangle(x, yy, w, hh, premiumRowRadius)
 	dc.Fill()
 
+	br := float64(classColor.R) + (255-float64(classColor.R))*0.35
+	bg := float64(classColor.G) + (255-float64(classColor.G))*0.35
+	bb := float64(classColor.B) + (255-float64(classColor.B))*0.35
 	dc.SetLineWidth(1)
-	dc.SetRGBA(1, 0.86, 0.50, 0.18)
+	dc.SetRGBA(br/255, bg/255, bb/255, 0.20)
 	dc.DrawRoundedRectangle(x+0.5, yy+0.5, w-1, hh-1, premiumRowRadius)
 	dc.Stroke()
 
-	dc.SetRGBA(0.98, 0.72, 0.15, 0.90)
+	dc.SetRGBA(float64(tint.R)/255, float64(tint.G)/255, float64(tint.B)/255, 0.90)
 	dc.DrawRoundedRectangle(x+1, yy+5, premiumRowAccent, hh-10, 1.5)
 	dc.Fill()
 }
