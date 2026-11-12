@@ -255,6 +255,11 @@ func main() {
 				},
 			},
 		},
+		{
+			Name:                     "grantpremium",
+			Description:              "Выдать всем серверам пробный премиум на 8 дней (только администратор)",
+			DefaultMemberPermissions: &manageChannelsPerm,
+		},
 	}
 
 	_, err = dg.ApplicationCommandBulkOverwrite(dg.State.User.ID, "", commands)

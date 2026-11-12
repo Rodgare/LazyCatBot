@@ -236,6 +236,33 @@ func (s *SubscribeStorage) GetDiscordIDByChannel(channelID string) (string, erro
 	return discordID, nil
 }
 
+// GetAllDiscordGuildIDs returns every Discord server the bot knows about:
+// servers that were welcomed, and servers that have guild or player
+// subscriptions. Used for server-wide actions such as trial grants.
+func (s *SubscribeStorage) GetAllDiscordGuildIDs() ([]string, error) {
+	rows, err := s.db.Query(`
+		SELECT discord_id FROM welcome_channels WHERE discord_id != ''
+		UNION
+		SELECT discord_id FROM subscribe WHERE discord_id != ''
+		UNION
+		SELECT discord_id FROM player_subscribe WHERE discord_id != ''
+		ORDER BY discord_id`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var ids []string
+	for rows.Next() {
+		var id string
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		ids = append(ids, id)
+	}
+	return ids, rows.Err()
+}
+
 // GetChannelDiscordIDs returns the Discord server id recorded for every
 // channel that has guild or player subscriptions. Premium is guild-wide, so the
 // worker needs this mapping to check premium for channels it knows only by id.

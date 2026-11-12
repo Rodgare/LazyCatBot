@@ -744,6 +744,9 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 	case "premium":
 		h.HandlePremiumCommand(s, i)
 
+	case "grantpremium":
+		h.HandleGrantPremiumCommand(s, i)
+
 	case "attendance":
 		h.HandleAttendanceCommand(s, i)
 

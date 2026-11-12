@@ -137,6 +137,88 @@ func (h *BotHandler) HandlePremiumCommand(s *discordgo.Session, i *discordgo.Int
 	})
 }
 
+// HandleGrantPremiumCommand gives every known Discord server an 8-day trial.
+// It is restricted to ADMIN_USER_ID. Existing active entitlements are skipped so
+// a paid plan is never overwritten by the trial.
+func (h *BotHandler) HandleGrantPremiumCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if !h.isAdmin(i) {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "⛔ У вас нет прав на эту команду.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+	if h.PremiumStore == nil {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "❌ Премиум ещё не подключён на этом инстансе.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	guildIDs, err := h.SubStore.GetAllDiscordGuildIDs()
+	if err != nil {
+		h.Logger.Error("List guilds for trial error", "error", err)
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "❌ Не удалось получить список серверов.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	if err := s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Flags: discordgo.MessageFlagsEphemeral,
+		},
+	}); err != nil {
+		h.Logger.Error("Defer trial grant response error", "error", err)
+		return
+	}
+
+	actor := ""
+	if i.Member != nil && i.Member.User != nil {
+		actor = i.Member.User.ID
+	} else if i.User != nil {
+		actor = i.User.ID
+	}
+
+	now := time.Now()
+	granted, alreadyPremium, failed := 0, 0, 0
+	for _, guildID := range guildIDs {
+		if ent, err := h.PremiumStore.Get(guildID); err == nil && ent != nil && ent.Active(now) {
+			alreadyPremium++
+			continue
+		}
+		if _, err := h.PremiumStore.Grant(guildID, "", storage.PlanTrial, "trial", actor); err != nil {
+			failed++
+			h.Logger.Error("Grant trial error", "error", err, "guild_id", guildID)
+			continue
+		}
+		granted++
+	}
+
+	content := fmt.Sprintf("🎁 Пробный премиум на 8 дней выдан **%d** серверам.", granted)
+	if alreadyPremium > 0 {
+		content += fmt.Sprintf("\nУже с активным премиумом: **%d** (пропущены).", alreadyPremium)
+	}
+	if failed > 0 {
+		content += fmt.Sprintf("\nОшибок: **%d** — подробности в логе.", failed)
+	}
+	if _, err := s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{Content: &content}); err != nil {
+		h.Logger.Error("Edit trial grant response error", "error", err)
+	}
+}
+
 // HandlePremiumButton creates a one-time activation code for the selected plan
 // and returns step-by-step instructions. It returns true when the interaction
 // was handled.
