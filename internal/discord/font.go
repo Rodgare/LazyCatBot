@@ -14,8 +14,6 @@ var embeddedFontFiles = []string{
 
 var fallbackFontPaths = []string{
 	"internal/discord/assets/fonts/Roboto-Regular.ttf",
-	"C:\\Windows\\Fonts\\arialbd.ttf",
-	"C:\\Windows\\Fonts\\arial.ttf",
 	"C:\\Windows\\Fonts\\seguiemj.ttf",
 	"/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
 	"/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
