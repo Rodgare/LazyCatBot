@@ -24,8 +24,8 @@ func TestRenderWeeklyDigest(t *testing.T) {
 			{Name: "Bob", ClassID: 5, Value: 9000},
 		},
 		Attendance: []models.AttendanceEntry{
-			{Name: "Alice", ClassID: 8, Kills: 9, Ilvl: 260},
-			{Name: "Bob", ClassID: 5, Kills: 8, Ilvl: 255},
+			{Name: "Alice", ClassID: 8, Kills: 9, Ilvl: 260, SetPieces: "4т4 4т6"},
+			{Name: "Bob", ClassID: 5, Kills: 8, Ilvl: 255, SetPieces: "4т4"},
 		},
 		MythicTop: []models.GuildMythicPlayer{
 			{Name: "Alice", ClassID: 8, BestKey: 10, Score: 3200, BlackDiamonds: 1},
@@ -42,4 +42,5 @@ func TestRenderWeeklyDigest(t *testing.T) {
 	if !bytes.HasPrefix(img, []byte{0x89, 'P', 'N', 'G'}) {
 		t.Fatalf("digest is not a PNG")
 	}
+	writePreview(t, "digest_preview.png", img)
 }

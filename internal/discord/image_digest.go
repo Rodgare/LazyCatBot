@@ -43,8 +43,15 @@ func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 	height += 50
 
 	dc := gg.NewContext(digestWidth, height)
-	dc.SetRGB(0.06, 0.07, 0.09)
-	dc.Clear()
+	if raidID := randomRaidBackgroundID(); raidID > 0 {
+		drawRaidBackground(dc, raidID, getRaidColor(raidID))
+	} else {
+		dc.SetRGB(0.06, 0.07, 0.09)
+		dc.Clear()
+	}
+	dc.SetRGBA(0.02, 0.03, 0.05, 0.30)
+	dc.DrawRectangle(0, 0, digestWidth, float64(height))
+	dc.Fill()
 
 	dc.SetRGB(0.95, 0.77, 0.24)
 	dc.DrawRectangle(0, 0, digestWidth, 4)
@@ -122,11 +129,16 @@ func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 			dc.SetRGB(0.55, 0.58, 0.64)
 			dc.DrawString(fmt.Sprintf("%d.", i+1), digestPad, y+20)
 			dc.SetColor(classColorRGBA(e.ClassID))
-			dc.DrawString(e.Name, digestPad+32, y+20)
+			dc.DrawString(fitText(dc, e.Name, 240), digestPad+32, y+20)
+			if e.SetPieces != "" {
+				loadCyrillicFontFace(dc, 14)
+				dc.SetRGB(0.70, 0.25, 0.95)
+				dc.DrawString(fitText(dc, e.SetPieces, 100), 350, y+20)
+			}
 			loadCyrillicFontFace(dc, 18)
 			dc.SetRGB(0.80, 0.83, 0.88)
 			dc.DrawString(fmt.Sprintf("%d / %d · %d%%", e.Kills, d.TotalKills, percent),
-				600, y+20)
+				560, y+20)
 			if e.BlackDiamonds > 0 {
 				dc.SetRGB(0.55, 0.58, 0.64)
 				dc.DrawString(fmt.Sprintf("ЧБ %d", e.BlackDiamonds), 790, y+20)
