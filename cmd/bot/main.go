@@ -182,6 +182,8 @@ func main() {
 	}
 	defer dg.Close()
 
+	go killWorker.AnnounceOnce(ctx)
+
 	manageChannelsPerm := int64(discordgo.PermissionManageChannels)
 
 	commands := []*discordgo.ApplicationCommand{

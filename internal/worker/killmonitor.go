@@ -24,6 +24,7 @@ type Reporter interface {
 	SendChannelNotice(channelID, text string) error
 	SendQueueNotice(channelID string, position int) (string, error)
 	DeleteNotice(channelID, messageID string) error
+	SendAnnouncement(channelID, text string) error
 	SendWeeklyDigest(channelID string, digest models.WeeklyDigest) error
 }
 
@@ -53,6 +54,9 @@ type SubscribeStore interface {
 	GetWelcomeChannel(discordID string) (string, error)
 	GetDiscordIDByChannel(channelID string) (string, error)
 	RemoveChannelSubscriptions(channelID string) error
+	GetAllWelcomeChannels() ([]string, error)
+	MetaGet(key string) (string, error)
+	MetaSet(key, value string) error
 }
 
 func isMissingAccess(err error) bool {

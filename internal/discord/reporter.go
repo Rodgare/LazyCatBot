@@ -305,6 +305,20 @@ func (r *DiscordReporter) DeleteNotice(channelID, messageID string) error {
 	return r.session.ChannelMessageDelete(channelID, messageID)
 }
 
+// SendAnnouncement posts a rare one-way news message to the guild's
+// system/welcome channel.
+func (r *DiscordReporter) SendAnnouncement(channelID, text string) error {
+	_, err := r.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
+		Content: text,
+		Components: []discordgo.MessageComponent{
+			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+				discordgo.Button{Label: "🐾 Премиум", Style: discordgo.SecondaryButton, CustomID: "premium_open"},
+			}},
+		},
+	})
+	return err
+}
+
 // SendWeeklyDigest renders and posts the weekly premium image.
 func (r *DiscordReporter) SendWeeklyDigest(channelID string, digest models.WeeklyDigest) error {
 	img, err := RenderWeeklyDigest(digest)
