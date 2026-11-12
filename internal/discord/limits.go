@@ -7,14 +7,14 @@ import (
 )
 
 func (h *BotHandler) isPremiumChannel(i *discordgo.InteractionCreate) bool {
-	return h.PremiumStore != nil && h.PremiumStore.IsPremium(i.ChannelID)
+	return h.PremiumStore != nil && h.PremiumStore.IsPremium(i.GuildID)
 }
 
 func (h *BotHandler) freeLimitUpsell(s *discordgo.Session, i *discordgo.InteractionCreate, reason string) {
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: "🔒 " + reason + "\n\nПремиум для этого канала снимает лимиты: `/premium`.",
+			Content: "🔒 " + reason + "\n\nПремиум для сервера снимает лимиты во всех каналах: `/premium`.",
 			Flags:   discordgo.MessageFlagsEphemeral,
 			Components: []discordgo.MessageComponent{
 				discordgo.ActionsRow{Components: []discordgo.MessageComponent{
@@ -34,7 +34,7 @@ func hasRealmConflict(realms []string, realm string) bool {
 	return false
 }
 
-// canAddGuild enforces free-tier limits. Premium channels are unlimited, and
+// canAddGuild enforces free-tier limits. Premium servers are unlimited, and
 // re-adding an already tracked guild is always allowed.
 func (h *BotHandler) canAddGuild(i *discordgo.InteractionCreate, guildID int, realm string) (bool, string) {
 	if h.isPremiumChannel(i) {
@@ -69,7 +69,7 @@ func (h *BotHandler) canAddGuild(i *discordgo.InteractionCreate, guildID int, re
 	return true, ""
 }
 
-// canAddPlayer enforces free-tier limits for player subscriptions.
+// canAddPlayer enforces free-tier limits for player subscriptions. Premium is\n// guild-wide, so any channel of a premium server is unconstrained.
 func (h *BotHandler) canAddPlayer(i *discordgo.InteractionCreate, playerID int, realm string) (bool, string) {
 	if h.isPremiumChannel(i) {
 		return true, ""

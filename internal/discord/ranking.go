@@ -154,7 +154,7 @@ func (h *BotHandler) handleRankingRangeButton(s *discordgo.Session, i *discordgo
 	}
 
 	if rng != storage.Range2W {
-		premium := h.PremiumStore != nil && h.PremiumStore.IsPremium(i.ChannelID)
+		premium := h.PremiumStore != nil && h.PremiumStore.IsPremium(i.GuildID)
 		if !premium {
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,

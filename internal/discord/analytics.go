@@ -49,16 +49,16 @@ func truncateRunes(s string, max int) string {
 	return string(r[:max-1]) + "…"
 }
 
-// requirePremium replies with an upsell and returns false when the channel has
+// requirePremium replies with an upsell and returns false when the server has
 // no active premium entitlement.
 func (h *BotHandler) requirePremium(s *discordgo.Session, i *discordgo.InteractionCreate) bool {
-	if h.PremiumStore != nil && h.PremiumStore.IsPremium(i.ChannelID) {
+	if h.PremiumStore != nil && h.PremiumStore.IsPremium(i.GuildID) {
 		return true
 	}
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content: "🔒 Эта функция доступна с премиумом для канала.\n" +
+			Content: "🔒 Эта функция доступна с премиумом для сервера.\n" +
 				"Оформите его командой `/premium` — код активации выдаётся сразу.",
 			Flags: discordgo.MessageFlagsEphemeral,
 			Components: []discordgo.MessageComponent{

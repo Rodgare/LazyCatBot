@@ -63,9 +63,9 @@ func premiumDenied(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	})
 }
 
-// HandlePremiumCommand shows the current premium status of the channel and the
-// purchase buttons. Premium is per channel: buying in one channel does not
-// enable another.
+// HandlePremiumCommand shows the current premium status of the server and the
+// purchase buttons. Premium is per Discord server: buying once unlocks every
+// channel of the server.
 func (h *BotHandler) HandlePremiumCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if !hasManageChannels(i) {
 		premiumDenied(s, i)
@@ -82,18 +82,18 @@ func (h *BotHandler) HandlePremiumCommand(s *discordgo.Session, i *discordgo.Int
 		return
 	}
 
-	ent, err := h.PremiumStore.Get(i.ChannelID)
+	ent, err := h.PremiumStore.Get(i.GuildID)
 	if err != nil {
-		h.Logger.Error("Get premium entitlement error", "error", err, "channel_id", i.ChannelID)
+		h.Logger.Error("Get premium entitlement error", "error", err, "guild_id", i.GuildID)
 	}
 
 	var status string
 	now := time.Now()
 	switch {
 	case ent == nil:
-		status = "Премиум в этом канале **не активирован**."
+		status = "Премиум на этом сервере **не активирован**."
 	case ent.Active(now) && (ent.Lifetime() || ent.ExpiresAt >= now.Unix()):
-		status = fmt.Sprintf("✅ Премиум активен: **%s**, действует до **%s**.",
+		status = fmt.Sprintf("✅ Премиум активен для всего сервера: **%s**, действует до **%s**.",
 			ent.Plan.Title(), formatPremiumExpiry(ent))
 	case ent.Active(now):
 		status = fmt.Sprintf("⚠️ Премиум истёк (%s), но ещё действует льготный период 72 ч. Продлите подписку.",
@@ -103,15 +103,15 @@ func (h *BotHandler) HandlePremiumCommand(s *discordgo.Session, i *discordgo.Int
 			formatPremiumExpiry(ent))
 	}
 
-	desc := "**🐾 Премиум для этого канала**\n" + status + "\n\n" +
+	desc := "**🐾 Премиум для всего сервера**\n" + status + "\n\n" +
 		"Что входит:\n" +
-		"— отчёты без очереди в пик рейдов;\n" +
+		"— отчёты без очереди в пик рейдов во всех каналах;\n" +
 		"— рейтинги за 4 КД и за всё время;\n" +
 		"— еженедельный дайджест;\n" +
 		"— посещаемость и профили игроков;\n" +
 		"— приоритетная поддержка.\n\n" +
 		fmt.Sprintf("Подписка: **$%d/мес**. Отменить можно в любой момент.\n", h.PremiumPricing.MonthlyUSD) +
-		"Премиум привязан к каналу: остальные каналы сервера остаются бесплатными."
+		"Премиум действует на весь сервер: оплата один раз открывает все каналы."
 
 	label := storage.PlanMonthly.Title()
 	if price := h.PremiumPricing.price(storage.PlanMonthly); price > 0 {
@@ -164,9 +164,9 @@ func (h *BotHandler) HandlePremiumButton(s *discordgo.Session, i *discordgo.Inte
 		userID = i.User.ID
 	}
 
-	code, expires, err := h.PremiumStore.CreateCode(i.ChannelID, userID, plan)
+	code, expires, err := h.PremiumStore.CreateCode(i.GuildID, i.ChannelID, userID, plan)
 	if err != nil {
-		h.Logger.Error("Create premium code error", "error", err, "channel_id", i.ChannelID, "plan", plan)
+		h.Logger.Error("Create premium code error", "error", err, "guild_id", i.GuildID, "channel_id", i.ChannelID, "plan", plan)
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 			Type: discordgo.InteractionResponseChannelMessageWithSource,
 			Data: &discordgo.InteractionResponseData{
@@ -195,7 +195,7 @@ func (h *BotHandler) HandlePremiumButton(s *discordgo.Session, i *discordgo.Inte
 	b.WriteString("\n")
 	fmt.Fprintf(&b, "2. В поле «Сообщение» вставьте код **%s**.\n", code)
 	fmt.Fprintf(&b, "3. Оформите подписку: %s (план «%s»).\n", priceLine, plan.Title())
-	fmt.Fprintf(&b, "4. Бот активирует премиум в канале <#%s> автоматически в течение нескольких минут.\n\n", i.ChannelID)
+	fmt.Fprintf(&b, "4. Бот активирует премиум на всём сервере автоматически в течение нескольких минут.\n\n")
 	fmt.Fprintf(&b, "Код одноразовый и действует до **%s** (МСК). Не передавайте его другим.\n",
 		expires.In(time.FixedZone("MSK", 3*3600)).Format("02.01.2006 15:04"))
 	b.WriteString("При продлении Tribute пришлёт повторный платёж — премиум продлится автоматически.\n")

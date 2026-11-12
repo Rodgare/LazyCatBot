@@ -12,23 +12,24 @@ import (
 )
 
 type BotHandler struct {
-	sirusClient    *sirus.Client
-	LbStore        *storage.LeaderboardStorage
-	SubStore       *storage.SubscribeStorage
-	PlayerSubStore *storage.PlayerSubscribeStorage
-	GMStore        *storage.GuildMembersStorage
-	arStore        *storage.ActualRaidsStorage
-	MythicStore    *storage.MythicLeaderboardStorage
-	Logger         *slog.Logger
-	AdminUserID    string
-	ResyncFunc     func(realm string, force bool)
-	PremiumStore   *storage.PremiumStore
-	PremiumPricing PremiumPricing
-	PremiumURL     string
+	sirusClient     *sirus.Client
+	LbStore         *storage.LeaderboardStorage
+	SubStore        *storage.SubscribeStorage
+	PlayerSubStore  *storage.PlayerSubscribeStorage
+	GMStore         *storage.GuildMembersStorage
+	arStore         *storage.ActualRaidsStorage
+	MythicStore     *storage.MythicLeaderboardStorage
+	Logger          *slog.Logger
+	AdminUserID     string
+	ResyncFunc      func(realm string, force bool)
+	PremiumStore    *storage.PremiumStore
+	PremiumPricing  PremiumPricing
+	PremiumURL      string
 	FreeGuildLimit  int
 	FreePlayerLimit int
-	KillHistory    *storage.KillHistoryStorage
-	CharacterCache *storage.CharacterCacheStorage
+	KillHistory     *storage.KillHistoryStorage
+	CharacterCache  *storage.CharacterCacheStorage
+	Reporter        *DiscordReporter
 }
 
 func NewHandler(
@@ -54,6 +55,9 @@ func NewHandler(
 }
 
 func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if h.Reporter != nil && i.ChannelID != "" && i.GuildID != "" {
+		h.Reporter.RememberGuild(i.ChannelID, i.GuildID)
+	}
 	switch i.Type {
 	case discordgo.InteractionApplicationCommand:
 		h.HandleSlashCommands(s, i)

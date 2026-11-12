@@ -8,6 +8,7 @@ import (
 	"math/rand"
 	"os"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/bwmarrin/discordgo"
@@ -210,10 +211,48 @@ func generateJoke() string {
 
 type DiscordReporter struct {
 	session *discordgo.Session
+
+	mu        sync.RWMutex
+	guildByCh map[string]string
 }
 
 func NewDiscordReporter(s *discordgo.Session) *DiscordReporter {
-	return &DiscordReporter{session: s}
+	return &DiscordReporter{
+		session:   s,
+		guildByCh: make(map[string]string),
+	}
+}
+
+// RememberGuild records which server a channel belongs to. Premium is
+// guild-wide, so the worker needs this mapping for channels it only knows by id.
+func (r *DiscordReporter) RememberGuild(channelID, guildID string) {
+	if channelID == "" || guildID == "" {
+		return
+	}
+	r.mu.Lock()
+	r.guildByCh[channelID] = guildID
+	r.mu.Unlock()
+}
+
+// GetChannelGuildID returns the server id for a channel: from the cache first,
+// then from the Discord API. Empty means unknown.
+func (r *DiscordReporter) GetChannelGuildID(channelID string) string {
+	if channelID == "" {
+		return ""
+	}
+	r.mu.RLock()
+	guildID := r.guildByCh[channelID]
+	r.mu.RUnlock()
+	if guildID != "" {
+		return guildID
+	}
+
+	ch, err := r.session.Channel(channelID)
+	if err != nil || ch == nil {
+		return ""
+	}
+	r.RememberGuild(channelID, ch.GuildID)
+	return ch.GuildID
 }
 
 func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKillReport) error {

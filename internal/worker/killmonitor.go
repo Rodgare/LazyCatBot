@@ -27,10 +27,17 @@ type Reporter interface {
 	SendWeeklyDigest(channelID string, digest models.WeeklyDigest) error
 }
 
-// PremiumGate reports whether a Discord channel has an active premium
-// entitlement. A nil gate means every channel is free.
+// PremiumGate reports whether a Discord server has an active premium
+// entitlement. Premium is guild-wide, so the channel is resolved to its server.
+// A nil gate means every server is free.
 type PremiumGate interface {
-	IsPremium(channelID string) bool
+	IsPremium(guildID string) bool
+}
+
+// ChannelGuildResolver maps a Discord channel to its server id so the worker can
+// apply the guild-wide premium check. An empty string means "unknown".
+type ChannelGuildResolver interface {
+	GetChannelGuildID(channelID string) string
 }
 
 type SubscribeStore interface {
@@ -132,6 +139,7 @@ type Worker struct {
 	reporter                Reporter
 	scheduler               *jobScheduler
 	premiumGate             PremiumGate
+	guildResolver           ChannelGuildResolver
 	charPriority            chan PriorityChar
 	apiLimiter              *RateLimiter
 	killApiLimiter          *RateLimiter
@@ -187,6 +195,24 @@ func (w *Worker) SetPremiumGate(g PremiumGate) {
 	w.premiumGate = g
 }
 
+// SetGuildResolver wires channel-to-server resolution required by the
+// guild-wide premium check.
+func (w *Worker) SetGuildResolver(r ChannelGuildResolver) {
+	w.guildResolver = r
+}
+
+// channelPremium reports whether the channel belongs to a premium server.
+func (w *Worker) channelPremium(channelID string) bool {
+	if w.premiumGate == nil || w.guildResolver == nil {
+		return false
+	}
+	guildID := w.guildResolver.GetChannelGuildID(channelID)
+	if guildID == "" {
+		return false
+	}
+	return w.premiumGate.IsPremium(guildID)
+}
+
 // enqueueJob classifies a job by the channels it targets and pushes it into the
 // priority scheduler. Free channels that will have to wait receive a short
 // queue-position notice, which is cleaned up when the job is processed.
@@ -194,7 +220,7 @@ func (w *Worker) enqueueJob(job KillJob) {
 	freeChannels := make([]string, 0, len(job.Channels))
 	hasPremium := false
 	for ch := range job.Channels {
-		if w.premiumGate != nil && w.premiumGate.IsPremium(ch) {
+		if w.channelPremium(ch) {
 			hasPremium = true
 			continue
 		}
@@ -847,16 +873,16 @@ func (w *Worker) createReport(fight *models.BossFight, killID int, realm string)
 			Name:      p.Name,
 			GUID:      p.GUID,
 			Dps:       p.Dps,
-			Hps:      p.Hps,
-			Ilvl:     p.Ilvl,
-			SpecID:   p.Spec,
-			ClassID:  p.ClassID,
-			SpecName: specName,
-			T4:       t4Count,
+			Hps:       p.Hps,
+			Ilvl:      p.Ilvl,
+			SpecID:    p.Spec,
+			ClassID:   p.ClassID,
+			SpecName:  specName,
+			T4:        t4Count,
 			SetPieces: setPieces,
-			Role:     sirus.GetRole(p.ClassID, p.Spec),
-			Zodiac:   p.Zodiac.ID,
-			Category: p.Category,
+			Role:      sirus.GetRole(p.ClassID, p.Spec),
+			Zodiac:    p.Zodiac.ID,
+			Category:  p.Category,
 		}
 
 		pRole := "dps"

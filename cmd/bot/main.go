@@ -122,6 +122,14 @@ func main() {
 	)
 	killWorker.SetMythicLeaderboardStore(mythLbStore)
 	killWorker.SetPremiumGate(premiumStore)
+	killWorker.SetGuildResolver(discordReporter)
+	if channelGuilds, err := subStore.GetChannelDiscordIDs(); err != nil {
+		logger.Error("Load channel guild ids error", "error", err)
+	} else {
+		for channelID, guildID := range channelGuilds {
+			discordReporter.RememberGuild(channelID, guildID)
+		}
+	}
 	killWorker.SetKillHistoryStore(killHistoryStore)
 
 	killWorker.StartCronScheduler()
@@ -155,6 +163,7 @@ func main() {
 	h.FreePlayerLimit = appCfg.FreePlayerLimit
 	h.KillHistory = killHistoryStore
 	h.CharacterCache = ccStore
+	h.Reporter = discordReporter
 	h.PremiumPricing = discord.PremiumPricing{
 		MonthlyUSD: appCfg.PremiumMonthlyUSD,
 	}
@@ -228,8 +237,8 @@ func main() {
 			DefaultMemberPermissions: &manageChannelsPerm,
 		},
 		{
-			Name:        "resync",
-			Description: "Пересчитать рейтинги (только администратор)",
+			Name:                     "resync",
+			Description:              "Пересчитать рейтинги (только администратор)",
 			DefaultMemberPermissions: &manageChannelsPerm,
 			Options: []*discordgo.ApplicationCommandOption{
 				{

@@ -51,6 +51,23 @@ CREATE TABLE leaderboard_history (
     snapshot_week TEXT NOT NULL,
     captured_at INTEGER NOT NULL,
     PRIMARY KEY (realm, raid_id, boss_id, class_id, spec_id, player_name, snapshot_week)
+);
+CREATE TABLE leaderboard (
+    raid_id INTEGER,
+    boss_id INTEGER,
+    class_id INTEGER,
+    spec_id INTEGER,
+    player_name TEXT,
+    ilvl INTEGER,
+    guild_id INTEGER,
+    zodiac INTEGER,
+    category INTEGER,
+    t4 INTEGER,
+    set_pieces TEXT,
+    role TEXT,
+    dps INTEGER,
+    hps INTEGER,
+    realm TEXT
 );`
 
 func newLeaderboardTestDB(t *testing.T) *sql.DB {
@@ -126,5 +143,30 @@ func TestGetBossTopRangeAggregatesHistory(t *testing.T) {
 	}
 	if len(players) != 2 || players[0].Name != "Alice" || players[0].Dps != 900 {
 		t.Fatalf("all-time top = %+v, want Alice 900", players)
+	}
+}
+
+func TestGetBossTopHandlesNullSetPieces(t *testing.T) {
+	db := newLeaderboardTestDB(t)
+	store := NewLeaderboardStorage(db, testLogger())
+
+	if _, err := db.Exec(`INSERT INTO guild_members (name, guild_id, realm) VALUES ('Alice', 100, 'x3')`); err != nil {
+		t.Fatalf("insert guild member: %v", err)
+	}
+	if _, err := db.Exec(`INSERT INTO leaderboard
+		(raid_id, boss_id, class_id, spec_id, player_name, ilvl, guild_id, role, hps, realm, set_pieces)
+		VALUES (45, 0, 5, 1, 'Alice', 250, 100, 'hps', 5000, 'x3', NULL)`); err != nil {
+		t.Fatalf("insert leaderboard: %v", err)
+	}
+
+	players, err := store.GetBossTop("x3", 45, 0, 100, "hps")
+	if err != nil {
+		t.Fatalf("GetBossTop with NULL set_pieces: %v", err)
+	}
+	if len(players) != 1 {
+		t.Fatalf("players = %d, want 1", len(players))
+	}
+	if players[0].SetPieces != "" {
+		t.Fatalf("NULL set_pieces should scan as empty, got %q", players[0].SetPieces)
 	}
 }

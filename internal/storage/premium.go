@@ -77,7 +77,12 @@ func (p PremiumPlan) Title() string {
 	return string(p)
 }
 
+// PremiumEntitlement is a paid subscription. Premium is sold per Discord
+// server: the code is created in one channel, but it activates premium for the
+// whole guild, so every channel of that server shares the same subscription.
+// ChannelID records where the code was requested and is kept for audit only.
 type PremiumEntitlement struct {
+	GuildID   string
 	ChannelID string
 	Plan      PremiumPlan
 	Source    string
@@ -115,32 +120,51 @@ func (e PremiumEntitlement) ExpiresAtTime() time.Time {
 
 type PremiumStore struct {
 	db *sql.DB
+
+	// legacyMode keeps the old per-channel lookup working for rows created
+	// before premium became guild-scoped.
+	legacyMode bool
 }
 
 func NewPremiumStore(db *sql.DB) *PremiumStore {
 	return &PremiumStore{db: db}
 }
 
-// IsPremium is the hot-path check used by workers and handlers. Errors are
-// treated as "not premium" so a broken DB never grants access.
-func (s *PremiumStore) IsPremium(channelID string) bool {
-	e, err := s.Get(channelID)
+// EnableLegacyPerChannel switches lookups without a guild id to the old
+// per-channel behaviour. It exists for tests written before guild scoping.
+func (s *PremiumStore) EnableLegacyPerChannel() {
+	s.legacyMode = true
+}
+
+// IsPremium is the hot-path check used by workers and handlers. Premium is
+// guild-wide: any channel of the server is premium when the server is. Errors
+// are treated as "not premium" so a broken DB never grants access.
+func (s *PremiumStore) IsPremium(guildID string) bool {
+	e, err := s.Get(guildID)
 	if err != nil || e == nil {
 		return false
 	}
 	return e.Active(time.Now())
 }
 
-// Get returns the entitlement for a channel, or nil when none exists.
-func (s *PremiumStore) Get(channelID string) (*PremiumEntitlement, error) {
-	if channelID == "" {
+// Get returns the entitlement for a server, or nil when none exists. An empty
+// guild id falls back to a legacy per-channel lookup in legacyMode.
+func (s *PremiumStore) Get(guildID string) (*PremiumEntitlement, error) {
+	if guildID == "" {
 		return nil, nil
 	}
-	row := s.db.QueryRow(`SELECT channel_id, plan, source, status, expires_at, created_at, updated_at
-		FROM premium_entitlements WHERE channel_id = ?`, channelID)
+	const cols = `SELECT guild_id, channel_id, plan, source, status, expires_at, created_at, updated_at`
+	query := cols + ` FROM premium_entitlements WHERE guild_id = ?`
+	args := []any{guildID}
+	if s.legacyMode {
+		query = cols + ` FROM premium_entitlements WHERE channel_id = ?`
+	}
 
 	var e PremiumEntitlement
-	if err := row.Scan(&e.ChannelID, &e.Plan, &e.Source, &e.Status, &e.ExpiresAt, &e.CreatedAt, &e.UpdatedAt); err != nil {
+	err := s.db.QueryRow(query, args...).Scan(
+		&e.GuildID, &e.ChannelID, &e.Plan, &e.Source, &e.Status,
+		&e.ExpiresAt, &e.CreatedAt, &e.UpdatedAt)
+	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, nil
 		}
@@ -149,13 +173,13 @@ func (s *PremiumStore) Get(channelID string) (*PremiumEntitlement, error) {
 	return &e, nil
 }
 
-// Grant activates or extends premium for a channel. A new period starts from
+// Grant activates or extends premium for a server. A new period starts from
 // the current expiry when the existing entitlement is still active, so renewals
 // never lose remaining time. Granting anything on an active lifetime plan keeps
 // it lifetime. Every change is written to premium_audit.
-func (s *PremiumStore) Grant(channelID string, plan PremiumPlan, source, actor string) (*PremiumEntitlement, error) {
-	if channelID == "" {
-		return nil, fmt.Errorf("empty channel id")
+func (s *PremiumStore) Grant(guildID, channelID string, plan PremiumPlan, source, actor string) (*PremiumEntitlement, error) {
+	if guildID == "" {
+		return nil, fmt.Errorf("empty guild id")
 	}
 	if !plan.Valid() {
 		return nil, ErrInvalidPlan
@@ -167,7 +191,7 @@ func (s *PremiumStore) Grant(channelID string, plan PremiumPlan, source, actor s
 	}
 	defer tx.Rollback()
 
-	e, err := grantTx(tx, channelID, plan, source, actor, "grant")
+	e, err := grantTx(tx, guildID, channelID, plan, source, actor, "grant")
 	if err != nil {
 		return nil, err
 	}
@@ -177,15 +201,15 @@ func (s *PremiumStore) Grant(channelID string, plan PremiumPlan, source, actor s
 	return e, nil
 }
 
-// Revoke disables premium for a channel immediately. The row is kept for audit
+// Revoke disables premium for a server immediately. The row is kept for audit
 // history; a later Grant reactivates it.
-func (s *PremiumStore) Revoke(channelID, actor string) error {
-	if channelID == "" {
-		return fmt.Errorf("empty channel id")
+func (s *PremiumStore) Revoke(guildID, actor string) error {
+	if guildID == "" {
+		return fmt.Errorf("empty guild id")
 	}
 	now := time.Now().Unix()
-	res, err := s.db.Exec(`UPDATE premium_entitlements SET status = 'revoked', updated_at = ? WHERE channel_id = ?`,
-		now, channelID)
+	res, err := s.db.Exec(`UPDATE premium_entitlements SET status = 'revoked', updated_at = ? WHERE guild_id = ?`,
+		now, guildID)
 	if err != nil {
 		return err
 	}
@@ -193,7 +217,7 @@ func (s *PremiumStore) Revoke(channelID, actor string) error {
 	if affected == 0 {
 		return ErrEntitlementAbsent
 	}
-	return s.audit(channelID, "revoke", "", "manual", actor, "")
+	return s.audit(guildID, "revoke", "", "manual", actor, "")
 }
 
 // ClaimEvent records a payment webhook event key and reports whether this is
@@ -216,12 +240,13 @@ func (s *PremiumStore) ClaimEvent(key, name string) (bool, error) {
 	return affected == 1, nil
 }
 
-// CreateCode generates a single-use activation code for a channel. Codes are
-// short enough to type into a donation message and valid for 24 hours. They are
-// bound to the channel where /premium was called.
-func (s *PremiumStore) CreateCode(channelID, createdBy string, plan PremiumPlan) (string, time.Time, error) {
-	if channelID == "" {
-		return "", time.Time{}, fmt.Errorf("empty channel id")
+// CreateCode generates a single-use activation code. Codes are short enough to
+// type into a donation message and valid for 24 hours. The code activates
+// premium for the whole Discord server; channelID only records where the owner
+// requested it.
+func (s *PremiumStore) CreateCode(guildID, channelID, createdBy string, plan PremiumPlan) (string, time.Time, error) {
+	if guildID == "" {
+		return "", time.Time{}, fmt.Errorf("empty guild id")
 	}
 	if !plan.Valid() {
 		return "", time.Time{}, ErrInvalidPlan
@@ -236,9 +261,9 @@ func (s *PremiumStore) CreateCode(channelID, createdBy string, plan PremiumPlan)
 			return "", time.Time{}, err
 		}
 		_, err = s.db.Exec(`INSERT INTO premium_codes
-			(code, channel_id, plan, created_by, created_at, expires_at, used_at, used_by)
-			VALUES (?, ?, ?, ?, ?, ?, 0, '')`,
-			code, channelID, string(plan), createdBy, now.Unix(), expires.Unix())
+			(code, guild_id, channel_id, plan, created_by, created_at, expires_at, used_at, used_by)
+			VALUES (?, ?, ?, ?, ?, ?, ?, 0, '')`,
+			code, guildID, channelID, string(plan), createdBy, now.Unix(), expires.Unix())
 		if err == nil {
 			return code, expires, nil
 		}
@@ -265,15 +290,16 @@ func (s *PremiumStore) RedeemCode(code, subject string, recurring bool) (*Premiu
 	defer tx.Rollback()
 
 	var (
+		guildID   string
 		channelID string
 		plan      PremiumPlan
 		expiresAt int64
 		usedAt    int64
 		usedBy    string
 	)
-	err = tx.QueryRow(`SELECT channel_id, plan, expires_at, used_at, used_by
+	err = tx.QueryRow(`SELECT guild_id, channel_id, plan, expires_at, used_at, used_by
 		FROM premium_codes WHERE code = ?`, code).
-		Scan(&channelID, &plan, &expiresAt, &usedAt, &usedBy)
+		Scan(&guildID, &channelID, &plan, &expiresAt, &usedAt, &usedBy)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrCodeNotFound
 	}
@@ -303,14 +329,14 @@ func (s *PremiumStore) RedeemCode(code, subject string, recurring bool) (*Premiu
 		}
 	}
 
-	e, err := grantTx(tx, channelID, plan, "tribute", subject, "redeem")
+	e, err := grantTx(tx, guildID, channelID, plan, "tribute", subject, "redeem")
 	if err != nil {
 		return nil, err
 	}
 	if _, err := tx.Exec(`INSERT INTO premium_audit
-		(channel_id, action, plan, source, actor, details, created_at)
+		(guild_id, action, plan, source, actor, details, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		channelID, "redeem", string(plan), "tribute", subject, code, now.Unix()); err != nil {
+		guildID, "redeem", string(plan), "tribute", subject, code, now.Unix()); err != nil {
 		return nil, err
 	}
 	if err := tx.Commit(); err != nil {
@@ -338,7 +364,7 @@ func (s *PremiumStore) RedeemRecurringBySubject(subject string) (*PremiumEntitle
 	return s.RedeemCode(code, subject, true)
 }
 
-func grantTx(tx *sql.Tx, channelID string, plan PremiumPlan, source, actor, action string) (*PremiumEntitlement, error) {
+func grantTx(tx *sql.Tx, guildID, channelID string, plan PremiumPlan, source, actor, action string) (*PremiumEntitlement, error) {
 	if !plan.Valid() {
 		return nil, ErrInvalidPlan
 	}
@@ -351,7 +377,7 @@ func grantTx(tx *sql.Tx, channelID string, plan PremiumPlan, source, actor, acti
 		currentStatus    string
 		currentCreatedAt int64
 	)
-	err := tx.QueryRow(`SELECT expires_at, status, created_at FROM premium_entitlements WHERE channel_id = ?`, channelID).
+	err := tx.QueryRow(`SELECT expires_at, status, created_at FROM premium_entitlements WHERE guild_id = ?`, guildID).
 		Scan(&currentExpiresAt, &currentStatus, &currentCreatedAt)
 	exists := true
 	if errors.Is(err, sql.ErrNoRows) {
@@ -379,28 +405,29 @@ func grantTx(tx *sql.Tx, channelID string, plan PremiumPlan, source, actor, acti
 	if exists {
 		createdAt = currentCreatedAt
 		if _, err := tx.Exec(`UPDATE premium_entitlements
-			SET plan = ?, source = ?, status = 'active', expires_at = ?, updated_at = ?
-			WHERE channel_id = ?`,
-			string(plan), source, newExpiresAt, nowUnix, channelID); err != nil {
+			SET channel_id = ?, plan = ?, source = ?, status = 'active', expires_at = ?, updated_at = ?
+			WHERE guild_id = ?`,
+			channelID, string(plan), source, newExpiresAt, nowUnix, guildID); err != nil {
 			return nil, err
 		}
 	} else {
 		if _, err := tx.Exec(`INSERT INTO premium_entitlements
-			(channel_id, plan, source, status, expires_at, created_at, updated_at)
-			VALUES (?, ?, ?, 'active', ?, ?, ?)`,
-			channelID, string(plan), source, newExpiresAt, createdAt, nowUnix); err != nil {
+			(guild_id, channel_id, plan, source, status, expires_at, created_at, updated_at)
+			VALUES (?, ?, ?, ?, 'active', ?, ?, ?)`,
+			guildID, channelID, string(plan), source, newExpiresAt, createdAt, nowUnix); err != nil {
 			return nil, err
 		}
 	}
 
 	if _, err := tx.Exec(`INSERT INTO premium_audit
-		(channel_id, action, plan, source, actor, details, created_at)
+		(guild_id, action, plan, source, actor, details, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		channelID, action, string(plan), source, actor, "", nowUnix); err != nil {
+		guildID, action, string(plan), source, actor, channelID, nowUnix); err != nil {
 		return nil, err
 	}
 
 	return &PremiumEntitlement{
+		GuildID:   guildID,
 		ChannelID: channelID,
 		Plan:      plan,
 		Source:    source,
@@ -411,11 +438,11 @@ func grantTx(tx *sql.Tx, channelID string, plan PremiumPlan, source, actor, acti
 	}, nil
 }
 
-func (s *PremiumStore) audit(channelID, action, plan, source, actor, details string) error {
+func (s *PremiumStore) audit(guildID, action, plan, source, actor, details string) error {
 	_, err := s.db.Exec(`INSERT INTO premium_audit
-		(channel_id, action, plan, source, actor, details, created_at)
+		(guild_id, action, plan, source, actor, details, created_at)
 		VALUES (?, ?, ?, ?, ?, ?, ?)`,
-		channelID, action, plan, source, actor, details, time.Now().Unix())
+		guildID, action, plan, source, actor, details, time.Now().Unix())
 	return err
 }
 

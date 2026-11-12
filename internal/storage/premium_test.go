@@ -11,7 +11,8 @@ import (
 
 const premiumTestSchema = `
 CREATE TABLE premium_entitlements (
-    channel_id TEXT PRIMARY KEY,
+    guild_id TEXT PRIMARY KEY,
+    channel_id TEXT NOT NULL DEFAULT '',
     plan TEXT NOT NULL,
     source TEXT NOT NULL DEFAULT '',
     status TEXT NOT NULL DEFAULT 'active',
@@ -21,7 +22,8 @@ CREATE TABLE premium_entitlements (
 );
 CREATE TABLE premium_codes (
     code TEXT PRIMARY KEY,
-    channel_id TEXT NOT NULL,
+    guild_id TEXT NOT NULL,
+    channel_id TEXT NOT NULL DEFAULT '',
     plan TEXT NOT NULL,
     created_by TEXT NOT NULL DEFAULT '',
     created_at INTEGER NOT NULL,
@@ -31,7 +33,7 @@ CREATE TABLE premium_codes (
 );
 CREATE TABLE premium_audit (
     id INTEGER PRIMARY KEY,
-    channel_id TEXT NOT NULL,
+    guild_id TEXT NOT NULL DEFAULT '',
     action TEXT NOT NULL,
     plan TEXT NOT NULL DEFAULT '',
     source TEXT NOT NULL DEFAULT '',
@@ -61,9 +63,9 @@ func newPremiumTestStore(t *testing.T) *PremiumStore {
 
 func TestPremiumCodeLifecycle(t *testing.T) {
 	s := newPremiumTestStore(t)
-	const channel = "chan-1"
+	const guild, channel = "guild-1", "chan-1"
 
-	code, expires, err := s.CreateCode(channel, "user-1", PlanMonthly)
+	code, expires, err := s.CreateCode(guild, channel, "user-1", PlanMonthly)
 	if err != nil {
 		t.Fatalf("create code: %v", err)
 	}
@@ -73,8 +75,8 @@ func TestPremiumCodeLifecycle(t *testing.T) {
 	if time.Until(expires) <= 0 {
 		t.Fatalf("code expiry should be in the future")
 	}
-	if s.IsPremium(channel) {
-		t.Fatalf("channel must not be premium before redemption")
+	if s.IsPremium(guild) {
+		t.Fatalf("guild must not be premium before redemption")
 	}
 
 	ent, err := s.RedeemCode(code, "tg:1", false)
@@ -84,8 +86,8 @@ func TestPremiumCodeLifecycle(t *testing.T) {
 	if ent.Plan != PlanMonthly || ent.Status != "active" {
 		t.Fatalf("unexpected entitlement: %+v", ent)
 	}
-	if !s.IsPremium(channel) {
-		t.Fatalf("channel should be premium after redemption")
+	if !s.IsPremium(guild) {
+		t.Fatalf("guild should be premium after redemption")
 	}
 
 	if _, err := s.RedeemCode(code, "tg:1", false); !errors.Is(err, ErrCodeUsed) {
@@ -96,7 +98,7 @@ func TestPremiumCodeLifecycle(t *testing.T) {
 		t.Fatalf("recurring redeem by another donor err = %v, want ErrCodeSubject", err)
 	}
 
-	before, _ := s.Get(channel)
+	before, _ := s.Get(guild)
 	extended, err := s.RedeemCode(code, "tg:1", true)
 	if err != nil {
 		t.Fatalf("recurring redeem: %v", err)
@@ -123,17 +125,60 @@ func TestPremiumCodeLifecycle(t *testing.T) {
 	if err != nil {
 		t.Fatalf("recurring by subject: %v", err)
 	}
-	if bySubject.ChannelID != channel || bySubject.ExpiresAt <= renewed.ExpiresAt {
-		t.Fatalf("recurring by subject = %+v, want channel %s with later expiry", bySubject, channel)
+	if bySubject.GuildID != guild || bySubject.ExpiresAt <= renewed.ExpiresAt {
+		t.Fatalf("recurring by subject = %+v, want guild %s with later expiry", bySubject, guild)
 	}
 	if _, err := s.RedeemRecurringBySubject("tg:missing"); !errors.Is(err, ErrCodeNotFound) {
 		t.Fatalf("unknown subject err = %v, want ErrCodeNotFound", err)
 	}
 }
 
+func TestPremiumAppliesToWholeGuild(t *testing.T) {
+	s := newPremiumTestStore(t)
+
+	code, _, err := s.CreateCode("guild-42", "chan-a", "user-1", PlanMonthly)
+	if err != nil {
+		t.Fatalf("create code: %v", err)
+	}
+	if _, err := s.RedeemCode(code, "tg:1", false); err != nil {
+		t.Fatalf("redeem: %v", err)
+	}
+
+	if !s.IsPremium("guild-42") {
+		t.Fatalf("guild should be premium")
+	}
+	if s.IsPremium("guild-other") {
+		t.Fatalf("other guild must stay free")
+	}
+
+	ent, err := s.Get("guild-42")
+	if err != nil || ent == nil {
+		t.Fatalf("Get guild entitlement = %+v, %v", ent, err)
+	}
+	if ent.ChannelID != "chan-a" {
+		t.Fatalf("channel_id should record the requesting channel, got %q", ent.ChannelID)
+	}
+
+	// A second code for the same guild extends the same entitlement row.
+	code2, _, err := s.CreateCode("guild-42", "chan-b", "user-2", PlanMonthly)
+	if err != nil {
+		t.Fatalf("create second code: %v", err)
+	}
+	extended, err := s.RedeemCode(code2, "tg:2", false)
+	if err != nil {
+		t.Fatalf("redeem second code: %v", err)
+	}
+	if extended.ExpiresAt <= ent.ExpiresAt {
+		t.Fatalf("same-guild code should extend expiry: before=%d after=%d", ent.ExpiresAt, extended.ExpiresAt)
+	}
+	if extended.ChannelID != "chan-b" {
+		t.Fatalf("channel_id should track the latest requesting channel, got %q", extended.ChannelID)
+	}
+}
+
 func TestPremiumCodeExpired(t *testing.T) {
 	s := newPremiumTestStore(t)
-	code, _, err := s.CreateCode("chan-1", "user-1", PlanMonthly)
+	code, _, err := s.CreateCode("guild-1", "chan-1", "user-1", PlanMonthly)
 	if err != nil {
 		t.Fatalf("create code: %v", err)
 	}
@@ -147,9 +192,9 @@ func TestPremiumCodeExpired(t *testing.T) {
 
 func TestPremiumGrantLifetimeAndRevoke(t *testing.T) {
 	s := newPremiumTestStore(t)
-	const channel = "chan-2"
+	const guild, channel = "guild-2", "chan-2"
 
-	ent, err := s.Grant(channel, PlanLifetime, "manual", "admin")
+	ent, err := s.Grant(guild, channel, PlanLifetime, "manual", "admin")
 	if err != nil {
 		t.Fatalf("grant lifetime: %v", err)
 	}
@@ -157,7 +202,7 @@ func TestPremiumGrantLifetimeAndRevoke(t *testing.T) {
 		t.Fatalf("lifetime entitlement inactive: %+v", ent)
 	}
 
-	ent, err = s.Grant(channel, PlanMonthly, "manual", "admin")
+	ent, err = s.Grant(guild, channel, PlanMonthly, "manual", "admin")
 	if err != nil {
 		t.Fatalf("grant monthly on lifetime: %v", err)
 	}
@@ -165,18 +210,18 @@ func TestPremiumGrantLifetimeAndRevoke(t *testing.T) {
 		t.Fatalf("lifetime must not be shortened, got expires_at=%d", ent.ExpiresAt)
 	}
 
-	if err := s.Revoke(channel, "admin"); err != nil {
+	if err := s.Revoke(guild, "admin"); err != nil {
 		t.Fatalf("revoke: %v", err)
 	}
-	if s.IsPremium(channel) {
-		t.Fatalf("revoked channel must not be premium")
+	if s.IsPremium(guild) {
+		t.Fatalf("revoked guild must not be premium")
 	}
 
-	if _, err := s.Grant(channel, PlanMonthly, "manual", "admin"); err != nil {
+	if _, err := s.Grant(guild, channel, PlanMonthly, "manual", "admin"); err != nil {
 		t.Fatalf("regrant: %v", err)
 	}
-	if !s.IsPremium(channel) {
-		t.Fatalf("regranted channel should be premium")
+	if !s.IsPremium(guild) {
+		t.Fatalf("regranted guild should be premium")
 	}
 }
 

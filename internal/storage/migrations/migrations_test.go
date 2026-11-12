@@ -38,4 +38,20 @@ func TestMigrationsApply(t *testing.T) {
 			t.Fatalf("table %s not created: %v", table, err)
 		}
 	}
+
+	// Premium is sold per Discord server, so codes and entitlements carry the
+	// guild id next to the channel that requested the code.
+	for table, column := range map[string]string{
+		"premium_entitlements": "guild_id",
+		"premium_codes":        "guild_id",
+		"premium_audit":        "guild_id",
+	} {
+		var found int
+		if err := db.QueryRow(`SELECT COUNT(*) FROM pragma_table_info(?) WHERE name = ?`, table, column).Scan(&found); err != nil {
+			t.Fatalf("inspect %s.%s: %v", table, column, err)
+		}
+		if found != 1 {
+			t.Fatalf("column %s.%s missing", table, column)
+		}
+	}
 }

@@ -236,6 +236,30 @@ func (s *SubscribeStorage) GetDiscordIDByChannel(channelID string) (string, erro
 	return discordID, nil
 }
 
+// GetChannelDiscordIDs returns the Discord server id recorded for every
+// channel that has guild or player subscriptions. Premium is guild-wide, so the
+// worker needs this mapping to check premium for channels it knows only by id.
+func (s *SubscribeStorage) GetChannelDiscordIDs() (map[string]string, error) {
+	rows, err := s.db.Query(`
+		SELECT channel_id, discord_id FROM subscribe WHERE discord_id != ''
+		UNION
+		SELECT channel_id, discord_id FROM player_subscribe WHERE discord_id != ''`)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	out := make(map[string]string)
+	for rows.Next() {
+		var channelID, discordID string
+		if err := rows.Scan(&channelID, &discordID); err != nil {
+			return nil, err
+		}
+		out[channelID] = discordID
+	}
+	return out, rows.Err()
+}
+
 // RemoveChannelData deletes every row tied to a channel: guild/player
 // subscriptions, processed-kill dedup markers and the welcome-channel pointer.
 // Channel-independent data (leaderboard, guild_members, caches) is left intact.

@@ -226,7 +226,9 @@ func (s *LeaderboardStorage) GetBossTop(realm string, raidID, bossID, guildID in
 	}
 
 	query := fmt.Sprintf(`
-		SELECT l.player_name, l.class_id, l.spec_id, l.ilvl, l.zodiac, l.category, l.t4, l.set_pieces, l.dps, l.hps,
+		SELECT l.player_name, l.class_id, l.spec_id,
+		       COALESCE(l.ilvl, 0), COALESCE(l.zodiac, 0), COALESCE(l.category, 0), COALESCE(l.t4, 0),
+		       COALESCE(l.set_pieces, ''), COALESCE(l.dps, 0), COALESCE(l.hps, 0),
 		       COALESCE(cc.black_diamonds, 0), COALESCE(cc.title, '')
 		FROM leaderboard l
 		JOIN guild_members gm ON l.player_name = gm.name AND COALESCE(l.realm, 'x3') = COALESCE(gm.realm, 'x3')
@@ -315,7 +317,9 @@ func (s *LeaderboardStorage) GetBossTopRange(realm string, raidID, bossID, guild
 	}
 
 	query := fmt.Sprintf(`
-		SELECT x.player_name, x.class_id, x.spec_id, x.ilvl, x.zodiac, x.category, x.t4, x.set_pieces, x.dps, x.hps,
+		SELECT x.player_name, x.class_id, x.spec_id,
+		       COALESCE(x.ilvl, 0), COALESCE(x.zodiac, 0), COALESCE(x.category, 0), COALESCE(x.t4, 0),
+		       COALESCE(x.set_pieces, ''), COALESCE(x.dps, 0), COALESCE(x.hps, 0),
 		       COALESCE(cc.black_diamonds, 0), COALESCE(cc.title, '')
 		FROM (
 			SELECT h.*, ROW_NUMBER() OVER (PARTITION BY h.player_name ORDER BY h.%s DESC) AS rn

@@ -59,7 +59,7 @@ func (w *Worker) SendWeeklyDigests() {
 		}
 
 		for _, ch := range channels {
-			if w.premiumGate != nil && !w.premiumGate.IsPremium(ch) {
+			if !w.channelPremium(ch) {
 				continue
 			}
 			if err := w.reporter.SendWeeklyDigest(ch, *digest); err != nil {
