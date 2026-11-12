@@ -283,7 +283,7 @@ func (r *DiscordReporter) SendChannelNotice(channelID, text string) error {
 // and returns its message ID so the caller can delete it once the report is out.
 func (r *DiscordReporter) SendQueueNotice(channelID string, position int) (string, error) {
 	text := fmt.Sprintf("⏳ Отчёт готовится к отправке. Позиция в очереди: **%d**.\n"+
-		"Каналы с **премиум** получают отчёты без очереди.", position)
+		"Сервер с **премиумом** получает отчёты без очереди во всех каналах.", position)
 	msg, err := r.session.ChannelMessageSend(channelID, text)
 	if err != nil {
 		return "", err

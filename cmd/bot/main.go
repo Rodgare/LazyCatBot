@@ -200,7 +200,7 @@ func main() {
 		},
 		{
 			Name:                     "premium",
-			Description:              "Премиум для этого канала: статус, активация и инструкция",
+			Description:              "Премиум для всего сервера: статус, активация и инструкция",
 			DefaultMemberPermissions: &manageChannelsPerm,
 		},
 		{

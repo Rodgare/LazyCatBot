@@ -159,7 +159,7 @@ func (h *BotHandler) handleRankingRangeButton(s *discordgo.Session, i *discordgo
 			s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 				Type: discordgo.InteractionResponseChannelMessageWithSource,
 				Data: &discordgo.InteractionResponseData{
-					Content: fmt.Sprintf("🔒 Рейтинг «%s» доступен с премиумом для этого канала.\n"+
+					Content: fmt.Sprintf("🔒 Рейтинг «%s» доступен с премиумом для всего сервера.\n"+
 						"Оформите его командой `/premium` — код активации выдаётся сразу.", rng.Title()),
 					Flags: discordgo.MessageFlagsEphemeral,
 					Components: []discordgo.MessageComponent{
