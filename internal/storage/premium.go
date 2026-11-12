@@ -368,6 +368,12 @@ func grantTx(tx *sql.Tx, guildID, channelID string, plan PremiumPlan, source, ac
 	if !plan.Valid() {
 		return nil, ErrInvalidPlan
 	}
+	// The legacy schema still has channel_id as PRIMARY KEY. Guild-wide grants
+	// (like a trial) have no requesting channel, so give the row a unique
+	// synthetic channel instead of an empty string that would collide.
+	if channelID == "" {
+		channelID = "guild:" + guildID
+	}
 
 	now := time.Now()
 	nowUnix := now.Unix()

@@ -229,15 +229,19 @@ func TestPremiumGrantLifetimeAndRevoke(t *testing.T) {
 func TestPremiumGrantTrialWithoutChannel(t *testing.T) {
 	s := newPremiumTestStore(t)
 
-	ent, err := s.Grant("guild-trial", "", PlanTrial, "trial", "admin")
-	if err != nil {
-		t.Fatalf("grant trial without channel: %v", err)
-	}
-	if ent.Plan != PlanTrial || !ent.Active(time.Now()) {
-		t.Fatalf("unexpected trial entitlement: %+v", ent)
-	}
-	if !s.IsPremium("guild-trial") {
-		t.Fatalf("trial guild should be premium")
+	// channel_id is still the legacy PRIMARY KEY, so guild-wide grants must not
+	// all insert the same empty string.
+	for _, guild := range []string{"guild-trial-a", "guild-trial-b"} {
+		ent, err := s.Grant(guild, "", PlanTrial, "trial", "admin")
+		if err != nil {
+			t.Fatalf("grant trial without channel for %s: %v", guild, err)
+		}
+		if ent.Plan != PlanTrial || !ent.Active(time.Now()) {
+			t.Fatalf("unexpected trial entitlement for %s: %+v", guild, ent)
+		}
+		if !s.IsPremium(guild) {
+			t.Fatalf("trial guild %s should be premium", guild)
+		}
 	}
 }
 
