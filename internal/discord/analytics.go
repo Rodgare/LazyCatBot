@@ -2,8 +2,8 @@ package discord
 
 import (
 	"LazyCatBot/internal/models"
-	"LazyCatBot/internal/sirus"
 	"LazyCatBot/internal/storage"
+	"bytes"
 	"fmt"
 	"strings"
 	"time"
@@ -137,42 +137,23 @@ func (h *BotHandler) HandleAttendanceCommand(s *discordgo.Session, i *discordgo.
 		guildName = n
 	}
 
-	limit := len(entries)
-	if limit > 15 {
-		limit = 15
-	}
-	var b strings.Builder
-	for idx := 0; idx < limit; idx++ {
-		e := entries[idx]
-		percent := e.Kills * 100 / total
-		if percent > 100 {
-			percent = 100
-		}
-		fmt.Fprintf(&b, "`%2d.` **%s** (%s, %d) — %d/%d (%d%%)",
-			idx+1, e.Name, sirus.GetSpecName(e.ClassID, e.SpecID), e.Ilvl, e.Kills, total, percent)
-		if e.BlackDiamonds > 0 {
-			fmt.Fprintf(&b, " · ЧБ %d", e.BlackDiamonds)
-		}
-		if e.Title != "" {
-			fmt.Fprintf(&b, " · «%s»", truncateRunes(e.Title, 24))
-		}
-		b.WriteString("\n")
-	}
-	if len(entries) > limit {
-		fmt.Fprintf(&b, "…и ещё %d игроков", len(entries)-limit)
-	}
-
-	embed := &discordgo.MessageEmbed{
-		Title:       "📋 Посещаемость — " + guildName,
-		Description: fmt.Sprintf("Период: **4 КД** · киллов: **%d** · игроков: **%d**", total, len(entries)),
-		Color:       0xf1c40f,
-		Fields: []*discordgo.MessageEmbedField{
-			{Name: "Явка", Value: b.String()},
-		},
-	}
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{Embeds: []*discordgo.MessageEmbed{embed}},
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+
+	img, err := RenderAttendanceImage(guildName, sub.Realm, since, total, entries)
+	if err != nil {
+		h.Logger.Error("RenderAttendanceImage error", "error", err, "guild_id", sub.GuildID)
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("❌ Не удалось сгенерировать изображение посещаемости."),
+		})
+		return
+	}
+	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Files: []*discordgo.File{{
+			Name:   "attendance.png",
+			Reader: bytes.NewReader(img),
+		}},
 	})
 }
 
@@ -304,32 +285,50 @@ func (h *BotHandler) HandleProfileCommand(s *discordgo.Session, i *discordgo.Int
 		sets = fmt.Sprintf("%d · %s", p.T4, p.SetPieces)
 	}
 
-	fields := []*discordgo.MessageEmbedField{
-		{Name: "Класс и спек", Value: fmt.Sprintf("%s · %s", className(p.ClassID), sirus.GetSpecName(p.ClassID, p.SpecID)), Inline: true},
-		{Name: "Роль", Value: role, Inline: true},
-		{Name: "Илвл", Value: fmt.Sprintf("%d", p.Ilvl), Inline: true},
-		{Name: "Рио (мифик)", Value: mythicValue, Inline: true},
-		{Name: "Лучший ключ", Value: bestKey, Inline: true},
-		{Name: "Мифик-раны (в тайм/всего)", Value: runs, Inline: true},
-		{Name: "Позиция в мифик-ладдере", Value: position, Inline: true},
-		{Name: "Чёрные бриллианты", Value: fmt.Sprintf("%d", cache.BlackDiamonds), Inline: true},
-		{Name: "Титул", Value: title, Inline: true},
-		{Name: "Т4 / сеты", Value: sets, Inline: true},
-		{Name: "Посещаемость", Value: fmt.Sprintf("%d%% (%d килов)", p.AttendedPct, p.TotalKills), Inline: true},
-		{Name: "Лучший DPS", Value: FormatNum(p.BestDps), Inline: true},
-		{Name: "Лучший HPS", Value: FormatNum(p.BestHps), Inline: true},
-		{Name: "Первый килл в окне", Value: formatProfileTime(p.FirstSeen), Inline: true},
-		{Name: "Последний килл", Value: formatProfileTime(p.LastSeen), Inline: true},
+	guildName := ""
+	if n, err := h.SubStore.GetGuildName(sub.GuildID, sub.Realm); err == nil {
+		guildName = n
 	}
 
-	embed := &discordgo.MessageEmbed{
-		Title:  "👤 Профиль — " + p.Name,
-		Color:  0xf1c40f,
-		Fields: fields,
-		Footer: &discordgo.MessageEmbedFooter{Text: "Период: последние 4 КД"},
-	}
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
-		Type: discordgo.InteractionResponseChannelMessageWithSource,
-		Data: &discordgo.InteractionResponseData{Embeds: []*discordgo.MessageEmbed{embed}},
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+
+	card := ProfileCard{
+		Name:          p.Name,
+		GuildName:     guildName,
+		Realm:         sub.Realm,
+		ClassID:       p.ClassID,
+		SpecID:        p.SpecID,
+		Role:          role,
+		Ilvl:          p.Ilvl,
+		MythicValue:   mythicValue,
+		BestKey:       bestKey,
+		Runs:          runs,
+		Position:      position,
+		BlackDiamonds: cache.BlackDiamonds,
+		Title:         title,
+		Sets:          sets,
+		Attendance:    fmt.Sprintf("%d%% (%d килов)", p.AttendedPct, p.TotalKills),
+		BestDps:       p.BestDps,
+		BestHps:       p.BestHps,
+		FirstSeen:     p.FirstSeen,
+		LastSeen:      p.LastSeen,
+		TotalKills:    p.TotalKills,
+	}
+
+	img, err := RenderPlayerProfileImage(card)
+	if err != nil {
+		h.Logger.Error("RenderPlayerProfileImage error", "error", err, "player", p.Name)
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("❌ Не удалось сгенерировать изображение профиля."),
+		})
+		return
+	}
+	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Files: []*discordgo.File{{
+			Name:   "profile.png",
+			Reader: bytes.NewReader(img),
+		}},
 	})
 }
