@@ -214,10 +214,11 @@ func main() {
 			Description: "Профиль игрока по киллам и рейдам (премиум)",
 			Options: []*discordgo.ApplicationCommandOption{
 				{
-					Name:        "name",
-					Description: "Ник персонажа",
-					Type:        discordgo.ApplicationCommandOptionString,
-					Required:    true,
+					Name:         "name",
+					Description:  "Ник персонажа",
+					Type:         discordgo.ApplicationCommandOptionString,
+					Required:     true,
+					Autocomplete: true,
 				},
 			},
 		},

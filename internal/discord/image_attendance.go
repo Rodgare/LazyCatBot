@@ -4,6 +4,9 @@ import (
 	"bytes"
 	"fmt"
 	"image"
+	"math/rand"
+	"strconv"
+	"strings"
 	"time"
 
 	"LazyCatBot/internal/models"
@@ -13,7 +16,7 @@ import (
 )
 
 const (
-	attendanceWidth      = 1100
+	attendanceWidth      = 1250
 	attendancePad        = 30
 	attendanceHeaderH    = 165
 	attendanceTableHeadH = 42
@@ -23,14 +26,14 @@ const (
 	attRankX     = 30
 	attClassX    = 74
 	attNameX     = 104
-	attSpecX     = 342
-	attSpecIconX = 342
-	attSpecTextX = 368
-	attRoleX     = 500
-	attIlvlX     = 585
-	attKillsX    = 665
-	attBarX      = 760
-	attBarW      = 92
+	attSpecIconX = 370
+	attSpecTextX = 396
+	attRoleX     = 545
+	attIlvlX     = 625
+	attSetX      = 695
+	attKillsX    = 825
+	attBarX      = 925
+	attBarW      = 100
 )
 
 // RenderAttendanceImage draws the full guild attendance table for the period.
@@ -43,8 +46,15 @@ func RenderAttendanceImage(guildName, realm string, since int64, total int, entr
 	}
 
 	dc := gg.NewContext(attendanceWidth, height)
-	dc.SetRGB(0.055, 0.065, 0.085)
-	dc.Clear()
+	if raidID := randomRaidBackgroundID(); raidID > 0 {
+		drawRaidBackground(dc, raidID, getRaidColor(raidID))
+	} else {
+		dc.SetRGB(0.055, 0.065, 0.085)
+		dc.Clear()
+	}
+	dc.SetRGBA(0.02, 0.03, 0.05, 0.28)
+	dc.DrawRectangle(0, 0, attendanceWidth, float64(height))
+	dc.Fill()
 
 	// Gold accent line, same visual language as the report and digest images.
 	dc.SetRGB(0.95, 0.77, 0.24)
@@ -87,6 +97,9 @@ func RenderAttendanceImage(guildName, realm string, since int64, total int, entr
 	dc.Fill()
 
 	headerY := float64(attendanceHeaderH)
+	dc.SetRGBA(0, 0, 0, 0.38)
+	dc.DrawRectangle(0, headerY, attendanceWidth, attendanceTableHeadH)
+	dc.Fill()
 	loadCyrillicFontFace(dc, 15)
 	dc.SetRGB(0.48, 0.52, 0.58)
 	dc.DrawString("#", attRankX, headerY+27)
@@ -94,10 +107,11 @@ func RenderAttendanceImage(guildName, realm string, since int64, total int, entr
 	dc.DrawString("Спек", attSpecTextX, headerY+27)
 	dc.DrawString("Роль", attRoleX, headerY+27)
 	dc.DrawString("Илвл", attIlvlX, headerY+27)
+	dc.DrawString("Сет", attSetX, headerY+27)
 	dc.DrawString("Килы", attKillsX, headerY+27)
 	dc.DrawString("Явка", attBarX, headerY+27)
-	dc.DrawString("Последний кил", 925, headerY+27)
-	dc.DrawString("ЧБ", 1062, headerY+27)
+	dc.DrawString("Последний кил", 1105, headerY+27)
+	dc.DrawString("ЧБ", 1210, headerY+27)
 
 	dc.SetRGBA(1, 1, 1, 0.08)
 	dc.DrawRectangle(attendancePad, headerY+attendanceTableHeadH-1, attendanceWidth-attendancePad*2, 1)
@@ -122,7 +136,7 @@ func RenderAttendanceImage(guildName, realm string, since int64, total int, entr
 
 func drawAttendanceRow(dc *gg.Context, idx int, e models.AttendanceEntry, total int, y float64) {
 	if idx%2 == 1 {
-		dc.SetRGBA(1, 1, 1, 0.03)
+		dc.SetRGBA(0, 0, 0, 0.18)
 		dc.DrawRectangle(0, y, attendanceWidth, attendanceRowH)
 		dc.Fill()
 	}
@@ -149,11 +163,11 @@ func drawAttendanceRow(dc *gg.Context, idx int, e models.AttendanceEntry, total 
 	if e.Title == "" {
 		nameY = y + 28
 	}
-	dc.DrawString(fitText(dc, e.Name, 225), attNameX, nameY)
+	dc.DrawString(fitText(dc, e.Name, 250), attNameX, nameY)
 	if e.Title != "" {
 		loadCyrillicFontFace(dc, 12)
 		dc.SetRGB(0.55, 0.58, 0.64)
-		dc.DrawString(fitText(dc, "«"+e.Title+"»", 225), attNameX, y+34)
+		dc.DrawString(fitText(dc, "«"+e.Title+"»", 250), attNameX, y+34)
 	}
 
 	specName := sirus.GetSpecName(e.ClassID, e.SpecID)
@@ -180,6 +194,16 @@ func drawAttendanceRow(dc *gg.Context, idx int, e models.AttendanceEntry, total 
 	loadCyrillicFontFace(dc, 16)
 	dc.SetRGB(0.82, 0.85, 0.90)
 	dc.DrawString(fmt.Sprintf("%d", e.Ilvl), attIlvlX, y+28)
+
+	setText := e.SetPieces
+	if setText == "" {
+		setText = "—"
+		dc.SetRGB(0.38, 0.41, 0.47)
+	} else {
+		dc.SetRGB(0.70, 0.25, 0.95)
+	}
+	loadCyrillicFontFace(dc, 14)
+	dc.DrawString(fitText(dc, setText, 110), attSetX, y+28)
 
 	kills := e.Kills
 	if total > 0 && kills > total {
@@ -212,15 +236,15 @@ func drawAttendanceRow(dc *gg.Context, idx int, e models.AttendanceEntry, total 
 
 	loadCyrillicFontFace(dc, 15)
 	dc.SetRGB(0.62, 0.66, 0.72)
-	dc.DrawString(formatAttendanceTime(e.LastSeen), 925, y+28)
+	dc.DrawString(formatAttendanceTime(e.LastSeen), 1105, y+28)
 
 	loadCyrillicFontFace(dc, 16)
 	if e.BlackDiamonds > 0 {
 		dc.SetRGB(0.92, 0.73, 0.25)
-		dc.DrawString(fmt.Sprintf("%d", e.BlackDiamonds), 1066, y+28)
+		dc.DrawString(fmt.Sprintf("%d", e.BlackDiamonds), 1210, y+28)
 	} else {
 		dc.SetRGB(0.38, 0.41, 0.47)
-		dc.DrawString("—", 1066, y+28)
+		dc.DrawString("—", 1210, y+28)
 	}
 }
 
@@ -288,4 +312,27 @@ func fitText(dc *gg.Context, s string, maxWidth float64) string {
 		}
 	}
 	return "…"
+}
+
+// randomRaidBackgroundID picks one of the embedded raid artworks so wide
+// attendance/profile images share the visual style of kill reports.
+func randomRaidBackgroundID() int {
+	entries, err := imagesFS.ReadDir("assets/images/raid")
+	if err != nil {
+		return 0
+	}
+	ids := make([]int, 0, len(entries))
+	for _, entry := range entries {
+		if entry.IsDir() || !strings.HasSuffix(entry.Name(), ".png") {
+			continue
+		}
+		id, err := strconv.Atoi(strings.TrimSuffix(entry.Name(), ".png"))
+		if err == nil {
+			ids = append(ids, id)
+		}
+	}
+	if len(ids) == 0 {
+		return 0
+	}
+	return ids[rand.Intn(len(ids))]
 }

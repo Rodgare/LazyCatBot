@@ -58,7 +58,7 @@ func RenderPlayerProfileImage(c ProfileCard) ([]byte, error) {
 		{"Класс и спек", className(c.ClassID) + " · " + sirus.GetSpecName(c.ClassID, c.SpecID)},
 		{"Роль", orDash(c.Role)},
 		{"Илвл", formatPositive(c.Ilvl)},
-		{"Т4 / сеты", orDash(c.Sets)},
+		{"Сет", orDash(c.Sets)},
 		{"Чёрные бриллианты", formatPositive(c.BlackDiamonds)},
 		{"Титул", orDash(c.Title)},
 		{"Посещаемость", orDash(c.Attendance)},
@@ -77,8 +77,15 @@ func RenderPlayerProfileImage(c ProfileCard) ([]byte, error) {
 
 	height := profileHeaderH + len(left)*profileRowH + profileFooterH + profilePad
 	dc := gg.NewContext(profileWidth, height)
-	dc.SetRGB(0.055, 0.065, 0.085)
-	dc.Clear()
+	if raidID := randomRaidBackgroundID(); raidID > 0 {
+		drawRaidBackground(dc, raidID, getRaidColor(raidID))
+	} else {
+		dc.SetRGB(0.055, 0.065, 0.085)
+		dc.Clear()
+	}
+	dc.SetRGBA(0.02, 0.03, 0.05, 0.30)
+	dc.DrawRectangle(0, 0, profileWidth, float64(height))
+	dc.Fill()
 
 	classColor := classColorRGBA(c.ClassID)
 	dc.SetRGB(float64(classColor.R)/255, float64(classColor.G)/255, float64(classColor.B)/255)
@@ -116,7 +123,7 @@ func RenderPlayerProfileImage(c ProfileCard) ([]byte, error) {
 	y := float64(profileHeaderH)
 	for i := 0; i < len(left); i++ {
 		if i%2 == 1 {
-			dc.SetRGBA(1, 1, 1, 0.03)
+			dc.SetRGBA(0, 0, 0, 0.18)
 			dc.DrawRectangle(profilePad, y, profileWidth-profilePad*2, profileRowH)
 			dc.Fill()
 		}

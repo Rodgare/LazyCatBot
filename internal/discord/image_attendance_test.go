@@ -11,8 +11,8 @@ import (
 
 func TestRenderAttendanceImage(t *testing.T) {
 	entries := []models.AttendanceEntry{
-		{Name: "Алиса", ClassID: 8, SpecID: 1, Role: "dps", Kills: 10, Ilvl: 260, BlackDiamonds: 3, Title: "Хранитель пламени", LastSeen: 1762900000},
-		{Name: "Боб", ClassID: 5, SpecID: 1, Role: "hps", Kills: 9, Ilvl: 255, BlackDiamonds: 1, LastSeen: 1762890000},
+		{Name: "Алиса", ClassID: 8, SpecID: 1, Role: "dps", Kills: 10, Ilvl: 260, SetPieces: "4т4 4т6", BlackDiamonds: 3, Title: "Хранитель пламени", LastSeen: 1762900000},
+		{Name: "Боб", ClassID: 5, SpecID: 1, Role: "hps", Kills: 9, Ilvl: 255, SetPieces: "4т4", BlackDiamonds: 1, LastSeen: 1762890000},
 		{Name: "Василиса", ClassID: 2, SpecID: 0, Role: "hps", Kills: 8, Ilvl: 258, Title: "Свет несущая", LastSeen: 1762880000},
 		{Name: "Григорий", ClassID: 1, SpecID: 2, Role: "dps", Kills: 7, Ilvl: 252, LastSeen: 1762870000},
 		{Name: "Дмитрий", ClassID: 6, SpecID: 0, Role: "dps", Kills: 6, Ilvl: 250, LastSeen: 1762860000},

@@ -26,6 +26,7 @@ type AttendanceEntry struct {
 	Kills         int
 	LastSeen      int64
 	Ilvl          int
+	SetPieces     string
 	BlackDiamonds int
 	Title         string
 }

@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"strings"
 	"time"
 
 	"LazyCatBot/internal/models"
@@ -95,15 +96,19 @@ func (s *KillHistoryStorage) RecordKill(report models.BossKillReport) error {
 }
 
 // GetAttendance returns the guild's total kills and per-player attendance in a
-// window starting at since (unix seconds).
+// window starting at since (unix seconds). Only actual raid encounters are
+// counted so old/irrelevant raids do not skew attendance percentages.
 func (s *KillHistoryStorage) GetAttendance(realm string, guildID int, since int64) (int, []models.AttendanceEntry, error) {
 	if realm == "" {
 		realm = "x3"
 	}
 
 	var total int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM kill_history
-		WHERE realm = ? AND guild_id = ? AND kills_at >= ?`, realm, guildID, since).Scan(&total); err != nil {
+	if err := s.db.QueryRow(`SELECT COUNT(*)
+		FROM kill_history h
+		JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
+		WHERE h.realm = ? AND h.guild_id = ? AND h.kills_at >= ?`,
+		realm, guildID, since).Scan(&total); err != nil {
 		return 0, nil, err
 	}
 	if total == 0 {
@@ -111,18 +116,36 @@ func (s *KillHistoryStorage) GetAttendance(realm string, guildID int, since int6
 	}
 
 	rows, err := s.db.Query(`
-		SELECT p.player_name, p.class_id, p.spec_id, p.role,
-		       COUNT(DISTINCT p.kill_id) AS attended,
-		       COALESCE(MAX(h.kills_at), 0) AS last_seen,
-		       COALESCE(MAX(p.ilvl), 0) AS ilvl,
-		       COALESCE(MAX(cc.black_diamonds), 0) AS black_diamonds,
-		       COALESCE(MAX(cc.title), '') AS title
-		FROM kill_players p
-		JOIN kill_history h ON h.realm = p.realm AND h.kill_id = p.kill_id AND h.guild_id = p.guild_id
-		LEFT JOIN character_cache cc ON cc.realm = p.realm AND cc.name = p.player_name
-		WHERE p.realm = ? AND p.guild_id = ? AND h.kills_at >= ?
-		GROUP BY p.player_name
-		ORDER BY attended DESC, p.player_name ASC`, realm, guildID, since)
+		WITH actual AS (
+			SELECT h.realm, h.kill_id, h.guild_id, h.kills_at
+			FROM kill_history h
+			JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
+			WHERE h.realm = ? AND h.guild_id = ? AND h.kills_at >= ?
+		),
+		agg AS (
+			SELECT p.player_name, p.class_id, p.spec_id, p.role,
+			       COUNT(DISTINCT p.kill_id) AS attended,
+			       COALESCE(MAX(a.kills_at), 0) AS last_seen,
+			       COALESCE(MAX(p.ilvl), 0) AS ilvl,
+			       COALESCE(MAX(cc.black_diamonds), 0) AS black_diamonds,
+			       COALESCE(MAX(cc.title), '') AS title
+			FROM kill_players p
+			JOIN actual a ON a.realm = p.realm AND a.kill_id = p.kill_id AND a.guild_id = p.guild_id
+			LEFT JOIN character_cache cc ON cc.realm = p.realm AND cc.name = p.player_name
+			GROUP BY p.player_name
+		),
+		latest AS (
+			SELECT p.player_name, p.set_pieces,
+			       ROW_NUMBER() OVER (PARTITION BY p.player_name ORDER BY a.kills_at DESC) AS rn
+			FROM kill_players p
+			JOIN actual a ON a.realm = p.realm AND a.kill_id = p.kill_id AND a.guild_id = p.guild_id
+		)
+		SELECT agg.player_name, agg.class_id, agg.spec_id, agg.role, agg.attended,
+		       agg.last_seen, agg.ilvl, agg.black_diamonds, agg.title,
+		       COALESCE(latest.set_pieces, '')
+		FROM agg
+		LEFT JOIN latest ON latest.player_name = agg.player_name AND latest.rn = 1
+		ORDER BY agg.attended DESC, agg.player_name ASC`, realm, guildID, since)
 	if err != nil {
 		return 0, nil, err
 	}
@@ -132,12 +155,80 @@ func (s *KillHistoryStorage) GetAttendance(realm string, guildID int, since int6
 	for rows.Next() {
 		var e models.AttendanceEntry
 		if err := rows.Scan(&e.Name, &e.ClassID, &e.SpecID, &e.Role, &e.Kills, &e.LastSeen, &e.Ilvl,
-			&e.BlackDiamonds, &e.Title); err != nil {
+			&e.BlackDiamonds, &e.Title, &e.SetPieces); err != nil {
 			return 0, nil, err
 		}
 		entries = append(entries, e)
 	}
 	return total, entries, rows.Err()
+}
+
+// GuildPlayerNames returns every player with a kill in an actual raid inside
+// the window. Used by /profile autocomplete and case-insensitive lookup.
+func (s *KillHistoryStorage) GuildPlayerNames(realm string, guildID int, since int64) ([]string, error) {
+	if realm == "" {
+		realm = "x3"
+	}
+	rows, err := s.db.Query(`
+		SELECT DISTINCT p.player_name
+		FROM kill_players p
+		JOIN kill_history h ON h.realm = p.realm AND h.kill_id = p.kill_id AND h.guild_id = p.guild_id
+		JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
+		WHERE p.realm = ? AND p.guild_id = ? AND h.kills_at >= ?
+		ORDER BY p.player_name`, realm, guildID, since)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var names []string
+	for rows.Next() {
+		var name string
+		if err := rows.Scan(&name); err != nil {
+			return nil, err
+		}
+		names = append(names, name)
+	}
+	return names, rows.Err()
+}
+
+// SearchGuildPlayerNames filters guild players by a case-insensitive prefix.
+func (s *KillHistoryStorage) SearchGuildPlayerNames(realm string, guildID int, prefix string, since int64, limit int) ([]string, error) {
+	if limit <= 0 || limit > 25 {
+		limit = 25
+	}
+	names, err := s.GuildPlayerNames(realm, guildID, since)
+	if err != nil {
+		return nil, err
+	}
+
+	prefix = strings.ToLower(strings.TrimSpace(prefix))
+	out := make([]string, 0, limit)
+	for _, name := range names {
+		if prefix != "" && !strings.HasPrefix(strings.ToLower(name), prefix) {
+			continue
+		}
+		out = append(out, name)
+		if len(out) == limit {
+			break
+		}
+	}
+	return out, nil
+}
+
+// resolveGuildPlayerName maps a user-entered name to the exact stored spelling,
+// ignoring case (SQLite NOCASE does not cover Cyrillic).
+func (s *KillHistoryStorage) resolveGuildPlayerName(realm string, guildID int, name string, since int64) (string, error) {
+	names, err := s.GuildPlayerNames(realm, guildID, since)
+	if err != nil {
+		return name, err
+	}
+	for _, candidate := range names {
+		if strings.EqualFold(candidate, name) {
+			return candidate, nil
+		}
+	}
+	return name, nil
 }
 
 // GetWeeklyDigest assembles the data for the weekly image. Both bounds are unix
@@ -149,18 +240,21 @@ func (s *KillHistoryStorage) GetWeeklyDigest(realm string, guildID int, since, u
 
 	digest := &models.WeeklyDigest{Realm: realm, Since: since, Until: until}
 
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM kill_history
-		WHERE realm = ? AND guild_id = ? AND kills_at >= ? AND kills_at < ?`,
+	if err := s.db.QueryRow(`SELECT COUNT(*)
+		FROM kill_history h
+		JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
+		WHERE h.realm = ? AND h.guild_id = ? AND h.kills_at >= ? AND h.kills_at < ?`,
 		realm, guildID, since, until).Scan(&digest.TotalKills); err != nil {
 		return nil, err
 	}
 
 	firstRows, err := s.db.Query(`
-		SELECT boss_id, raid_id, MIN(kills_at) AS first_kill
-		FROM kill_history
-		WHERE realm = ? AND guild_id = ?
-		GROUP BY boss_id, raid_id
-		HAVING MIN(kills_at) >= ? AND MIN(kills_at) < ?
+		SELECT h.boss_id, h.raid_id, MIN(h.kills_at) AS first_kill
+		FROM kill_history h
+		JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
+		WHERE h.realm = ? AND h.guild_id = ?
+		GROUP BY h.boss_id, h.raid_id
+		HAVING MIN(h.kills_at) >= ? AND MIN(h.kills_at) < ?
 		ORDER BY first_kill ASC`, realm, guildID, since, until)
 	if err != nil {
 		return nil, err
@@ -201,6 +295,7 @@ func (s *KillHistoryStorage) topPlayers(realm string, guildID int, since, until 
 		       COALESCE(MAX(cc.title), '') AS title
 		FROM kill_players p
 		JOIN kill_history h ON h.realm = p.realm AND h.kill_id = p.kill_id AND h.guild_id = p.guild_id
+		JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
 		LEFT JOIN character_cache cc ON cc.realm = p.realm AND cc.name = p.player_name
 		WHERE p.realm = ? AND p.guild_id = ? AND h.kills_at >= ? AND h.kills_at < ?
 		  AND p.role = ? AND %s > 0
@@ -231,12 +326,18 @@ func (s *KillHistoryStorage) GetPlayerProfile(realm string, guildID int, name st
 		realm = "x3"
 	}
 
+	name, err := s.resolveGuildPlayerName(realm, guildID, name, since)
+	if err != nil {
+		return nil, err
+	}
+
 	profile := &models.PlayerKillProfile{Name: name}
-	err := s.db.QueryRow(`
+	err = s.db.QueryRow(`
 		SELECT COUNT(DISTINCT p.kill_id), COALESCE(MAX(p.dps), 0), COALESCE(MAX(p.hps), 0),
 		       COALESCE(MIN(h.kills_at), 0), COALESCE(MAX(h.kills_at), 0), COALESCE(MAX(p.ilvl), 0)
 		FROM kill_players p
 		JOIN kill_history h ON h.realm = p.realm AND h.kill_id = p.kill_id AND h.guild_id = p.guild_id
+		JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
 		WHERE p.realm = ? AND p.guild_id = ? AND p.player_name = ? AND h.kills_at >= ?`,
 		realm, guildID, name, since).
 		Scan(&profile.TotalKills, &profile.BestDps, &profile.BestHps,
@@ -251,6 +352,7 @@ func (s *KillHistoryStorage) GetPlayerProfile(realm string, guildID int, name st
 	err = s.db.QueryRow(`
 		SELECT p.guid, p.class_id, p.spec_id, p.role, p.t4, p.set_pieces FROM kill_players p
 		JOIN kill_history h ON h.realm = p.realm AND h.kill_id = p.kill_id AND h.guild_id = p.guild_id
+		JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
 		WHERE p.realm = ? AND p.guild_id = ? AND p.player_name = ? AND h.kills_at >= ?
 		ORDER BY h.kills_at DESC LIMIT 1`,
 		realm, guildID, name, since).
@@ -260,8 +362,11 @@ func (s *KillHistoryStorage) GetPlayerProfile(realm string, guildID int, name st
 	}
 
 	var guildKills int
-	if err := s.db.QueryRow(`SELECT COUNT(*) FROM kill_history
-		WHERE realm = ? AND guild_id = ? AND kills_at >= ?`, realm, guildID, since).Scan(&guildKills); err != nil {
+	if err := s.db.QueryRow(`SELECT COUNT(*)
+		FROM kill_history h
+		JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
+		WHERE h.realm = ? AND h.guild_id = ? AND h.kills_at >= ?`,
+		realm, guildID, since).Scan(&guildKills); err != nil {
 		return nil, err
 	}
 	if guildKills > 0 {

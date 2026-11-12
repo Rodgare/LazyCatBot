@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"time"
 
 	"github.com/bwmarrin/discordgo"
 )
@@ -61,11 +62,60 @@ func (h *BotHandler) InteractionCreate(s *discordgo.Session, i *discordgo.Intera
 	switch i.Type {
 	case discordgo.InteractionApplicationCommand:
 		h.HandleSlashCommands(s, i)
+	case discordgo.InteractionApplicationCommandAutocomplete:
+		h.HandleAutocomplete(s, i)
 	case discordgo.InteractionMessageComponent:
 		h.HandleButtons(s, i)
 	case discordgo.InteractionModalSubmit:
 		h.HandleModalSubmit(s, i)
 	}
+}
+
+// HandleAutocomplete suggests guild players for /profile. Matching is
+// case-insensitive and prefix-based, so Cyrillic names work too.
+func (h *BotHandler) HandleAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	data := i.ApplicationCommandData()
+	if data.Name != "profile" || h.KillHistory == nil {
+		h.respondAutocomplete(s, i, nil)
+		return
+	}
+
+	prefix := ""
+	for _, opt := range data.Options {
+		if opt.Focused {
+			prefix = opt.StringValue()
+			break
+		}
+	}
+
+	subs, err := h.SubStore.GetGuildSubsByChannel(i.ChannelID)
+	if err != nil || len(subs) == 0 {
+		h.respondAutocomplete(s, i, nil)
+		return
+	}
+
+	since := time.Now().AddDate(0, 0, -28).Unix()
+	names, err := h.KillHistory.SearchGuildPlayerNames(subs[0].Realm, subs[0].GuildID, prefix, since, 25)
+	if err != nil {
+		h.Logger.Error("Profile autocomplete error", "error", err, "guild_id", subs[0].GuildID)
+		h.respondAutocomplete(s, i, nil)
+		return
+	}
+	h.respondAutocomplete(s, i, names)
+}
+
+func (h *BotHandler) respondAutocomplete(s *discordgo.Session, i *discordgo.InteractionCreate, names []string) {
+	choices := make([]*discordgo.ApplicationCommandOptionChoice, 0, len(names))
+	for _, name := range names {
+		choices = append(choices, &discordgo.ApplicationCommandOptionChoice{
+			Name:  name,
+			Value: name,
+		})
+	}
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionApplicationCommandAutocompleteResult,
+		Data: &discordgo.InteractionResponseData{Choices: choices},
+	})
 }
 
 func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.InteractionCreate) {

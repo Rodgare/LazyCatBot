@@ -48,6 +48,12 @@ CREATE TABLE character_cache (
     black_diamonds INTEGER DEFAULT 0,
     updated_at INTEGER DEFAULT 0,
     PRIMARY KEY (realm, name)
+);
+CREATE TABLE actual_raids (
+    raid_id INTEGER NOT NULL,
+    boss_id INTEGER NOT NULL,
+    realm TEXT NOT NULL DEFAULT 'x3',
+    PRIMARY KEY (raid_id, boss_id)
 );`
 
 func newKillHistoryTestStore(t *testing.T) *KillHistoryStorage {
@@ -84,11 +90,17 @@ func TestKillHistoryDigestAndProfile(t *testing.T) {
 		t.Fatalf("insert cache: %v", err)
 	}
 
-	alice1 := models.PlayerReport{Name: "Alice", GUID: 1, ClassID: 8, SpecID: 1, Ilvl: 250, Dps: 1000, Role: 0}
-	bob1 := models.PlayerReport{Name: "Bob", GUID: 2, ClassID: 5, SpecID: 2, Ilvl: 255, Hps: 800, Role: 1}
-	alice2 := models.PlayerReport{Name: "Alice", GUID: 1, ClassID: 8, SpecID: 1, Ilvl: 260, Dps: 1200, Role: 0}
-	bob2 := models.PlayerReport{Name: "Bob", GUID: 2, ClassID: 5, SpecID: 2, Ilvl: 255, Hps: 900, Role: 1}
+	if _, err := store.db.Exec(`INSERT INTO actual_raids (raid_id, boss_id, realm)
+		VALUES (631, 1, 'x3'), (631, 2, 'x3')`); err != nil {
+		t.Fatalf("insert actual raids: %v", err)
+	}
+
+	alice1 := models.PlayerReport{Name: "Alice", GUID: 1, ClassID: 8, SpecID: 1, Ilvl: 250, Dps: 1000, Role: 0, SetPieces: "4т4"}
+	bob1 := models.PlayerReport{Name: "Bob", GUID: 2, ClassID: 5, SpecID: 2, Ilvl: 255, Hps: 800, Role: 1, SetPieces: "4т4"}
+	alice2 := models.PlayerReport{Name: "Alice", GUID: 1, ClassID: 8, SpecID: 1, Ilvl: 260, Dps: 1200, Role: 0, SetPieces: "4т4 4т6"}
+	bob2 := models.PlayerReport{Name: "Bob", GUID: 2, ClassID: 5, SpecID: 2, Ilvl: 255, Hps: 900, Role: 1, SetPieces: "4т4 4т6"}
 	other := models.PlayerReport{Name: "Alice", GUID: 1, ClassID: 8, SpecID: 1, Ilvl: 260, Dps: 9999, Role: 0}
+	trash := models.PlayerReport{Name: "Alice", GUID: 1, ClassID: 8, SpecID: 1, Ilvl: 260, Dps: 9999, Role: 0, SetPieces: "4т4"}
 
 	if err := store.RecordKill(killReport(1, 100, "2026-11-10 20:00:00", alice1, bob1)); err != nil {
 		t.Fatalf("record kill 1: %v", err)
@@ -98,6 +110,9 @@ func TestKillHistoryDigestAndProfile(t *testing.T) {
 	}
 	if err := store.RecordKill(killReport(3, 200, "2026-11-11 21:00:00", other)); err != nil {
 		t.Fatalf("record other guild kill: %v", err)
+	}
+	if err := store.RecordKill(killReport(4, 100, "2026-11-11 22:00:00", trash)); err != nil {
+		t.Fatalf("record non-actual kill: %v", err)
 	}
 
 	since := parseKillTime("2026-11-01 00:00:00")
@@ -116,6 +131,9 @@ func TestKillHistoryDigestAndProfile(t *testing.T) {
 	}
 	if attendance[0].BlackDiamonds != 4 || attendance[0].Title != "Тест" {
 		t.Fatalf("attendance cache = %+v", attendance[0])
+	}
+	if attendance[0].SetPieces != "4т4 4т6" {
+		t.Fatalf("attendance set pieces = %q, want latest kill set", attendance[0].SetPieces)
 	}
 
 	digest, err := store.GetWeeklyDigest("x3", 100, weekSince, until)
@@ -147,6 +165,22 @@ func TestKillHistoryDigestAndProfile(t *testing.T) {
 	}
 	if profile.ClassID != 8 || profile.Role != "dps" || profile.Ilvl != 260 {
 		t.Fatalf("profile metadata = %+v", profile)
+	}
+
+	caseProfile, err := store.GetPlayerProfile("x3", 100, "alice", since)
+	if err != nil {
+		t.Fatalf("case-insensitive profile: %v", err)
+	}
+	if caseProfile.Name != "Alice" || caseProfile.TotalKills != 2 {
+		t.Fatalf("case-insensitive profile = %+v, want stored spelling Alice", caseProfile)
+	}
+
+	names, err := store.SearchGuildPlayerNames("x3", 100, "al", since, 25)
+	if err != nil {
+		t.Fatalf("search players: %v", err)
+	}
+	if len(names) != 1 || names[0] != "Alice" {
+		t.Fatalf("search players = %v, want [Alice]", names)
 	}
 
 	if err := store.RecordKill(killReport(1, 100, "2026-11-10 20:00:00", alice1, bob1)); err != nil {

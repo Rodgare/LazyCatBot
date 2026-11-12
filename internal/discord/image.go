@@ -522,23 +522,31 @@ func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
 		return
 	}
 
-	canvasH := dc.Height()
-	imgH := img.Bounds().Dy()
+	canvasW := float64(dc.Width())
+	canvasH := float64(dc.Height())
+	imgW := float64(img.Bounds().Dx())
+	imgH := float64(img.Bounds().Dy())
 
-	// Photo is anchored to the top and fills the whole width.
+	// Scale the artwork to the canvas width (reports are 800px wide, but
+	// wider layouts such as attendance must not leave an empty strip).
+	scale := canvasW / imgW
+	scaledH := imgH * scale
+	dc.Push()
+	dc.Scale(scale, scale)
 	dc.DrawImage(img, 0, 0)
+	dc.Pop()
 
 	// If the report is taller than the photo, fill the rest with the solid colour.
-	if canvasH > imgH {
+	if canvasH > scaledH {
 		dc.SetHexColor(bgColor + "ff")
-		dc.DrawRectangle(0, float64(imgH), float64(width), float64(canvasH-imgH))
+		dc.DrawRectangle(0, scaledH, canvasW, canvasH-scaledH)
 		dc.Fill()
 	}
 
 	// Semi-transparent dark overlay to dim bright backgrounds. Tune raidBgDimAlpha.
 	if raidBgDimAlpha > 0 {
 		dc.SetRGBA(0, 0, 0, raidBgDimAlpha)
-		dc.DrawRectangle(0, 0, float64(width), float64(canvasH))
+		dc.DrawRectangle(0, 0, canvasW, canvasH)
 		dc.Fill()
 	}
 
@@ -546,16 +554,16 @@ func drawRaidBackground(dc *gg.Context, raidID int, bgColor string) {
 	// Tune bottomGradHeight / bottomAlpha to taste.
 	const bottomGradHeight = 180.0
 	const bottomAlpha = 250
-	startFrac := (float64(canvasH) - bottomGradHeight) / float64(canvasH)
+	startFrac := (canvasH - bottomGradHeight) / canvasH
 	if startFrac < 0 {
 		startFrac = 0
 	}
 
-	grad := gg.NewLinearGradient(0, 0, 0, float64(canvasH))
+	grad := gg.NewLinearGradient(0, 0, 0, canvasH)
 	grad.AddColorStop(0, color.RGBA{0, 0, 0, 0})
 	grad.AddColorStop(startFrac, color.RGBA{0, 0, 0, 0})
 	grad.AddColorStop(1, color.RGBA{0, 0, 0, bottomAlpha})
 	dc.SetFillStyle(grad)
-	dc.DrawRectangle(0, 0, float64(width), float64(canvasH))
+	dc.DrawRectangle(0, 0, canvasW, canvasH)
 	dc.Fill()
 }

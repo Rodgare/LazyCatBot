@@ -20,7 +20,7 @@ func TestRenderPlayerProfileImage(t *testing.T) {
 		Position:      "#12",
 		BlackDiamonds: 3,
 		Title:         "Хранитель пламени",
-		Sets:          "4 · T4 4/5",
+		Sets:          "4т4 4т6",
 		Attendance:    "90% (9 килов)",
 		BestDps:       123456,
 		BestHps:       0,

@@ -280,10 +280,7 @@ func (h *BotHandler) HandleProfileCommand(s *discordgo.Session, i *discordgo.Int
 	if title == "" {
 		title = "—"
 	}
-	sets := fmt.Sprintf("%d", p.T4)
-	if p.SetPieces != "" {
-		sets = fmt.Sprintf("%d · %s", p.T4, p.SetPieces)
-	}
+	sets := p.SetPieces
 
 	guildName := ""
 	if n, err := h.SubStore.GetGuildName(sub.GuildID, sub.Realm); err == nil {
