@@ -214,8 +214,9 @@ func (w *Worker) channelPremium(channelID string) bool {
 }
 
 // enqueueJob classifies a job by the channels it targets and pushes it into the
-// priority scheduler. Free channels that will have to wait receive a short
-// queue-position notice, which is cleaned up when the job is processed.
+// priority scheduler. Free channels always receive a short processing/queue
+// notice, which is cleaned up when the job is processed. Premium servers get
+// their report without a placeholder because they never wait in the queue.
 func (w *Worker) enqueueJob(job KillJob) {
 	freeChannels := make([]string, 0, len(job.Channels))
 	hasPremium := false
@@ -228,18 +229,16 @@ func (w *Worker) enqueueJob(job KillJob) {
 	}
 
 	position := w.scheduler.total() + 1
-	if position > 1 {
-		for _, ch := range freeChannels {
-			msgID, err := w.reporter.SendQueueNotice(ch, position)
-			if err != nil {
-				w.logger.Warn("[Processor] Send queue notice err", "error", err, "channel", ch)
-				continue
-			}
-			if job.QueueNotices == nil {
-				job.QueueNotices = make(map[string]string)
-			}
-			job.QueueNotices[ch] = msgID
+	for _, ch := range freeChannels {
+		msgID, err := w.reporter.SendQueueNotice(ch, position)
+		if err != nil {
+			w.logger.Warn("[Processor] Send queue notice err", "error", err, "channel", ch)
+			continue
 		}
+		if job.QueueNotices == nil {
+			job.QueueNotices = make(map[string]string)
+		}
+		job.QueueNotices[ch] = msgID
 	}
 
 	w.scheduler.push(job, hasPremium)
