@@ -90,21 +90,42 @@ func pickShowcaseName(names []string) string {
 	return candidates[rand.Intn(len(candidates))]
 }
 
-// drawPremiumBackdrop paints a gold→purple gradient rounded rectangle behind a
-// donor's nickname to set it apart from the regular rows.
-func drawPremiumBackdrop(dc *gg.Context, x, y, w, h float64) {
-	if w <= 0 || h <= 0 {
+const (
+	premiumRowInset  = 2.0
+	premiumRowRadius = 5.0
+	premiumRowAccent = 3.0
+)
+
+// drawPremiumRow paints the donor highlight across the whole table row. The
+// gold gradient is strongest around the rank and nickname, fades through the
+// middle and reaches full transparency at the right edge, so class colors and
+// numbers stay readable. A thin left accent bar and a hairline inner border
+// separate the row from its neighbours; the small inset keeps stacked donor
+// rows from merging.
+func drawPremiumRow(dc *gg.Context, y, h, width float64) {
+	x := premiumRowInset
+	w := width - premiumRowInset*2
+	yy := y + premiumRowInset
+	hh := h - premiumRowInset*2
+	if w <= 0 || hh <= 0 {
 		return
 	}
-	grad := gg.NewLinearGradient(x, y, x+w, y+h)
-	grad.AddColorStop(0, color.RGBA{R: 255, G: 199, B: 77, A: 120})
-	grad.AddColorStop(1, color.RGBA{R: 156, G: 92, B: 255, A: 120})
+
+	grad := gg.NewLinearGradient(x, 0, x+w, 0)
+	grad.AddColorStop(0, color.RGBA{R: 245, G: 158, B: 11, A: 59})
+	grad.AddColorStop(0.25, color.RGBA{R: 245, G: 158, B: 11, A: 42})
+	grad.AddColorStop(0.55, color.RGBA{R: 245, G: 158, B: 11, A: 20})
+	grad.AddColorStop(1, color.RGBA{R: 245, G: 158, B: 11, A: 0})
 	dc.SetFillStyle(grad)
-	dc.DrawRoundedRectangle(x, y, w, h, 6)
+	dc.DrawRoundedRectangle(x, yy, w, hh, premiumRowRadius)
 	dc.Fill()
 
 	dc.SetLineWidth(1)
-	dc.SetRGBA(1, 0.86, 0.45, 0.65)
-	dc.DrawRoundedRectangle(x, y, w, h, 6)
+	dc.SetRGBA(1, 0.86, 0.50, 0.18)
+	dc.DrawRoundedRectangle(x+0.5, yy+0.5, w-1, hh-1, premiumRowRadius)
 	dc.Stroke()
+
+	dc.SetRGBA(0.98, 0.72, 0.15, 0.90)
+	dc.DrawRoundedRectangle(x+1, yy+5, premiumRowAccent, hh-10, 1.5)
+	dc.Fill()
 }
