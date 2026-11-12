@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"log/slog"
 	"strings"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -19,7 +20,10 @@ func NewMythicLeaderboardStorage(db *sql.DB, logger *slog.Logger) *MythicLeaderb
 }
 
 // UpdateMythicLeaderboard replaces the whole mythic leaderboard snapshot for the
-// given realm/season/week in one transaction.
+// given realm in one transaction. Every row shares one updated_at value: the
+// snapshot marker used by the read queries. Using unixepoch() per row would
+// split a large sync across several timestamps, so only the rows inserted in
+// the last second would look "current".
 func (s *MythicLeaderboardStorage) UpdateMythicLeaderboard(realm string, season, weekID int, players []models.MythicScorePlayer) error {
 	if realm == "" {
 		realm = "x3"
@@ -31,20 +35,23 @@ func (s *MythicLeaderboardStorage) UpdateMythicLeaderboard(realm string, season,
 	}
 	defer tx.Rollback()
 
-	if _, err := tx.Exec("DELETE FROM mythic_leaderboard WHERE realm=? AND season=? AND week_id=?", realm, season, weekID); err != nil {
+	// Keep a single snapshot per realm so old seasons cannot leak into reads.
+	if _, err := tx.Exec("DELETE FROM mythic_leaderboard WHERE realm=?", realm); err != nil {
 		return err
 	}
 
+	updatedAt := time.Now().Unix()
+
 	stmt, err := tx.Prepare(`INSERT OR REPLACE INTO mythic_leaderboard
 		(realm, guid, name, class_id, spec_id, current_score, position, total_runs, timed_runs, best_key, zodiac, season, week_id, updated_at)
-		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, unixepoch())`)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`)
 	if err != nil {
 		return err
 	}
 	defer stmt.Close()
 
 	for _, p := range players {
-		_, err = stmt.Exec(realm, p.GUID, p.Name, p.Class, p.SpecID, p.Score, p.Position, p.TotalRuns, p.TimedRuns, p.BestKey, p.Zodiac, season, weekID)
+		_, err = stmt.Exec(realm, p.GUID, p.Name, p.Class, p.SpecID, p.Score, p.Position, p.TotalRuns, p.TimedRuns, p.BestKey, p.Zodiac, season, weekID, updatedAt)
 		if err != nil {
 			return err
 		}
@@ -58,22 +65,20 @@ func (s *MythicLeaderboardStorage) UpdateMythicLeaderboard(realm string, season,
 }
 
 // GetPlayerMythicRank computes the player's rank and percentile among the same
-// class+spec by current_score, mirroring the raid GetPlayerRank logic. It
-// always uses the most recently synced snapshot, so it does not need to know
-// which season is current.
+// class+spec by current_score, mirroring the raid GetPlayerRank logic. The table
+// always holds one snapshot per realm, so no season/week filter is needed.
 func (s *MythicLeaderboardStorage) GetPlayerMythicRank(realm string, classID, specID int, score float64) (rank, total, percentile int, err error) {
 	if realm == "" {
 		realm = "x3"
 	}
 
-	const latest = `updated_at = (SELECT MAX(updated_at) FROM mythic_leaderboard WHERE realm = ?)`
 	query := `SELECT
-		(SELECT COUNT(*) + 1 FROM mythic_leaderboard WHERE realm=? AND class_id=? AND spec_id=? AND current_score > ? AND ` + latest + `) as rank,
-		(SELECT COUNT(*) FROM mythic_leaderboard WHERE realm=? AND class_id=? AND spec_id=? AND ` + latest + `) as total`
+		(SELECT COUNT(*) + 1 FROM mythic_leaderboard WHERE realm=? AND class_id=? AND spec_id=? AND current_score > ?) as rank,
+		(SELECT COUNT(*) FROM mythic_leaderboard WHERE realm=? AND class_id=? AND spec_id=?) as total`
 
 	err = s.db.QueryRow(query,
-		realm, classID, specID, score, realm,
-		realm, classID, specID, realm,
+		realm, classID, specID, score,
+		realm, classID, specID,
 	).Scan(&rank, &total)
 	if err != nil {
 		return 0, 0, 0, err
@@ -100,8 +105,8 @@ func (s *MythicLeaderboardStorage) GetGuildMythicPlayers(realm string, guids []i
 	}
 
 	placeholders := strings.TrimSuffix(strings.Repeat("?,", len(guids)), ",")
-	args := make([]any, 0, len(guids)+2)
-	args = append(args, realm, realm)
+	args := make([]any, 0, len(guids)+1)
+	args = append(args, realm)
 	for _, g := range guids {
 		args = append(args, g)
 	}
@@ -111,22 +116,18 @@ func (s *MythicLeaderboardStorage) GetGuildMythicPlayers(realm string, guids []i
 	       gm.ilvl, COALESCE(cc.black_diamonds, 0), COALESCE(cc.title, ''),
 	       (SELECT COUNT(*)+1 FROM mythic_leaderboard ml2
 	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id
-	            AND ml2.current_score > ml.current_score
-	            AND ml2.updated_at = ml.updated_at) AS class_rank,
+	            AND ml2.current_score > ml.current_score) AS class_rank,
 	       (SELECT COUNT(*) FROM mythic_leaderboard ml2
-	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id
-	            AND ml2.updated_at = ml.updated_at) AS class_total,
+	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id) AS class_total,
 	       (SELECT COUNT(*)+1 FROM mythic_leaderboard ml2
 	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id AND ml2.spec_id = ml.spec_id
-	            AND ml2.current_score > ml.current_score
-	            AND ml2.updated_at = ml.updated_at) AS spec_rank,
+	            AND ml2.current_score > ml.current_score) AS spec_rank,
 	       (SELECT COUNT(*) FROM mythic_leaderboard ml2
-	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id AND ml2.spec_id = ml.spec_id
-	            AND ml2.updated_at = ml.updated_at) AS spec_total
+	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id AND ml2.spec_id = ml.spec_id) AS spec_total
 	FROM mythic_leaderboard ml
 	JOIN guild_members gm ON gm.id = ml.guid AND gm.realm = ml.realm
 	LEFT JOIN character_cache cc ON cc.realm = ml.realm AND cc.name = ml.name
-	WHERE ml.realm = ? AND ml.updated_at = (SELECT MAX(updated_at) FROM mythic_leaderboard WHERE realm = ?)
+	WHERE ml.realm = ?
 	  AND ml.guid IN (` + placeholders + `)
 	ORDER BY ml.current_score DESC`
 
