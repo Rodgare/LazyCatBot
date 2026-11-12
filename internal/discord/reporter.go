@@ -244,3 +244,22 @@ func (r *DiscordReporter) SendChannelNotice(channelID, text string) error {
 	_, err := r.session.ChannelMessageSend(channelID, text)
 	return err
 }
+
+// SendQueueNotice posts the "report is queued" placeholder for free channels
+// and returns its message ID so the caller can delete it once the report is out.
+func (r *DiscordReporter) SendQueueNotice(channelID string, position int) (string, error) {
+	text := fmt.Sprintf("⏳ Отчёт готовится к отправке. Позиция в очереди: **%d**.\n"+
+		"Каналы с **премиум** получают отчёты без очереди.", position)
+	msg, err := r.session.ChannelMessageSend(channelID, text)
+	if err != nil {
+		return "", err
+	}
+	return msg.ID, nil
+}
+
+func (r *DiscordReporter) DeleteNotice(channelID, messageID string) error {
+	if messageID == "" {
+		return nil
+	}
+	return r.session.ChannelMessageDelete(channelID, messageID)
+}

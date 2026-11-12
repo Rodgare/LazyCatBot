@@ -104,6 +104,7 @@ func main() {
 	arStore := storage.NewActualRaidsStorage(db)
 	mythLbStore := storage.NewMythicLeaderboardStorage(db, logger)
 	donorStore := storage.NewDonorStorage(db)
+	premiumStore := storage.NewPremiumStore(db)
 
 	if names, err := donorStore.Names(); err == nil {
 		discord.SetPremiumNames(names)
@@ -132,6 +133,7 @@ func main() {
 		appCfg,
 	)
 	killWorker.SetMythicLeaderboardStore(mythLbStore)
+	killWorker.SetPremiumGate(premiumStore)
 
 	killWorker.StartCronScheduler()
 	if appCfg.SyncOnStart {
@@ -147,7 +149,7 @@ func main() {
 	go killWorker.CleanupRoutine(ctx)
 
 	if appCfg.TributeAPIKey != "" && appCfg.TributeWebhookAddr != "" {
-		wh := webhook.NewHandler(appCfg.TributeAPIKey, donorStore, discord.AddPremiumName, logger)
+		wh := webhook.NewHandler(appCfg.TributeAPIKey, donorStore, premiumStore, discord.AddPremiumName, logger)
 		go webhook.Start(ctx, appCfg.TributeWebhookAddr, appCfg.TributeWebhookPath, wh, logger)
 	} else {
 		slog.Info("Tribute webhook disabled (set TRIBUTE_API_KEY and TRIBUTE_WEBHOOK_ADDR to enable)")
@@ -159,6 +161,12 @@ func main() {
 	h.AdminUserID = appCfg.AdminUserID
 	h.ResyncFunc = killWorker.RequestLeaderboardSync
 	h.Donation = donation
+	h.PremiumStore = premiumStore
+	h.PremiumPricing = discord.PremiumPricing{
+		MonthlyUSD:  appCfg.PremiumMonthlyUSD,
+		YearlyUSD:   appCfg.PremiumYearlyUSD,
+		LifetimeUSD: appCfg.PremiumLifetimeUSD,
+	}
 
 	dg.AddHandler(h.InteractionCreate)
 	if !appCfg.IsDebug {
@@ -189,6 +197,11 @@ func main() {
 		{
 			Name:        "topm",
 			Description: "Показать мифик-рейтинг (Рио) среди участников гильдии",
+		},
+		{
+			Name:                     "premium",
+			Description:              "Премиум для этого канала: статус, активация и инструкция",
+			DefaultMemberPermissions: &manageChannelsPerm,
 		},
 		{
 			Name:        "help",

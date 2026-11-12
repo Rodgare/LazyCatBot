@@ -15,6 +15,9 @@ type BossKillReport struct {
 	Realm     string
 	Loots     []LootReport
 	Players   []PlayerReport
+	// RangeLabel is the human-readable ranking window shown on rendered
+	// ranking images (e.g. "4 КД"). Empty means the default "2 кд".
+	RangeLabel string
 }
 
 type LootReport struct {

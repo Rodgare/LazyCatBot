@@ -7,9 +7,11 @@ import (
 	"encoding/base64"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"io"
 	"log/slog"
 	"net/http"
+	"regexp"
 	"strings"
 	"time"
 
@@ -32,14 +34,15 @@ type tributeEvent struct {
 // Handler receives Tribute webhooks, verifies the trbt-signature HMAC and
 // registers the donor nickname typed into the donation message.
 type Handler struct {
-	apiKey string
-	store  *storage.DonorStorage
-	onName func(string)
-	logger *slog.Logger
+	apiKey  string
+	store   *storage.DonorStorage
+	premium *storage.PremiumStore
+	onName  func(string)
+	logger  *slog.Logger
 }
 
-func NewHandler(apiKey string, store *storage.DonorStorage, onName func(string), logger *slog.Logger) *Handler {
-	return &Handler{apiKey: apiKey, store: store, onName: onName, logger: logger}
+func NewHandler(apiKey string, store *storage.DonorStorage, premium *storage.PremiumStore, onName func(string), logger *slog.Logger) *Handler {
+	return &Handler{apiKey: apiKey, store: store, premium: premium, onName: onName, logger: logger}
 }
 
 func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
@@ -72,11 +75,17 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 
 	switch ev.Name {
 	case "new_donation", "recurrent_donation":
-		nick := extractDonorNick(ev.Payload.Message)
+		code, rest := extractPremiumCode(ev.Payload.Message)
+		if code != "" {
+			h.redeemPremium(ev, code)
+		}
+
+		nick := extractDonorNick(rest)
 		if nick == "" {
 			h.logger.Info("[Tribute] donation skipped: no nickname in message",
 				"amount", ev.Payload.Amount, "currency", ev.Payload.Currency,
-				"tg_user", ev.Payload.TelegramUserID, "tg_username", ev.Payload.TelegramUsername)
+				"tg_user", ev.Payload.TelegramUserID, "tg_username", ev.Payload.TelegramUsername,
+				"premium_code", code != "")
 			break
 		}
 		if err := h.store.Upsert(nick, ev.Payload.Amount, ev.Payload.Currency); err != nil {
@@ -149,6 +158,47 @@ func cleanNick(s string) string {
 	s = strings.TrimPrefix(s, "@")
 	s = strings.Trim(s, ".,;:!?()[]{}\"'«»")
 	return s
+}
+
+var premiumCodeRe = regexp.MustCompile(`(?i)\bLZ-[A-Z0-9]{4}-[A-Z0-9]{4}\b`)
+
+// extractPremiumCode finds an activation code in the donation message and
+// returns the code plus the message with the code removed, so the remaining
+// text can still be treated as a donor nickname.
+func extractPremiumCode(msg string) (string, string) {
+	loc := premiumCodeRe.FindStringIndex(msg)
+	if loc == nil {
+		return "", msg
+	}
+	code := storage.NormalizePremiumCode(msg[loc[0]:loc[1]])
+	rest := strings.TrimSpace(msg[:loc[0]] + " " + msg[loc[1]:])
+	return code, rest
+}
+
+func tributeSubject(ev tributeEvent) string {
+	if ev.Payload.TelegramUserID > 0 {
+		return fmt.Sprintf("tg:%d", ev.Payload.TelegramUserID)
+	}
+	if u := strings.ToLower(strings.TrimSpace(ev.Payload.TelegramUsername)); u != "" {
+		return "tgname:" + u
+	}
+	return ""
+}
+
+func (h *Handler) redeemPremium(ev tributeEvent, code string) {
+	if h.premium == nil {
+		return
+	}
+	recurring := ev.Name == "recurrent_donation"
+	ent, err := h.premium.RedeemCode(code, tributeSubject(ev), recurring)
+	if err != nil {
+		h.logger.Warn("[Tribute] premium code not redeemed", "error", err, "code", code,
+			"recurring", recurring, "tg_user", ev.Payload.TelegramUserID)
+		return
+	}
+	h.logger.Info("[Tribute] premium activated",
+		"channel_id", ent.ChannelID, "plan", ent.Plan, "expires_at", ent.ExpiresAt,
+		"recurring", recurring, "tg_user", ev.Payload.TelegramUserID)
 }
 
 // Start serves the webhook on addr+path until ctx is cancelled.

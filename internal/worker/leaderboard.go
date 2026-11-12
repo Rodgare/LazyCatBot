@@ -33,6 +33,7 @@ func (w *Worker) StartLeaderboardSyncOnStart() {
 
 func (w *Worker) syncRealm(r string, force bool) {
 	syncDate := time.Now().In(time.FixedZone("MSK", 3*3600)).Format("2006-01-02")
+	weekFrom, _ := w.sirusClient.GetSirusDates()
 
 	actualRaids, err := w.sirusClient.FetchActualRaids(r)
 	if err != nil {
@@ -98,7 +99,7 @@ func (w *Worker) syncRealm(r string, force bool) {
 						continue
 					}
 
-					err = w.lbStore.UpdateLeaderboardStorage(r, raid.Order, bossID, classID, specID, players)
+					err = w.lbStore.UpdateLeaderboardStorage(r, raid.Order, bossID, classID, specID, weekFrom, players)
 					if err != nil {
 						l.Error("Error saving to database", "error", err)
 						time.Sleep(5 * time.Second)

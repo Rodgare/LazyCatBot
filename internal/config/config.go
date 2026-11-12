@@ -25,6 +25,10 @@ type Config struct {
 	DonateCryptoURL string
 	DonateTitle     string
 
+	PremiumMonthlyUSD  int
+	PremiumYearlyUSD   int
+	PremiumLifetimeUSD int
+
 	TributeAPIKey      string
 	TributeWebhookAddr string
 	TributeWebhookPath string
@@ -62,6 +66,10 @@ func LoadConfig() *Config {
 		DonateURL:       os.Getenv("DONATE_URL"),
 		DonateCryptoURL: os.Getenv("DONATE_CRYPTO_URL"),
 		DonateTitle:     getStringEnv("DONATE_TITLE", "Поддержать проект"),
+
+		PremiumMonthlyUSD:  getIntEnv("PREMIUM_MONTHLY_USD", 3),
+		PremiumYearlyUSD:   getIntEnv("PREMIUM_YEARLY_USD", 30),
+		PremiumLifetimeUSD: getIntEnv("PREMIUM_LIFETIME_USD", 60),
 
 		TributeAPIKey:      os.Getenv("TRIBUTE_API_KEY"),
 		TributeWebhookAddr: os.Getenv("TRIBUTE_WEBHOOK_ADDR"),

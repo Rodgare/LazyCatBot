@@ -1,0 +1,414 @@
+package storage
+
+import (
+	"crypto/rand"
+	"database/sql"
+	"errors"
+	"fmt"
+	"math/big"
+	"strings"
+	"time"
+
+	_ "modernc.org/sqlite"
+)
+
+// PremiumPlan identifies a paid plan. Durations are intentionally expressed in
+// days: monthly/yearly are billing periods, not exact calendar months, and
+// lifetime is stored as expires_at = 0.
+type PremiumPlan string
+
+const (
+	PlanMonthly  PremiumPlan = "monthly"
+	PlanYearly   PremiumPlan = "yearly"
+	PlanLifetime PremiumPlan = "lifetime"
+	PlanTrial    PremiumPlan = "trial"
+)
+
+// PremiumGracePeriod is how long premium features stay active after expires_at,
+// so a slightly late renewal does not immediately cut access.
+const PremiumGracePeriod = 72 * time.Hour
+
+const premiumCodeTTL = 24 * time.Hour
+
+var (
+	ErrInvalidPlan       = errors.New("invalid premium plan")
+	ErrCodeNotFound      = errors.New("premium code not found")
+	ErrCodeUsed          = errors.New("premium code already used")
+	ErrCodeExpired       = errors.New("premium code expired")
+	ErrCodeSubject       = errors.New("premium code belongs to another donor")
+	ErrEntitlementAbsent = errors.New("premium entitlement not found")
+)
+
+func (p PremiumPlan) Valid() bool {
+	switch p {
+	case PlanMonthly, PlanYearly, PlanLifetime, PlanTrial:
+		return true
+	}
+	return false
+}
+
+// Duration returns the subscription length. Lifetime returns 0, which is the
+// sentinel used by the storage layer for "never expires".
+func (p PremiumPlan) Duration() time.Duration {
+	switch p {
+	case PlanMonthly:
+		return 31 * 24 * time.Hour
+	case PlanYearly:
+		return 366 * 24 * time.Hour
+	case PlanTrial:
+		return 8 * 24 * time.Hour
+	case PlanLifetime:
+		return 0
+	}
+	return 0
+}
+
+func (p PremiumPlan) Title() string {
+	switch p {
+	case PlanMonthly:
+		return "1 месяц"
+	case PlanYearly:
+		return "12 месяцев"
+	case PlanLifetime:
+		return "Навсегда"
+	case PlanTrial:
+		return "Пробный период"
+	}
+	return string(p)
+}
+
+type PremiumEntitlement struct {
+	ChannelID string
+	Plan      PremiumPlan
+	Source    string
+	Status    string
+	ExpiresAt int64
+	CreatedAt int64
+	UpdatedAt int64
+}
+
+// Lifetime reports whether the entitlement never expires.
+func (e PremiumEntitlement) Lifetime() bool {
+	return e.ExpiresAt == 0
+}
+
+// Active reports whether premium features are available right now, including
+// the grace period after expiry.
+func (e PremiumEntitlement) Active(now time.Time) bool {
+	if e.Status != "active" {
+		return false
+	}
+	if e.Lifetime() {
+		return true
+	}
+	return now.Unix() <= e.ExpiresAt+int64(PremiumGracePeriod/time.Second)
+}
+
+// ExpiresAtTime returns the expiry as time.Time. For lifetime plans the zero
+// time is returned; check Lifetime() first.
+func (e PremiumEntitlement) ExpiresAtTime() time.Time {
+	if e.ExpiresAt == 0 {
+		return time.Time{}
+	}
+	return time.Unix(e.ExpiresAt, 0)
+}
+
+type PremiumStore struct {
+	db *sql.DB
+}
+
+func NewPremiumStore(db *sql.DB) *PremiumStore {
+	return &PremiumStore{db: db}
+}
+
+// IsPremium is the hot-path check used by workers and handlers. Errors are
+// treated as "not premium" so a broken DB never grants access.
+func (s *PremiumStore) IsPremium(channelID string) bool {
+	e, err := s.Get(channelID)
+	if err != nil || e == nil {
+		return false
+	}
+	return e.Active(time.Now())
+}
+
+// Get returns the entitlement for a channel, or nil when none exists.
+func (s *PremiumStore) Get(channelID string) (*PremiumEntitlement, error) {
+	if channelID == "" {
+		return nil, nil
+	}
+	row := s.db.QueryRow(`SELECT channel_id, plan, source, status, expires_at, created_at, updated_at
+		FROM premium_entitlements WHERE channel_id = ?`, channelID)
+
+	var e PremiumEntitlement
+	if err := row.Scan(&e.ChannelID, &e.Plan, &e.Source, &e.Status, &e.ExpiresAt, &e.CreatedAt, &e.UpdatedAt); err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return &e, nil
+}
+
+// Grant activates or extends premium for a channel. A new period starts from
+// the current expiry when the existing entitlement is still active, so renewals
+// never lose remaining time. Granting anything on an active lifetime plan keeps
+// it lifetime. Every change is written to premium_audit.
+func (s *PremiumStore) Grant(channelID string, plan PremiumPlan, source, actor string) (*PremiumEntitlement, error) {
+	if channelID == "" {
+		return nil, fmt.Errorf("empty channel id")
+	}
+	if !plan.Valid() {
+		return nil, ErrInvalidPlan
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	e, err := grantTx(tx, channelID, plan, source, actor, "grant")
+	if err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+// Revoke disables premium for a channel immediately. The row is kept for audit
+// history; a later Grant reactivates it.
+func (s *PremiumStore) Revoke(channelID, actor string) error {
+	if channelID == "" {
+		return fmt.Errorf("empty channel id")
+	}
+	now := time.Now().Unix()
+	res, err := s.db.Exec(`UPDATE premium_entitlements SET status = 'revoked', updated_at = ? WHERE channel_id = ?`,
+		now, channelID)
+	if err != nil {
+		return err
+	}
+	affected, _ := res.RowsAffected()
+	if affected == 0 {
+		return ErrEntitlementAbsent
+	}
+	return s.audit(channelID, "revoke", "", "manual", actor, "")
+}
+
+// CreateCode generates a single-use activation code for a channel. Codes are
+// short enough to type into a donation message and valid for 24 hours. They are
+// bound to the channel where /premium was called.
+func (s *PremiumStore) CreateCode(channelID, createdBy string, plan PremiumPlan) (string, time.Time, error) {
+	if channelID == "" {
+		return "", time.Time{}, fmt.Errorf("empty channel id")
+	}
+	if !plan.Valid() {
+		return "", time.Time{}, ErrInvalidPlan
+	}
+
+	now := time.Now()
+	expires := now.Add(premiumCodeTTL)
+
+	for attempt := 0; attempt < 5; attempt++ {
+		code, err := generatePremiumCode()
+		if err != nil {
+			return "", time.Time{}, err
+		}
+		_, err = s.db.Exec(`INSERT INTO premium_codes
+			(code, channel_id, plan, created_by, created_at, expires_at, used_at, used_by)
+			VALUES (?, ?, ?, ?, ?, ?, 0, '')`,
+			code, channelID, string(plan), createdBy, now.Unix(), expires.Unix())
+		if err == nil {
+			return code, expires, nil
+		}
+		if !isUniqueConstraint(err) {
+			return "", time.Time{}, err
+		}
+	}
+	return "", time.Time{}, fmt.Errorf("could not generate unique premium code")
+}
+
+// RedeemCode activates the plan encoded in a code. New donations require a
+// fresh code. Recurrent donations may reuse the code they were first redeemed
+// with, but only by the same donor subject.
+func (s *PremiumStore) RedeemCode(code, subject string, recurring bool) (*PremiumEntitlement, error) {
+	code = NormalizePremiumCode(code)
+	if code == "" {
+		return nil, ErrCodeNotFound
+	}
+
+	tx, err := s.db.Begin()
+	if err != nil {
+		return nil, err
+	}
+	defer tx.Rollback()
+
+	var (
+		channelID string
+		plan      PremiumPlan
+		expiresAt int64
+		usedAt    int64
+		usedBy    string
+	)
+	err = tx.QueryRow(`SELECT channel_id, plan, expires_at, used_at, used_by
+		FROM premium_codes WHERE code = ?`, code).
+		Scan(&channelID, &plan, &expiresAt, &usedAt, &usedBy)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrCodeNotFound
+	}
+	if err != nil {
+		return nil, err
+	}
+
+	now := time.Now()
+	if now.Unix() > expiresAt {
+		return nil, ErrCodeExpired
+	}
+
+	if recurring {
+		if usedAt == 0 {
+			return nil, ErrCodeUsed
+		}
+		if usedBy != "" && subject != "" && usedBy != subject {
+			return nil, ErrCodeSubject
+		}
+	} else {
+		if usedAt != 0 {
+			return nil, ErrCodeUsed
+		}
+		if _, err := tx.Exec(`UPDATE premium_codes SET used_at = ?, used_by = ? WHERE code = ?`,
+			now.Unix(), subject, code); err != nil {
+			return nil, err
+		}
+	}
+
+	e, err := grantTx(tx, channelID, plan, "tribute", subject, "redeem")
+	if err != nil {
+		return nil, err
+	}
+	if _, err := tx.Exec(`INSERT INTO premium_audit
+		(channel_id, action, plan, source, actor, details, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		channelID, "redeem", string(plan), "tribute", subject, code, now.Unix()); err != nil {
+		return nil, err
+	}
+	if err := tx.Commit(); err != nil {
+		return nil, err
+	}
+	return e, nil
+}
+
+func grantTx(tx *sql.Tx, channelID string, plan PremiumPlan, source, actor, action string) (*PremiumEntitlement, error) {
+	if !plan.Valid() {
+		return nil, ErrInvalidPlan
+	}
+
+	now := time.Now()
+	nowUnix := now.Unix()
+
+	var (
+		currentExpiresAt int64
+		currentStatus    string
+		currentCreatedAt int64
+	)
+	err := tx.QueryRow(`SELECT expires_at, status, created_at FROM premium_entitlements WHERE channel_id = ?`, channelID).
+		Scan(&currentExpiresAt, &currentStatus, &currentCreatedAt)
+	exists := true
+	if errors.Is(err, sql.ErrNoRows) {
+		exists = false
+	} else if err != nil {
+		return nil, err
+	}
+
+	var newExpiresAt int64
+	switch {
+	case plan == PlanLifetime:
+		newExpiresAt = 0
+	case exists && currentStatus == "active" && currentExpiresAt == 0:
+		// Already lifetime: never shorten it.
+		newExpiresAt = 0
+	default:
+		base := nowUnix
+		if exists && currentStatus == "active" && currentExpiresAt > base {
+			base = currentExpiresAt
+		}
+		newExpiresAt = base + int64(plan.Duration()/time.Second)
+	}
+
+	createdAt := nowUnix
+	if exists {
+		createdAt = currentCreatedAt
+		if _, err := tx.Exec(`UPDATE premium_entitlements
+			SET plan = ?, source = ?, status = 'active', expires_at = ?, updated_at = ?
+			WHERE channel_id = ?`,
+			string(plan), source, newExpiresAt, nowUnix, channelID); err != nil {
+			return nil, err
+		}
+	} else {
+		if _, err := tx.Exec(`INSERT INTO premium_entitlements
+			(channel_id, plan, source, status, expires_at, created_at, updated_at)
+			VALUES (?, ?, ?, 'active', ?, ?, ?)`,
+			channelID, string(plan), source, newExpiresAt, createdAt, nowUnix); err != nil {
+			return nil, err
+		}
+	}
+
+	if _, err := tx.Exec(`INSERT INTO premium_audit
+		(channel_id, action, plan, source, actor, details, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		channelID, action, string(plan), source, actor, "", nowUnix); err != nil {
+		return nil, err
+	}
+
+	return &PremiumEntitlement{
+		ChannelID: channelID,
+		Plan:      plan,
+		Source:    source,
+		Status:    "active",
+		ExpiresAt: newExpiresAt,
+		CreatedAt: createdAt,
+		UpdatedAt: nowUnix,
+	}, nil
+}
+
+func (s *PremiumStore) audit(channelID, action, plan, source, actor, details string) error {
+	_, err := s.db.Exec(`INSERT INTO premium_audit
+		(channel_id, action, plan, source, actor, details, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		channelID, action, plan, source, actor, details, time.Now().Unix())
+	return err
+}
+
+const premiumCodeAlphabet = "23456789ABCDEFGHJKLMNPQRSTUVWXYZ"
+
+func generatePremiumCode() (string, error) {
+	const groups, groupLen = 2, 4
+	buf := make([]byte, groups*groupLen)
+	limit := big.NewInt(int64(len(premiumCodeAlphabet)))
+	for i := range buf {
+		n, err := rand.Int(rand.Reader, limit)
+		if err != nil {
+			return "", err
+		}
+		buf[i] = premiumCodeAlphabet[n.Int64()]
+	}
+	parts := make([]string, 0, groups)
+	for i := 0; i < groups; i++ {
+		parts = append(parts, string(buf[i*groupLen:(i+1)*groupLen]))
+	}
+	return "LZ-" + strings.Join(parts, "-"), nil
+}
+
+// NormalizePremiumCode trims and uppercases a user-supplied code.
+func NormalizePremiumCode(code string) string {
+	return strings.ToUpper(strings.TrimSpace(code))
+}
+
+func isUniqueConstraint(err error) bool {
+	if err == nil {
+		return false
+	}
+	msg := strings.ToLower(err.Error())
+	return strings.Contains(msg, "unique constraint") || strings.Contains(msg, "constraint failed")
+}

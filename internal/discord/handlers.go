@@ -23,6 +23,8 @@ type BotHandler struct {
 	AdminUserID    string
 	ResyncFunc     func(realm string, force bool)
 	Donation       Donation
+	PremiumStore   *storage.PremiumStore
+	PremiumPricing PremiumPricing
 }
 
 func NewHandler(
@@ -162,19 +164,33 @@ func (h *BotHandler) HandleModalSubmit(s *discordgo.Session, i *discordgo.Intera
 func (h *BotHandler) HandleButtons(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	data := i.MessageComponentData()
 
+	if h.HandlePremiumButton(s, i, data.CustomID) {
+		return
+	}
+
+	if data.CustomID == "premium_open" {
+		h.HandlePremiumCommand(s, i)
+		return
+	}
+
+	if strings.HasPrefix(data.CustomID, "range_") {
+		h.handleRankingRangeButton(s, i, data.CustomID)
+		return
+	}
+
 	if strings.HasPrefix(data.CustomID, "select_raid_") {
 		if len(data.Values) > 0 {
 			selectedValue := data.Values[0]
 			if after, ok := strings.CutPrefix(selectedValue, "top_dps_"); ok {
 				var raidID, bossID int
 				fmt.Sscanf(after, "%d_%d", &raidID, &bossID)
-				h.SendBossRanking(s, i, raidID, bossID, "dps")
+				h.handleRankingRangePrompt(s, i, raidID, bossID, "dps")
 				return
 			}
 			if after, ok := strings.CutPrefix(selectedValue, "top_hps_"); ok {
 				var raidID, bossID int
 				fmt.Sscanf(after, "%d_%d", &raidID, &bossID)
-				h.SendBossRanking(s, i, raidID, bossID, "hps")
+				h.handleRankingRangePrompt(s, i, raidID, bossID, "hps")
 				return
 			}
 		}
@@ -252,14 +268,14 @@ func (h *BotHandler) HandleButtons(s *discordgo.Session, i *discordgo.Interactio
 	if after, ok := strings.CutPrefix(data.CustomID, "top_dps_"); ok {
 		var raidID, bossID int
 		fmt.Sscanf(after, "%d_%d", &raidID, &bossID)
-		h.SendBossRanking(s, i, raidID, bossID, "dps")
+		h.handleRankingRangePrompt(s, i, raidID, bossID, "dps")
 		return
 	}
 
 	if after, ok := strings.CutPrefix(data.CustomID, "top_hps_"); ok {
 		var raidID, bossID int
 		fmt.Sscanf(after, "%d_%d", &raidID, &bossID)
-		h.SendBossRanking(s, i, raidID, bossID, "hps")
+		h.handleRankingRangePrompt(s, i, raidID, bossID, "hps")
 		return
 	}
 
@@ -368,6 +384,7 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 				Style:    map[bool]discordgo.ButtonStyle{true: discordgo.SuccessButton, false: discordgo.SecondaryButton}[mythicEnabled],
 				CustomID: "toggle_mythic_reports",
 			},
+			discordgo.Button{Label: "🐾 Премиум", Style: discordgo.SecondaryButton, CustomID: "premium_open"},
 		},
 	})
 
@@ -539,7 +556,7 @@ func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.Intera
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
 		Type: discordgo.InteractionResponseChannelMessageWithSource,
 		Data: &discordgo.InteractionResponseData{
-			Content:    "🏆 **Рейтинг за 2 кд:**",
+			Content:    "🏆 **Выберите босса и роль** — период рейтинга выберете следующим шагом (2 КД бесплатно, 4 КД и всё время — с премиумом):",
 			Components: rows,
 		},
 	})
@@ -679,6 +696,9 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 	case "topm":
 		h.HandleTopMMythicCommand(s, i)
 
+	case "premium":
+		h.HandlePremiumCommand(s, i)
+
 	case "listcats":
 		characters, err := h.PlayerSubStore.GetPlayersByChannel(channelID)
 		if err != nil {
@@ -725,6 +745,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 							"**/menu** Вызывает меню с настройкой подписок бота, трекинга и т.д. (Требует права Управление каналами)\n" +
 							"**/top** Открывает меню с кнопками, нажав на которые можно отправить рейтинги по чек боссам среди игроков гильдии.\n" +
 							"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
+							"**/premium** — Премиум для этого канала: статус, активация и подробная инструкция.\n" +
 							"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 							"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
 							"**/removechannel** — Полностью убрать этот канал из отслеживания (гильдии, игроки, отчёты). Требует права Управление каналами.\n" +

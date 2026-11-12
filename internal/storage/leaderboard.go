@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"fmt"
 	"log/slog"
+	"time"
 
 	_ "modernc.org/sqlite"
 )
@@ -22,9 +23,12 @@ func NewLeaderboardStorage(db *sql.DB, logger *slog.Logger) *LeaderboardStorage 
 	}
 }
 
-func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, encounter, classID, specID int, players []models.LeaderboardPlayer) error {
+func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, encounter, classID, specID int, weekFrom string, players []models.LeaderboardPlayer) error {
 	if realm == "" {
 		realm = "x3"
+	}
+	if weekFrom == "" {
+		weekFrom = time.Now().In(time.FixedZone("MSK", 3*3600)).Format("2006-01-02")
 	}
 
 	tx, err := s.db.Begin()
@@ -46,6 +50,26 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, e
 	}
 	defer stmt.Close()
 
+	historyStmt, err := tx.Prepare(`INSERT INTO leaderboard_history
+		(realm, raid_id, boss_id, class_id, spec_id, player_name, ilvl, guild_id, zodiac, category, t4, set_pieces, role, dps, hps, snapshot_week, captured_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		ON CONFLICT(realm, raid_id, boss_id, class_id, spec_id, player_name, snapshot_week)
+		DO UPDATE SET
+			ilvl = excluded.ilvl,
+			guild_id = excluded.guild_id,
+			zodiac = excluded.zodiac,
+			category = excluded.category,
+			t4 = excluded.t4,
+			set_pieces = excluded.set_pieces,
+			role = excluded.role,
+			dps = MAX(leaderboard_history.dps, excluded.dps),
+			hps = MAX(leaderboard_history.hps, excluded.hps),
+			captured_at = excluded.captured_at`)
+	if err != nil {
+		return err
+	}
+	defer historyStmt.Close()
+
 	role := sirus.GetRoleString(classID, specID)
 
 	keep := make(map[string]models.LeaderboardPlayer, len(players))
@@ -64,12 +88,19 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, e
 		}
 	}
 
+	capturedAt := time.Now().Unix()
 	saved := 0
 	for _, p := range keep {
 		t4 := sirus.GetT4CountForLeaderboard(p.Itemset)
 		setPieces := sirus.GetSetPiecesForLeaderboard(p.Itemset)
 		_, err = stmt.Exec(raidOrder, encounter, p.ClassID, p.SpecID, p.Name, p.Ilvl, p.GuildID, p.Zodiac.ID, p.Category, t4, setPieces, role, p.Dps, p.Hps, realm)
 
+		if err != nil {
+			return err
+		}
+
+		_, err = historyStmt.Exec(realm, raidOrder, encounter, p.ClassID, p.SpecID, p.Name, p.Ilvl, p.GuildID,
+			p.Zodiac.ID, p.Category, t4, setPieces, role, p.Dps, p.Hps, weekFrom, capturedAt)
 		if err != nil {
 			return err
 		}
@@ -80,7 +111,7 @@ func (s *LeaderboardStorage) UpdateLeaderboardStorage(realm string, raidOrder, e
 	if err == nil {
 		s.logger.Info("[DB] Successfully saved",
 			"realm", realm, "players_count", saved, "parses", len(players), "duplicates", len(players)-saved,
-			"raid_id", raidOrder, "boss_id", encounter, "class_id", classID, "spec_id", specID)
+			"raid_id", raidOrder, "boss_id", encounter, "class_id", classID, "spec_id", specID, "week_from", weekFrom)
 	}
 	return err
 }
@@ -229,4 +260,89 @@ func (s *LeaderboardStorage) GetBossTop(realm string, raidID, bossID, guildID in
 	}
 
 	return players, nil
+}
+
+// LeaderboardRange selects the time window for a guild ranking.
+type LeaderboardRange string
+
+const (
+	Range2W  LeaderboardRange = "2w"
+	Range4W  LeaderboardRange = "4w"
+	RangeAll LeaderboardRange = "all"
+)
+
+func (r LeaderboardRange) Valid() bool {
+	switch r {
+	case Range2W, Range4W, RangeAll:
+		return true
+	}
+	return false
+}
+
+func (r LeaderboardRange) Title() string {
+	switch r {
+	case Range4W:
+		return "4 КД"
+	case RangeAll:
+		return "всё время"
+	default:
+		return "2 КД"
+	}
+}
+
+// GetBossTopRange returns the guild ranking for a time window. 2 KD is served
+// from the current snapshot (historical behaviour). 4 KD and all-time are
+// aggregated from leaderboard_history, which accumulates one best-per-week row
+// per player as the nightly sync runs, so no extra Sirus API calls are needed.
+func (s *LeaderboardStorage) GetBossTopRange(realm string, raidID, bossID, guildID int, role string, rng LeaderboardRange) ([]models.PlayerReport, error) {
+	if rng == "" || rng == Range2W {
+		return s.GetBossTop(realm, raidID, bossID, guildID, role)
+	}
+	if realm == "" {
+		realm = "x3"
+	}
+
+	orderBy := "dps"
+	if role == "hps" {
+		orderBy = "hps"
+	}
+
+	where := fmt.Sprintf(`h.realm = ? AND h.raid_id = ? AND h.boss_id = ? AND h.role = ? AND h.%s > 0 AND gm.guild_id = ?`, orderBy)
+	args := []any{realm, raidID, bossID, role, guildID}
+	if rng == Range4W {
+		where += " AND h.captured_at >= ?"
+		args = append(args, time.Now().AddDate(0, 0, -28).Unix())
+	}
+
+	query := fmt.Sprintf(`
+		SELECT x.player_name, x.class_id, x.spec_id, x.ilvl, x.zodiac, x.category, x.t4, x.set_pieces, x.dps, x.hps,
+		       COALESCE(cc.black_diamonds, 0), COALESCE(cc.title, '')
+		FROM (
+			SELECT h.*, ROW_NUMBER() OVER (PARTITION BY h.player_name ORDER BY h.%s DESC) AS rn
+			FROM leaderboard_history h
+			JOIN guild_members gm ON gm.name = h.player_name AND COALESCE(gm.realm, 'x3') = COALESCE(h.realm, 'x3')
+			WHERE %s
+		) x
+		LEFT JOIN character_cache cc ON cc.realm = COALESCE(x.realm, 'x3') AND cc.name = x.player_name
+		WHERE x.rn = 1
+		ORDER BY x.%s DESC
+		LIMIT 30`, orderBy, where, orderBy)
+
+	rows, err := s.db.Query(query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var players []models.PlayerReport
+	for rows.Next() {
+		var p models.PlayerReport
+		if err := rows.Scan(&p.Name, &p.ClassID, &p.SpecID, &p.Ilvl, &p.Zodiac, &p.Category, &p.T4, &p.SetPieces, &p.Dps, &p.Hps, &p.BlackDiamonds, &p.Title); err != nil {
+			return nil, err
+		}
+		p.Role = sirus.GetRole(p.ClassID, p.SpecID)
+		p.SpecName = sirus.GetSpecName(p.ClassID, p.SpecID)
+		players = append(players, p)
+	}
+	return players, rows.Err()
 }

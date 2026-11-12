@@ -22,6 +22,14 @@ type Reporter interface {
 	SendMythicTopMock(channelID string) error
 	GetChannelName(channelID string) string
 	SendChannelNotice(channelID, text string) error
+	SendQueueNotice(channelID string, position int) (string, error)
+	DeleteNotice(channelID, messageID string) error
+}
+
+// PremiumGate reports whether a Discord channel has an active premium
+// entitlement. A nil gate means every channel is free.
+type PremiumGate interface {
+	IsPremium(channelID string) bool
 }
 
 type SubscribeStore interface {
@@ -96,6 +104,7 @@ type SirusAPI interface {
 	GetLatestMythicRuns(realm string) (*models.MythicRuns, error)
 	FetchMythicRunDetails(realm string, runID int) (*models.MythicRun, error)
 	FetchChallengeScores(realm string, season, weekID int) ([]models.MythicScorePlayer, int, error)
+	GetSirusDates() (string, string)
 }
 
 type KillJob struct {
@@ -104,6 +113,9 @@ type KillJob struct {
 	Channels     map[string]bool
 	Type         string
 	MythicReport *models.MythicReport
+	// QueueNotices maps channel ID to the placeholder message that was sent to
+	// free channels while the job was waiting. It is empty for premium channels.
+	QueueNotices map[string]string
 }
 
 type Worker struct {
@@ -116,7 +128,8 @@ type Worker struct {
 	charStore               *storage.CharacterCacheStorage
 	arStore                 *storage.ActualRaidsStorage
 	reporter                Reporter
-	killQueue               chan KillJob
+	scheduler               *jobScheduler
+	premiumGate             PremiumGate
 	charPriority            chan PriorityChar
 	apiLimiter              *RateLimiter
 	killApiLimiter          *RateLimiter
@@ -147,7 +160,7 @@ func NewWorker(
 		charStore:               cc,
 		arStore:                 ar,
 		reporter:                reporter,
-		killQueue:               make(chan KillJob, 100),
+		scheduler:               newJobScheduler(),
 		charPriority:            make(chan PriorityChar, 1000),
 		apiLimiter:              NewRateLimiter(2, 1),
 		killApiLimiter:          NewRateLimiter(2, 1),
@@ -159,6 +172,55 @@ func NewWorker(
 
 func (w *Worker) SetMythicLeaderboardStore(ml *storage.MythicLeaderboardStorage) {
 	w.mythLbStore = ml
+}
+
+// SetPremiumGate wires the premium entitlement lookup used to prioritize report
+// delivery. Without it every channel is treated as free.
+func (w *Worker) SetPremiumGate(g PremiumGate) {
+	w.premiumGate = g
+}
+
+// enqueueJob classifies a job by the channels it targets and pushes it into the
+// priority scheduler. Free channels that will have to wait receive a short
+// queue-position notice, which is cleaned up when the job is processed.
+func (w *Worker) enqueueJob(job KillJob) {
+	freeChannels := make([]string, 0, len(job.Channels))
+	hasPremium := false
+	for ch := range job.Channels {
+		if w.premiumGate != nil && w.premiumGate.IsPremium(ch) {
+			hasPremium = true
+			continue
+		}
+		freeChannels = append(freeChannels, ch)
+	}
+
+	position := w.scheduler.total() + 1
+	if position > 1 {
+		for _, ch := range freeChannels {
+			msgID, err := w.reporter.SendQueueNotice(ch, position)
+			if err != nil {
+				w.logger.Warn("[Processor] Send queue notice err", "error", err, "channel", ch)
+				continue
+			}
+			if job.QueueNotices == nil {
+				job.QueueNotices = make(map[string]string)
+			}
+			job.QueueNotices[ch] = msgID
+		}
+	}
+
+	w.scheduler.push(job, hasPremium)
+}
+
+func (w *Worker) clearQueueNotices(job KillJob) {
+	for ch, msgID := range job.QueueNotices {
+		if msgID == "" {
+			continue
+		}
+		if err := w.reporter.DeleteNotice(ch, msgID); err != nil {
+			w.logger.Debug("[Processor] Delete queue notice err", "error", err, "channel", ch)
+		}
+	}
 }
 
 const killPollWindowSeconds = 90
@@ -217,13 +279,14 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case w.killQueue <- KillJob{
+			default:
+			}
+			w.enqueueJob(KillJob{
 				KillID:   killID,
 				Realm:    killRealms[killID],
 				Channels: kills[killID],
 				Type:     "raid",
-			}:
-			}
+			})
 		}
 
 		elapsed := time.Since(started)
@@ -266,13 +329,14 @@ func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case w.killQueue <- KillJob{
+			default:
+			}
+			w.enqueueJob(KillJob{
 				KillID:   killID,
 				Realm:    killRealms[killID],
 				Channels: kills[killID],
 				Type:     "raid",
-			}:
-			}
+			})
 		}
 
 		select {
@@ -404,14 +468,15 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 			select {
 			case <-ctx.Done():
 				return
-			case w.killQueue <- KillJob{
+			default:
+			}
+			w.enqueueJob(KillJob{
 				KillID:       runID,
 				Realm:        realm,
 				Channels:     channels,
 				MythicReport: &report,
 				Type:         "myth",
-			}:
-			}
+			})
 		}
 
 		select {
@@ -428,49 +493,45 @@ const killQueueOverloadThreshold = 10
 func (w *Worker) StartProcessor(ctx context.Context) {
 	queueOverloaded := false
 	for {
+		job, ok := w.scheduler.pop(ctx)
+		if !ok {
+			w.logger.Info("[KillMonitor] Processor stopped")
+			return
+		}
+
+		queued := w.scheduler.total()
+		if queued >= killQueueOverloadThreshold {
+			if !queueOverloaded {
+				queueOverloaded = true
+				w.logger.Warn("[KillMonitor] Kill queue is accumulating",
+					"queued", queued, "threshold", killQueueOverloadThreshold,
+				)
+			}
+		} else {
+			if queueOverloaded {
+				queueOverloaded = false
+				w.logger.Info("[KillMonitor] Kill queue drained", "queued", queued)
+			}
+		}
+
+		switch job.Type {
+		case "myth":
+			w.processMythicRuns(job)
+		default:
+			w.processRaids(job)
+		}
+
 		select {
 		case <-ctx.Done():
 			w.logger.Info("[KillMonitor] Processor stopped")
 			return
-		case job, ok := <-w.killQueue:
-			if !ok {
-				w.logger.Info("[KillMonitor] Kill queue closed, processor stopped")
-				return
-			}
-
-			queued := len(w.killQueue)
-			if queued >= killQueueOverloadThreshold {
-				if !queueOverloaded {
-					queueOverloaded = true
-					w.logger.Warn("[KillMonitor] Kill queue is accumulating",
-						"queued", queued, "threshold", killQueueOverloadThreshold,
-					)
-				}
-			} else {
-				if queueOverloaded {
-					queueOverloaded = false
-					w.logger.Info("[KillMonitor] Kill queue drained", "queued", queued)
-				}
-			}
-
-			switch job.Type {
-			case "myth":
-				w.processMythicRuns(job)
-			default:
-				w.processRaids(job)
-			}
-
-			select {
-			case <-ctx.Done():
-				w.logger.Info("[KillMonitor] Processor stopped")
-				return
-			case <-time.After(300 * time.Millisecond):
-			}
+		case <-time.After(300 * time.Millisecond):
 		}
 	}
 }
 
 func (w *Worker) processRaids(job KillJob) {
+	defer w.clearQueueNotices(job)
 	var report *models.BossKillReport
 
 	for ch := range job.Channels {
@@ -521,6 +582,7 @@ func (w *Worker) processRaids(job KillJob) {
 }
 
 func (w *Worker) processMythicRuns(job KillJob) {
+	defer w.clearQueueNotices(job)
 	if job.MythicReport.HasRunLog {
 		w.apiLimiter.Wait()
 		runDetails, err := w.sirusClient.FetchMythicRunDetails(job.Realm, job.KillID)

@@ -223,7 +223,11 @@ func RenderReportImage(report models.BossKillReport) ([]byte, error) {
 
 	//footer
 	dc.SetRGB(0.4, 0.4, 0.4)
-	dc.DrawString("*Рейтинг за 2 кд", 630, y+20)
+	rangeLabel := report.RangeLabel
+	if rangeLabel == "" {
+		rangeLabel = "2 кд"
+	}
+	dc.DrawString("*Рейтинг за "+rangeLabel, 630, y+20)
 
 	buf := new(bytes.Buffer)
 	err := dc.EncodePNG(buf)
