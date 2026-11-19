@@ -120,7 +120,7 @@ func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 	y += 26
 	loadCyrillicFontFace(dc, 15)
 	dc.SetRGB(0.38, 0.41, 0.47)
-	dc.DrawString("LazyCatBot · премиум-дайджест", digestPad, y)
+	dc.DrawString("LazyCatBot · Посещаемость учитывает только актуальные рейды 25 игроков", digestPad, y)
 
 	var buf bytes.Buffer
 	if err := dc.EncodePNG(&buf); err != nil {

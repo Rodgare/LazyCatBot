@@ -157,6 +157,94 @@ func (h *BotHandler) HandleAttendanceCommand(s *discordgo.Session, i *discordgo.
 	})
 }
 
+func (h *BotHandler) HandleDigestCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	if !h.requirePremium(s, i) {
+		return
+	}
+	if h.KillHistory == nil {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "❌ История киллов ещё не подключена.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	sub, ok := h.firstGuildSub(s, i)
+	if !ok {
+		return
+	}
+
+	now := time.Now()
+	since := now.AddDate(0, 0, -7).Unix()
+	until := now.Unix()
+
+	digest, err := h.KillHistory.GetWeeklyDigest(sub.Realm, sub.GuildID, since, until)
+	if err != nil {
+		h.Logger.Error("GetWeeklyDigest error", "error", err, "guild_id", sub.GuildID, "realm", sub.Realm)
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "❌ Не удалось получить данные для дайджеста.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	if h.GMStore != nil && h.MythicStore != nil {
+		if guids, err := h.GMStore.GetPlayersByGuildID(sub.Realm, sub.GuildID); err == nil && len(guids) > 0 {
+			if mythic, err := h.MythicStore.GetGuildMythicPlayers(sub.Realm, guids); err == nil {
+				if len(mythic) > 10 {
+					mythic = mythic[:10]
+				}
+				digest.MythicTop = mythic
+			} else {
+				h.Logger.Error("GetGuildMythicPlayers error", "error", err, "guild_id", sub.GuildID, "realm", sub.Realm)
+			}
+		}
+	}
+
+	if name, err := h.SubStore.GetGuildName(sub.GuildID, sub.Realm); err == nil && name != "" {
+		digest.GuildName = name
+	}
+	if digest.GuildName == "" {
+		digest.GuildName = fmt.Sprintf("Гильдия %d", sub.GuildID)
+	}
+
+	if digest.TotalKills == 0 && len(digest.MythicTop) == 0 {
+		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+			Type: discordgo.InteractionResponseChannelMessageWithSource,
+			Data: &discordgo.InteractionResponseData{
+				Content: "📭 За последнюю неделю нет данных для дайджеста. История собирается с момента обновления бота.",
+				Flags:   discordgo.MessageFlagsEphemeral,
+			},
+		})
+		return
+	}
+
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseDeferredChannelMessageWithSource,
+	})
+
+	img, err := RenderWeeklyDigest(*digest)
+	if err != nil {
+		h.Logger.Error("RenderWeeklyDigest error", "error", err, "guild_id", sub.GuildID, "realm", sub.Realm)
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("❌ Не удалось сгенерировать изображение дайджеста."),
+		})
+		return
+	}
+	s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+		Files: []*discordgo.File{{
+			Name:   "digest.png",
+			Reader: bytes.NewReader(img),
+		}},
+	})
+}
+
 func (h *BotHandler) HandleProfileCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if !h.requirePremium(s, i) {
 		return

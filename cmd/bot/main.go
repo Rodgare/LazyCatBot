@@ -210,6 +210,10 @@ func main() {
 			Description: "Посещаемость гильдии за 4 КД (премиум)",
 		},
 		{
+			Name:        "digest",
+			Description: "Дайджест гильдии за последнюю неделю (премиум)",
+		},
+		{
 			Name:        "profile",
 			Description: "Профиль игрока по киллам и рейдам (премиум)",
 			Options: []*discordgo.ApplicationCommandOption{

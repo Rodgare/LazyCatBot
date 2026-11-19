@@ -800,6 +800,9 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 	case "attendance":
 		h.HandleAttendanceCommand(s, i)
 
+	case "digest":
+		h.HandleDigestCommand(s, i)
+
 	case "profile":
 		h.HandleProfileCommand(s, i)
 
@@ -851,6 +854,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 							"**/topm** Показывает мифик-рейтинг (Рио) среди участников гильдии — таблица с Илвл, зодиаком, чёрными бриллиантами и лучшим ключом.\n" +
 							"**/premium** — Премиум для всего сервера: статус, активация и подробная инструкция.\n" +
 							"**/attendance** — Посещаемость гильдии за 4 КД (премиум).\n" +
+							"**/digest** — Дайджест гильдии за последнюю неделю: топ DPS/HPS, мифик и посещаемость (премиум).\n" +
 							"**/profile** — Профиль игрока по киллам и рейдам (премиум).\n" +
 							"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 							"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
