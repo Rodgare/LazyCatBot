@@ -899,12 +899,6 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 							"**/removechannel** — Полностью убрать этот канал из отслеживания (гильдии, игроки, отчёты). Требует права Управление каналами.\n" +
 							"**/help** — Показать это сообщение.\n",
 						Color: 0xf1c40f,
-						Fields: []*discordgo.MessageEmbedField{
-							{
-								Name:  "⚙️ Команды администратора",
-								Value: "**/resync** — Пересчитать рейтинги. Параметры: `realm` (напр. `x5`, пусто = все) и `force` (true — игнорировать уже синхронизированное за сегодня).",
-							},
-						},
 					},
 				},
 			},
