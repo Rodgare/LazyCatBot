@@ -19,24 +19,10 @@ func (w *Worker) StartMythicLeaderboardSync() {
 	configuredSeason := w.cfg.MythicSeason
 	weekID := w.cfg.MythicWeekID
 
-	realms := w.cfg.MythicRealms
+	realms := w.cfg.Realms
 	if len(realms) == 0 {
-		realms = w.cfg.Realms
+		realms = []string{"x3", "x5"}
 	}
-
-	// Drop stale snapshots for realms where mythic+ is not available so they
-	// cannot leak into /topm or the weekly digest.
-	for _, realm := range w.cfg.Realms {
-		if w.cfg.IsMythicRealm(realm) {
-			continue
-		}
-		if err := w.mythLbStore.DeleteMythicLeaderboard(realm); err != nil {
-			w.logger.Error("Error clearing mythic leaderboard", "error", err, "realm", realm)
-			continue
-		}
-		w.logger.Info("Cleared mythic leaderboard for realm without mythic+", "realm", realm)
-	}
-
 	for _, realm := range realms {
 		w.logger.Info("Start parsing mythic challenge scores leaderboard", "realm", realm, "season", configuredSeason, "week_id", weekID)
 

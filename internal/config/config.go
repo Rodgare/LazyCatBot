@@ -20,7 +20,6 @@ type Config struct {
 	SyncForce       bool
 	MythicSeason    int
 	MythicWeekID    int
-	MythicRealms    []string
 
 	PremiumURL string
 
@@ -61,7 +60,6 @@ func LoadConfig() *Config {
 		SyncForce:       os.Getenv("SYNC_LEADERBOARD_FORCE") == "true",
 		MythicSeason:    getIntEnv("SIRUS_MYTHIC_SEASON", 0),
 		MythicWeekID:    getIntEnv("SIRUS_MYTHIC_WEEK_ID", 0),
-		MythicRealms:    getStringListEnv("SIRUS_MYTHIC_REALMS", []string{"x3"}),
 
 		PremiumURL:        getStringEnv("PREMIUM_URL", os.Getenv("DONATE_URL")),
 		PremiumMonthlyUSD: getIntEnv("PREMIUM_MONTHLY_USD", 1),
@@ -124,21 +122,6 @@ func (c *Config) GetSirusURLs() []string {
 // parse actual (current) raids instead of the full history.
 func (c *Config) IsSecondaryRealm(realm string) bool {
 	for _, r := range c.SecondaryRealms {
-		if r == realm {
-			return true
-		}
-	}
-	return false
-}
-
-// IsMythicRealm reports whether mythic+ leaderboards, reports and digest blocks
-// should be used for the realm. Some Sirus realms expose a challenge board via
-// the API even though the game mode is not available there.
-func (c *Config) IsMythicRealm(realm string) bool {
-	if realm == "" {
-		realm = c.DefaultRealm
-	}
-	for _, r := range c.MythicRealms {
 		if r == realm {
 			return true
 		}
