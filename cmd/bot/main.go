@@ -214,6 +214,10 @@ func main() {
 			Description: "Дайджест гильдии за последнюю неделю (премиум)",
 		},
 		{
+			Name:        "panel",
+			Description: "Панель с кнопками быстрых действий",
+		},
+		{
 			Name:        "profile",
 			Description: "Профиль игрока по киллам и рейдам (премиум)",
 			Options: []*discordgo.ApplicationCommandOption{

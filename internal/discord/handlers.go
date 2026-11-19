@@ -250,6 +250,21 @@ func (h *BotHandler) HandleButtons(s *discordgo.Session, i *discordgo.Interactio
 		return
 	}
 
+	switch data.CustomID {
+	case "panel_digest":
+		h.HandleDigestCommand(s, i)
+		return
+	case "panel_attendance":
+		h.HandleAttendanceCommand(s, i)
+		return
+	case "panel_top":
+		h.HandleTopMCommand(s, i)
+		return
+	case "panel_topm":
+		h.HandleTopMMythicCommand(s, i)
+		return
+	}
+
 	if strings.HasPrefix(data.CustomID, "range_") {
 		h.handleRankingRangeButton(s, i, data.CustomID)
 		return
@@ -444,6 +459,26 @@ func (h *BotHandler) handleAddPlayerModalWithRealm(s *discordgo.Session, i *disc
 	}
 }
 
+func (h *BotHandler) HandlePanelCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
+	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
+		Type: discordgo.InteractionResponseChannelMessageWithSource,
+		Data: &discordgo.InteractionResponseData{
+			Content: "🐾 **LazyCatBot**\nБыстрые действия — выберите, что показать:\n\n" +
+				"🔒 Дайджест, посещаемость за 4 КД и профили игроков доступны с **премиумом** — нажмите «Премиум».",
+			Flags: discordgo.MessageFlagsEphemeral,
+			Components: []discordgo.MessageComponent{
+				discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+					discordgo.Button{Label: "📊 Дайджест", Style: discordgo.PrimaryButton, CustomID: "panel_digest"},
+					discordgo.Button{Label: "🗓 Посещаемость", Style: discordgo.PrimaryButton, CustomID: "panel_attendance"},
+					discordgo.Button{Label: "🏆 Топ", Style: discordgo.SecondaryButton, CustomID: "panel_top"},
+					discordgo.Button{Label: "🌀 Мифик", Style: discordgo.SecondaryButton, CustomID: "panel_topm"},
+					discordgo.Button{Label: "🐾 Премиум", Style: discordgo.SuccessButton, CustomID: "premium_open"},
+				}},
+			},
+		},
+	})
+}
+
 func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	if !hasManageChannels(i) {
 		s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -527,7 +562,7 @@ func (h *BotHandler) HandleMenuCommand(s *discordgo.Session, i *discordgo.Intera
 	if h.isPremiumChannel(i) {
 		menuContent += "\n✅ Премиум активен для всего сервера."
 	} else {
-		menuContent += "\n🐾 Премиум для всего сервера: отчёты без очереди, рейтинги за 4 КД, дайджест и профили."
+		menuContent += "\n🐾 **Премиум для всего сервера:** отчёты без очереди, рейтинги за 4 КД, дайджест, посещаемость и профили игроков. Нажмите кнопку «Премиум»."
 	}
 
 	s.InteractionRespond(i.Interaction, &discordgo.InteractionResponse{
@@ -749,6 +784,8 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 	switch data.Name {
 	case "menu":
 		h.HandleMenuCommand(s, i)
+	case "panel":
+		h.HandlePanelCommand(s, i)
 	case "list":
 		guilds, err := h.SubStore.GetGuildsByChannel(channelID)
 		if err != nil {
@@ -855,6 +892,7 @@ func (h *BotHandler) HandleSlashCommands(s *discordgo.Session, i *discordgo.Inte
 							"**/premium** — Премиум для всего сервера: статус, активация и подробная инструкция.\n" +
 							"**/attendance** — Посещаемость гильдии за 4 КД (премиум).\n" +
 							"**/digest** — Дайджест гильдии за последнюю неделю: топ DPS/HPS, мифик и посещаемость (премиум).\n" +
+							"**/panel** — Панель с кнопками быстрых действий.\n" +
 							"**/profile** — Профиль игрока по киллам и рейдам (премиум).\n" +
 							"**/list** — Список отслеживаемых гильдий в данном канале.\n" +
 							"**/listcats** — Список отслеживаемых игроков в данном канале.\n" +
@@ -1007,7 +1045,7 @@ func (h *BotHandler) GuildCreate(s *discordgo.Session, g *discordgo.GuildCreate)
 		Components: []discordgo.MessageComponent{
 			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
 				discordgo.Button{Label: "⚙️ Настроить", Style: discordgo.PrimaryButton, CustomID: "open_menu"},
-				discordgo.Button{Label: "🐾 Премиум", Style: discordgo.SecondaryButton, CustomID: "premium_open"},
+				discordgo.Button{Label: "🐾 Премиум", Style: discordgo.SuccessButton, CustomID: "premium_open"},
 			}},
 		},
 	})
