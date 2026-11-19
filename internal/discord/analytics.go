@@ -194,7 +194,7 @@ func (h *BotHandler) HandleDigestCommand(s *discordgo.Session, i *discordgo.Inte
 		return
 	}
 
-	if h.GMStore != nil && h.MythicStore != nil {
+	if h.supportsMythic(sub.Realm) && h.GMStore != nil && h.MythicStore != nil {
 		if guids, err := h.GMStore.GetPlayersByGuildID(sub.Realm, sub.GuildID); err == nil && len(guids) > 0 {
 			if mythic, err := h.MythicStore.GetGuildMythicPlayers(sub.Realm, guids); err == nil {
 				if len(mythic) > 10 {

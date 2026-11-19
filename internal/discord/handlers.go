@@ -31,6 +31,9 @@ type BotHandler struct {
 	KillHistory     *storage.KillHistoryStorage
 	CharacterCache  *storage.CharacterCacheStorage
 	Reporter        *DiscordReporter
+	// MythicRealmSupported reports whether mythic+ exists on a realm. Nil means
+	// "all realms", which keeps tests and older wiring working.
+	MythicRealmSupported func(realm string) bool
 }
 
 func NewHandler(
@@ -692,6 +695,10 @@ func (h *BotHandler) HandleTopMCommand(s *discordgo.Session, i *discordgo.Intera
 	})
 }
 
+func (h *BotHandler) supportsMythic(realm string) bool {
+	return h.MythicRealmSupported == nil || h.MythicRealmSupported(realm)
+}
+
 func (h *BotHandler) HandleTopMMythicCommand(s *discordgo.Session, i *discordgo.InteractionCreate) {
 	l := h.Logger.With(
 		"command", "topm",
@@ -714,6 +721,13 @@ func (h *BotHandler) HandleTopMMythicCommand(s *discordgo.Session, i *discordgo.
 		return
 	}
 	targetSub := subs[0]
+
+	if !h.supportsMythic(targetSub.Realm) {
+		s.InteractionResponseEdit(i.Interaction, &discordgo.WebhookEdit{
+			Content: pointer("🌀 На сервере " + targetSub.Realm + " мифик+ недоступен."),
+		})
+		return
+	}
 
 	guids, err := h.GMStore.GetPlayersByGuildID(targetSub.Realm, targetSub.GuildID)
 	if err != nil {

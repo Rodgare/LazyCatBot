@@ -65,6 +65,16 @@ func (s *MythicLeaderboardStorage) UpdateMythicLeaderboard(realm string, season,
 	return nil
 }
 
+// DeleteMythicLeaderboard removes a realm's snapshot. Used to clear stale data
+// for realms where mythic+ is not available.
+func (s *MythicLeaderboardStorage) DeleteMythicLeaderboard(realm string) error {
+	if realm == "" {
+		realm = "x3"
+	}
+	_, err := s.db.Exec("DELETE FROM mythic_leaderboard WHERE realm = ?", realm)
+	return err
+}
+
 // GetPlayerMythicRank computes the player's rank and percentile among the same
 // class+spec by current_score, mirroring the raid GetPlayerRank logic. The table
 // always holds one snapshot per realm, so no season/week filter is needed.

@@ -33,7 +33,7 @@ func (w *Worker) SendWeeklyDigests() {
 			continue
 		}
 
-		if w.gmStore != nil && w.mythLbStore != nil {
+		if w.cfg.IsMythicRealm(key.Realm) && w.gmStore != nil && w.mythLbStore != nil {
 			if guids, err := w.gmStore.GetPlayersByGuildID(key.Realm, key.GuildID); err == nil && len(guids) > 0 {
 				if mythic, err := w.mythLbStore.GetGuildMythicPlayers(key.Realm, guids); err == nil {
 					if len(mythic) > 10 {

@@ -164,6 +164,7 @@ func main() {
 	h.KillHistory = killHistoryStore
 	h.CharacterCache = ccStore
 	h.Reporter = discordReporter
+	h.MythicRealmSupported = appCfg.IsMythicRealm
 	h.PremiumPricing = discord.PremiumPricing{
 		MonthlyUSD: appCfg.PremiumMonthlyUSD,
 	}
