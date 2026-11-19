@@ -36,8 +36,8 @@ func (w *Worker) SendWeeklyDigests() {
 		if w.gmStore != nil && w.mythLbStore != nil {
 			if guids, err := w.gmStore.GetPlayersByGuildID(key.Realm, key.GuildID); err == nil && len(guids) > 0 {
 				if mythic, err := w.mythLbStore.GetGuildMythicPlayers(key.Realm, guids); err == nil {
-					if len(mythic) > 5 {
-						mythic = mythic[:5]
+					if len(mythic) > 10 {
+						mythic = mythic[:10]
 					}
 					digest.MythicTop = mythic
 				} else {

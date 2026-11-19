@@ -95,9 +95,16 @@ func (s *KillHistoryStorage) RecordKill(report models.BossKillReport) error {
 	return nil
 }
 
+// raid25Filter keeps only encounters that had more than ten players in the
+// roster, i.e. 25-player raids. 10-player modes cannot have an 11+ roster, so
+// this excludes them without storing raid difficulty separately.
+const raid25Filter = `(SELECT COUNT(*) FROM kill_players kp
+	WHERE kp.realm = h.realm AND kp.kill_id = h.kill_id AND kp.guild_id = h.guild_id) > 10`
+
 // GetAttendance returns the guild's total kills and per-player attendance in a
-// window starting at since (unix seconds). Only actual raid encounters are
-// counted so old/irrelevant raids do not skew attendance percentages.
+// window starting at since (unix seconds). Only actual 25-player raid
+// encounters are counted so 10-player runs and old/irrelevant raids do not
+// skew attendance percentages.
 func (s *KillHistoryStorage) GetAttendance(realm string, guildID int, since int64) (int, []models.AttendanceEntry, error) {
 	if realm == "" {
 		realm = "x3"
@@ -107,7 +114,7 @@ func (s *KillHistoryStorage) GetAttendance(realm string, guildID int, since int6
 	if err := s.db.QueryRow(`SELECT COUNT(*)
 		FROM kill_history h
 		JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
-		WHERE h.realm = ? AND h.guild_id = ? AND h.kills_at >= ?`,
+		WHERE h.realm = ? AND h.guild_id = ? AND h.kills_at >= ? AND `+raid25Filter,
 		realm, guildID, since).Scan(&total); err != nil {
 		return 0, nil, err
 	}
@@ -120,7 +127,7 @@ func (s *KillHistoryStorage) GetAttendance(realm string, guildID int, since int6
 			SELECT h.realm, h.kill_id, h.guild_id, h.kills_at
 			FROM kill_history h
 			JOIN actual_raids ar ON ar.realm = h.realm AND ar.raid_id = h.raid_id AND ar.boss_id = h.boss_id
-			WHERE h.realm = ? AND h.guild_id = ? AND h.kills_at >= ?
+			WHERE h.realm = ? AND h.guild_id = ? AND h.kills_at >= ? AND `+raid25Filter+`
 		),
 		agg AS (
 			SELECT p.player_name, p.class_id, p.spec_id, p.role,
@@ -277,7 +284,7 @@ func (s *KillHistoryStorage) GetWeeklyDigest(realm string, guildID int, since, u
 	if digest.TopHps, err = s.topPlayers(realm, guildID, since, until, "hps"); err != nil {
 		return nil, err
 	}
-	if _, digest.Attendance, err = s.GetAttendance(realm, guildID, since); err != nil {
+	if digest.AttendanceKills, digest.Attendance, err = s.GetAttendance(realm, guildID, since); err != nil {
 		return nil, err
 	}
 

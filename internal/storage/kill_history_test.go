@@ -2,6 +2,7 @@ package storage
 
 import (
 	"database/sql"
+	"fmt"
 	"testing"
 
 	"LazyCatBot/internal/models"
@@ -71,6 +72,13 @@ func newKillHistoryTestStore(t *testing.T) *KillHistoryStorage {
 }
 
 func killReport(killID, guildID int, killedAt string, players ...models.PlayerReport) models.BossKillReport {
+	for len(players) < 11 {
+		players = append(players, models.PlayerReport{
+			Name:    fmt.Sprintf("Filler%02d", len(players)),
+			ClassID: 1,
+			Role:    0,
+		})
+	}
 	return models.BossKillReport{
 		Realm:     "x3",
 		KillID:    killID,
@@ -126,7 +134,7 @@ func TestKillHistoryDigestAndProfile(t *testing.T) {
 	if total != 2 {
 		t.Fatalf("total kills = %d, want 2", total)
 	}
-	if len(attendance) != 2 || attendance[0].Name != "Alice" || attendance[0].Kills != 2 {
+	if len(attendance) < 2 || attendance[0].Name != "Alice" || attendance[0].Kills != 2 {
 		t.Fatalf("attendance = %+v", attendance)
 	}
 	if attendance[0].BlackDiamonds != 4 || attendance[0].Title != "Тест" {

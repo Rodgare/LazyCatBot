@@ -18,29 +18,31 @@ const (
 
 // RenderWeeklyDigest draws a self-contained weekly summary image. It uses only
 // the embedded font/assets already shipped with the bot and keeps a simple,
-// readable layout: header, first kills, top DPS/HPS and attendance.
+// readable layout: header, top DPS/HPS, mythic and attendance.
 func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 	attendance := d.Attendance
-	if len(attendance) > 10 {
-		attendance = attendance[:10]
-	}
-	firstKills := d.FirstKills
-	if len(firstKills) > 6 {
-		firstKills = firstKills[:6]
+	if len(attendance) > 30 {
+		attendance = attendance[:30]
 	}
 	mythic := d.MythicTop
-	if len(mythic) > 5 {
-		mythic = mythic[:5]
+	if len(mythic) > 10 {
+		mythic = mythic[:10]
+	}
+	attendanceTotal := d.AttendanceKills
+	if attendanceTotal <= 0 {
+		attendanceTotal = d.TotalKills
 	}
 
-	height := 150 + 20
-	height += digestSectH + maxInt(1, len(firstKills))*digestRowH
+	mythicRows := (len(mythic) + 1) / 2
+	attendanceRows := (len(attendance) + 1) / 2
+
+	height := 130
 	height += digestSectH + 5*digestRowH
 	if len(mythic) > 0 {
-		height += digestSectH + len(mythic)*digestRowH
+		height += digestSectH + mythicRows*digestRowH
 	}
-	height += digestSectH + maxInt(1, len(attendance))*digestRowH
-	height += 50
+	height += digestSectH + maxInt(1, attendanceRows)*digestRowH
+	height += 60
 
 	dc := gg.NewContext(digestWidth, height)
 	if raidID := randomRaidBackgroundID(); raidID > 0 {
@@ -74,21 +76,6 @@ func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 		digestPad, y)
 	y += 34
 
-	y = digestSection(dc, "Новые боссы", y)
-	if len(firstKills) == 0 {
-		y = digestEmptyRow(dc, "Новых боссов за неделю нет", y)
-	} else {
-		for _, fk := range firstKills {
-			name := fk.BossName
-			if name == "" {
-				name = fmt.Sprintf("Босс %d", fk.BossID)
-			}
-			digestRowText(dc, name, formatDigestDateTime(fk.KilledAt), y)
-			y += digestRowH
-		}
-	}
-	y += 14
-
 	y = digestSection(dc, "Топ DPS / Топ HPS", y)
 	colW := float64(digestWidth-digestPad*2) / 2
 	leftY, rightY := y, y
@@ -106,45 +93,28 @@ func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 
 	if len(mythic) > 0 {
 		y = digestSection(dc, "Мифик", y)
+		rowsPerCol := (len(mythic) + 1) / 2
 		for i, p := range mythic {
-			digestMythicRow(dc, digestPad, y, p, i+1)
-			y += digestRowH
+			col := i / rowsPerCol
+			row := i % rowsPerCol
+			x := float64(digestPad) + float64(col)*(colW+20)
+			digestMythicRow(dc, x, y+float64(row)*digestRowH, p, i+1)
 		}
-		y += 14
+		y += float64(rowsPerCol)*digestRowH + 14
 	}
 
 	y = digestSection(dc, "Посещаемость", y)
 	if len(attendance) == 0 {
 		y = digestEmptyRow(dc, "Нет данных о посещаемости", y)
 	} else {
+		rowsPerCol := (len(attendance) + 1) / 2
 		for i, e := range attendance {
-			percent := 0
-			if d.TotalKills > 0 {
-				percent = e.Kills * 100 / d.TotalKills
-				if percent > 100 {
-					percent = 100
-				}
-			}
-			loadCyrillicFontFace(dc, 18)
-			dc.SetRGB(0.55, 0.58, 0.64)
-			dc.DrawString(fmt.Sprintf("%d.", i+1), digestPad, y+20)
-			dc.SetColor(classColorRGBA(e.ClassID))
-			dc.DrawString(fitText(dc, e.Name, 240), digestPad+32, y+20)
-			if e.SetPieces != "" {
-				loadCyrillicFontFace(dc, 14)
-				dc.SetRGB(0.70, 0.25, 0.95)
-				dc.DrawString(fitText(dc, e.SetPieces, 100), 350, y+20)
-			}
-			loadCyrillicFontFace(dc, 18)
-			dc.SetRGB(0.80, 0.83, 0.88)
-			dc.DrawString(fmt.Sprintf("%d / %d · %d%%", e.Kills, d.TotalKills, percent),
-				560, y+20)
-			if e.BlackDiamonds > 0 {
-				dc.SetRGB(0.55, 0.58, 0.64)
-				dc.DrawString(fmt.Sprintf("ЧБ %d", e.BlackDiamonds), 790, y+20)
-			}
-			y += digestRowH
+			col := i / rowsPerCol
+			row := i % rowsPerCol
+			x := float64(digestPad) + float64(col)*(colW+20)
+			digestAttendanceRow(dc, x, y+float64(row)*digestRowH, e, i+1, attendanceTotal)
 		}
+		y += float64(rowsPerCol) * digestRowH
 	}
 
 	y += 26
@@ -167,14 +137,6 @@ func digestSection(dc *gg.Context, title string, y float64) float64 {
 	dc.DrawRectangle(digestPad, y+28, digestWidth-digestPad*2, 1)
 	dc.Fill()
 	return y + digestSectH
-}
-
-func digestRowText(dc *gg.Context, left, right string, y float64) {
-	loadCyrillicFontFace(dc, 18)
-	dc.SetRGB(0.88, 0.90, 0.93)
-	dc.DrawString(left, digestPad, y+20)
-	dc.SetRGB(0.55, 0.58, 0.64)
-	dc.DrawString(right, float64(digestWidth-digestPad-170), y+20)
 }
 
 func digestEmptyRow(dc *gg.Context, text string, y float64) float64 {
@@ -203,17 +165,30 @@ func digestMythicRow(dc *gg.Context, x, y float64, p models.GuildMythicPlayer, r
 	dc.SetRGB(0.55, 0.58, 0.64)
 	dc.DrawString(fmt.Sprintf("%d.", rank), x, y+20)
 	dc.SetColor(classColorRGBA(p.ClassID))
-	dc.DrawString(p.Name, x+28, y+20)
+	dc.DrawString(fitText(dc, p.Name, 210), x+28, y+20)
 	dc.SetRGB(0.82, 0.85, 0.90)
 	key := "—"
 	if p.BestKey > 0 {
 		key = fmt.Sprintf("+%d", p.BestKey)
 	}
 	dc.DrawString(fmt.Sprintf("%s  ·  %s", key, FormatNum(int(p.Score))), x+250, y+20)
-	if p.BlackDiamonds > 0 {
-		dc.SetRGB(0.55, 0.58, 0.64)
-		dc.DrawString(fmt.Sprintf("ЧБ %d", p.BlackDiamonds), x+420, y+20)
+}
+
+func digestAttendanceRow(dc *gg.Context, x, y float64, e models.AttendanceEntry, rank, total int) {
+	percent := 0
+	if total > 0 {
+		percent = e.Kills * 100 / total
+		if percent > 100 {
+			percent = 100
+		}
 	}
+	loadCyrillicFontFace(dc, 18)
+	dc.SetRGB(0.55, 0.58, 0.64)
+	dc.DrawString(fmt.Sprintf("%d.", rank), x, y+20)
+	dc.SetColor(classColorRGBA(e.ClassID))
+	dc.DrawString(fitText(dc, e.Name, 210), x+32, y+20)
+	dc.SetRGB(0.80, 0.83, 0.88)
+	dc.DrawString(fmt.Sprintf("%d / %d · %d%%", e.Kills, total, percent), x+250, y+20)
 }
 
 func formatDigestDate(unix int64) string {
@@ -221,13 +196,6 @@ func formatDigestDate(unix int64) string {
 		return "—"
 	}
 	return time.Unix(unix, 0).In(time.FixedZone("MSK", 3*3600)).Format("02.01")
-}
-
-func formatDigestDateTime(unix int64) string {
-	if unix == 0 {
-		return "—"
-	}
-	return time.Unix(unix, 0).In(time.FixedZone("MSK", 3*3600)).Format("02.01 15:04")
 }
 
 func upperRealm(realm string) string {

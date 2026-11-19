@@ -39,11 +39,14 @@ type WeeklyDigest struct {
 	Until     int64
 
 	TotalKills int
-	FirstKills []FirstKill
-	TopDps     []DigestPlayer
-	TopHps     []DigestPlayer
-	Attendance []AttendanceEntry
-	MythicTop  []GuildMythicPlayer
+	// AttendanceKills is the number of 25-player raid kills used as the
+	// attendance denominator.
+	AttendanceKills int
+	FirstKills      []FirstKill
+	TopDps          []DigestPlayer
+	TopHps          []DigestPlayer
+	Attendance      []AttendanceEntry
+	MythicTop       []GuildMythicPlayer
 }
 
 // PlayerKillProfile is the kill-history part of a player card. Character data
