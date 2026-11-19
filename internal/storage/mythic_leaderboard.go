@@ -134,6 +134,11 @@ func (s *MythicLeaderboardStorage) queryMythicInfo(realm, field string, value an
 // GetGuildMythicPlayers returns the latest mythic leaderboard snapshot rows for
 // the given guild member GUIDs, joined with guild ilvl and cached character
 // data (black diamonds, title), sorted by current_score descending.
+//
+// The join also requires the character name to match: Sirus uses the same GUID
+// namespace across realms, and a realm without mythic+ can still expose a board
+// for it. Without the name check a guild member would inherit a random
+// same-GUID character from another realm.
 func (s *MythicLeaderboardStorage) GetGuildMythicPlayers(realm string, guids []int) ([]models.GuildMythicPlayer, error) {
 	if realm == "" {
 		realm = "x3"
@@ -163,7 +168,7 @@ func (s *MythicLeaderboardStorage) GetGuildMythicPlayers(realm string, guids []i
 	       (SELECT COUNT(*) FROM mythic_leaderboard ml2
 	          WHERE ml2.realm = ml.realm AND ml2.class_id = ml.class_id AND ml2.spec_id = ml.spec_id) AS spec_total
 	FROM mythic_leaderboard ml
-	JOIN guild_members gm ON gm.id = ml.guid AND gm.realm = ml.realm
+	JOIN guild_members gm ON gm.id = ml.guid AND gm.realm = ml.realm AND gm.name = ml.name
 	LEFT JOIN character_cache cc ON cc.realm = ml.realm AND cc.name = ml.name
 	WHERE ml.realm = ?
 	  AND ml.guid IN (` + placeholders + `)

@@ -71,8 +71,12 @@ func RenderWeeklyDigest(d models.WeeklyDigest) ([]byte, error) {
 
 	loadCyrillicFontFace(dc, 18)
 	dc.SetRGB(0.62, 0.66, 0.72)
-	dc.DrawString(fmt.Sprintf("%s · %s – %s · килов: %d",
-		upperRealm(d.Realm), formatDigestDate(d.Since), formatDigestDate(d.Until), d.TotalKills),
+	killsText := fmt.Sprintf("килов: %d", d.TotalKills)
+	if d.AttendanceKills > 0 && d.AttendanceKills != d.TotalKills {
+		killsText += fmt.Sprintf(" · 25-плей: %d", d.AttendanceKills)
+	}
+	dc.DrawString(fmt.Sprintf("%s · %s – %s · %s",
+		upperRealm(d.Realm), formatDigestDate(d.Since), formatDigestDate(d.Until), killsText),
 		digestPad, y)
 	y += 34
 
