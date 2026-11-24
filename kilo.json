@@ -1,0 +1,36 @@
+{
+  "$schema": "https://app.kilo.ai/config.json",
+  "compaction": {
+    "auto": true,
+    "prune": true
+  },
+  "mcp": {},
+  "permission": {
+    "read": "allow",
+    "glob": "allow",
+    "grep": "allow",
+    "list": "allow",
+    "semantic_search": "allow",
+    "lsp": "allow",
+    "edit": "allow",
+    "todowrite": "allow",
+    "external_directory": "deny",
+    "webfetch": "ask",
+    "websearch": "ask",
+    "bash": {
+      "go build*": "allow",
+      "go test*": "allow",
+      "go vet*": "allow",
+      "go run*": "allow",
+      "go fmt*": "allow",
+      "gofmt*": "allow",
+      "make*": "allow",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "git show*": "allow",
+      "git branch*": "allow",
+      "*": "ask"
+    }
+  }
+}
