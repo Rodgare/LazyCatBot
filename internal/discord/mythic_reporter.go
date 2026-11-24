@@ -11,7 +11,28 @@ import (
 )
 
 func (r *DiscordReporter) SendMythicReport(channelID string, report *models.MythicReport) error {
-	embed := &discordgo.MessageEmbed{
+	params := &discordgo.MessageSend{
+		Embeds: []*discordgo.MessageEmbed{mythicReportEmbed(r, report)},
+	}
+	if file := mythicReportFile(r, report); file != nil {
+		params.Files = []*discordgo.File{file}
+	}
+
+	_, err := r.session.ChannelMessageSendComplex(channelID, params)
+	if err != nil {
+		slog.Error("Error sending mythic report", "error", err, "channel_id", channelID)
+	}
+	return err
+}
+
+// EditMythicReport turns an existing queue notice into the finished mythic
+// report, adding the rendered image to the same message.
+func (r *DiscordReporter) EditMythicReport(channelID, messageID string, report *models.MythicReport) error {
+	return editReportMessage(r.session, channelID, messageID, mythicReportEmbed(r, report), mythicReportFile(r, report))
+}
+
+func mythicReportEmbed(r *DiscordReporter, report *models.MythicReport) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
 		Title:  fmt.Sprintf("%s — %d +%d", report.Name, report.KeystoneLevel, report.RewardLevel),
 		URL:    fmt.Sprintf("https://sirus.su/base/ladder/keystone/run/%s/%d", report.Realm, report.ID),
 		Color:  0xf1c40f,
@@ -24,29 +45,19 @@ func (r *DiscordReporter) SendMythicReport(channelID string, report *models.Myth
 		},
 		Timestamp: time.Now().Format(time.RFC3339),
 	}
+}
 
-	params := &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{embed},
-	}
-
+func mythicReportFile(r *DiscordReporter, report *models.MythicReport) *discordgo.File {
 	imgData, err := r.RenderMythicReportImage(report)
-	if err == nil {
-		params.Files = []*discordgo.File{
-			{
-				Name:        "report.png",
-				ContentType: "image/png",
-				Reader:      bytes.NewReader(imgData),
-			},
-		}
-	} else {
-		slog.Error("Error mythic rendering image", "error", err)
-	}
-
-	_, err = r.session.ChannelMessageSendComplex(channelID, params)
 	if err != nil {
-		slog.Error("Error sending mythic report", "error", err, "channel_id", channelID)
+		slog.Error("Error mythic rendering image", "error", err)
+		return nil
 	}
-	return err
+	return &discordgo.File{
+		Name:        "report.png",
+		ContentType: "image/png",
+		Reader:      bytes.NewReader(imgData),
+	}
 }
 
 func formatMythicTime(totalSeconds int) string {

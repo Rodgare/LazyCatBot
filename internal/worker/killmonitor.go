@@ -18,7 +18,9 @@ import (
 
 type Reporter interface {
 	SendKillReport(channelID string, report models.BossKillReport) error
+	EditKillReport(channelID, messageID string, report models.BossKillReport) error
 	SendMythicReport(channelID string, report *models.MythicReport) error
+	EditMythicReport(channelID, messageID string, report *models.MythicReport) error
 	SendMythicTopMock(channelID string) error
 	GetChannelName(channelID string) string
 	SendChannelNotice(channelID, text string) error
@@ -140,6 +142,7 @@ type queueNotice struct {
 	Position  int
 	Title     string
 	KillTime  string
+	CreatedAt time.Time
 }
 
 type Worker struct {
@@ -166,6 +169,8 @@ type Worker struct {
 	noticeMu                sync.Mutex
 	activeNotices           map[string][]queueNotice
 	pendingJobs             map[string]struct{}
+	deliveryMu              sync.Mutex
+	delivered               map[string]struct{}
 }
 
 func NewWorker(
@@ -198,6 +203,7 @@ func NewWorker(
 		missingAccessSuppressed: make(map[string]int),
 		activeNotices:           make(map[string][]queueNotice),
 		pendingJobs:             make(map[string]struct{}),
+		delivered:               make(map[string]struct{}),
 	}
 }
 
@@ -253,6 +259,20 @@ func (w *Worker) enqueueJob(job KillJob) {
 	w.pendingJobs[job.JobID] = struct{}{}
 	w.noticeMu.Unlock()
 
+	channels := make(map[string]bool, len(job.Channels))
+	for ch := range job.Channels {
+		if !w.isDelivered(job.JobID, ch) {
+			channels[ch] = true
+		}
+	}
+	if len(channels) == 0 {
+		w.noticeMu.Lock()
+		delete(w.pendingJobs, job.JobID)
+		w.noticeMu.Unlock()
+		return
+	}
+	job.Channels = channels
+
 	freeChannels := make([]string, 0, len(job.Channels))
 	hasPremium := false
 	for ch := range job.Channels {
@@ -272,6 +292,7 @@ func (w *Worker) enqueueJob(job KillJob) {
 				Position:  position,
 				Title:     job.Title,
 				KillTime:  job.KillTime,
+				CreatedAt: time.Now(),
 			}
 			msgID, err := w.reporter.SendQueueNotice(ch, notice.queuedText())
 			if err != nil {
@@ -390,6 +411,43 @@ func (w *Worker) finishJob(job KillJob) {
 		}
 	}
 	w.refreshNoticePositions()
+}
+
+func deliveryKey(jobID, channelID string) string {
+	return jobID + ":" + channelID
+}
+
+func (w *Worker) isDelivered(jobID, channelID string) bool {
+	w.deliveryMu.Lock()
+	defer w.deliveryMu.Unlock()
+	_, ok := w.delivered[deliveryKey(jobID, channelID)]
+	return ok
+}
+
+func (w *Worker) markDelivered(jobID, channelID string) {
+	w.deliveryMu.Lock()
+	w.delivered[deliveryKey(jobID, channelID)] = struct{}{}
+	w.deliveryMu.Unlock()
+}
+
+// takeNotice removes and returns the notice for a channel so finishJob will not
+// delete a message that is about to be edited into the report.
+func (w *Worker) takeNotice(jobID, channelID string) (queueNotice, bool) {
+	w.noticeMu.Lock()
+	defer w.noticeMu.Unlock()
+
+	notices := w.activeNotices[jobID]
+	for i, n := range notices {
+		if n.ChannelID != channelID {
+			continue
+		}
+		w.activeNotices[jobID] = append(notices[:i], notices[i+1:]...)
+		if len(w.activeNotices[jobID]) == 0 {
+			delete(w.activeNotices, jobID)
+		}
+		return n, true
+	}
+	return queueNotice{}, false
 }
 
 const killPollWindowSeconds = 90
@@ -719,7 +777,7 @@ func (w *Worker) processRaids(job KillJob) {
 	var report *models.BossKillReport
 
 	for ch := range job.Channels {
-		if w.subStore.IsKillProcessed(job.KillID, ch) {
+		if w.isDelivered(job.JobID, ch) || w.subStore.IsKillProcessed(job.KillID, ch) {
 			continue
 		}
 
@@ -758,29 +816,76 @@ func (w *Worker) processRaids(job KillJob) {
 			}
 		}
 
-		if w.subStore.IsReportsEnabled(report.GuildID, ch) {
-			if w.isAccessSuppressed(ch) {
-				continue
-			}
-			if err := w.reporter.SendKillReport(ch, *report); err != nil {
-				if isMissingAccess(err) {
-					w.suppressAccess(ch)
-					w.notifyMissingAccess(ch)
-					if rmErr := w.subStore.RemoveChannelSubscriptions(ch); rmErr != nil {
-						w.logger.Error("[Processor] Remove inaccessible channel subscriptions err", "error", rmErr, "channel", ch)
-					} else {
-						w.logger.Warn("[Processor] Removed subscriptions for inaccessible channel", "channel", ch)
-					}
-					w.logger.Warn("[Processor] Missing access for channel (subscriptions removed)", "error", err, "kill_id", job.KillID, "channel", ch)
-				} else {
-					w.logger.Error("[Processor] Send kill report err", "error", err, "kill_id", job.KillID, "channel", ch)
-				}
-				continue
-			}
+		if !w.subStore.IsReportsEnabled(report.GuildID, ch) {
+			w.markDelivered(job.JobID, ch)
+			w.markProcessed(job.KillID, ch)
+			continue
 		}
-		w.subStore.MarkKillProcessed(job.KillID, ch)
+		if w.isAccessSuppressed(ch) {
+			continue
+		}
 
+		notice, hasNotice := w.takeNotice(job.JobID, ch)
+		w.markDelivered(job.JobID, ch)
+		w.markProcessed(job.KillID, ch)
+		w.scheduleKillReport(job, ch, notice, hasNotice, *report)
 	}
+}
+
+func (w *Worker) markProcessed(killID int, ch string) {
+	if err := w.subStore.MarkKillProcessed(killID, ch); err != nil {
+		w.logger.Error("[Processor] Mark kill processed err", "error", err, "kill_id", killID, "channel", ch)
+	}
+}
+
+// queueNoticeMinVisible keeps the queue message on screen long enough that a
+// free-channel report never looks like a flicker.
+const queueNoticeMinVisible = 12 * time.Second
+
+func (w *Worker) scheduleKillReport(job KillJob, ch string, notice queueNotice, hasNotice bool, report models.BossKillReport) {
+	if !hasNotice {
+		w.deliverKillReport(job, ch, "", false, report)
+		return
+	}
+	go func() {
+		if wait := time.Until(notice.CreatedAt.Add(queueNoticeMinVisible)); wait > 0 {
+			time.Sleep(wait)
+		}
+		w.deliverKillReport(job, ch, notice.MessageID, true, report)
+	}()
+}
+
+func (w *Worker) deliverKillReport(job KillJob, ch, messageID string, edit bool, report models.BossKillReport) {
+	var err error
+	if edit {
+		err = w.reporter.EditKillReport(ch, messageID, report)
+		if err != nil {
+			w.logger.Warn("[Processor] Edit kill report err, sending a new message",
+				"error", err, "kill_id", job.KillID, "channel", ch)
+			_ = w.reporter.DeleteNotice(ch, messageID)
+			err = w.reporter.SendKillReport(ch, report)
+		}
+	} else {
+		err = w.reporter.SendKillReport(ch, report)
+	}
+	if err != nil {
+		w.handleReportDeliveryError(job.KillID, ch, err)
+	}
+}
+
+func (w *Worker) handleReportDeliveryError(killID int, ch string, err error) {
+	if isMissingAccess(err) {
+		w.suppressAccess(ch)
+		w.notifyMissingAccess(ch)
+		if rmErr := w.subStore.RemoveChannelSubscriptions(ch); rmErr != nil {
+			w.logger.Error("[Processor] Remove inaccessible channel subscriptions err", "error", rmErr, "channel", ch)
+		} else {
+			w.logger.Warn("[Processor] Removed subscriptions for inaccessible channel", "channel", ch)
+		}
+		w.logger.Warn("[Processor] Missing access for channel (subscriptions removed)", "error", err, "kill_id", killID, "channel", ch)
+		return
+	}
+	w.logger.Error("[Processor] Send kill report err", "error", err, "kill_id", killID, "channel", ch)
 }
 
 func (w *Worker) processMythicRuns(job KillJob) {
@@ -803,33 +908,56 @@ func (w *Worker) processMythicRuns(job KillJob) {
 		w.enqueueCharRefreshIfStale(job.Realm, m.Name, m.MemberGUID)
 	}
 	for ch := range job.Channels {
-		if w.subStore.IsKillProcessed(job.KillID, ch) {
+		if w.isDelivered(job.JobID, ch) || w.subStore.IsKillProcessed(job.KillID, ch) {
 			continue
 		}
 
-		if w.subStore.IsMythicReportsEnabled(ch) {
-			if w.isAccessSuppressed(ch) {
-				continue
-			}
-			if err := w.reporter.SendMythicReport(ch, job.MythicReport); err != nil {
-				if isMissingAccess(err) {
-					w.suppressAccess(ch)
-					w.notifyMissingAccess(ch)
-					if rmErr := w.subStore.RemoveChannelSubscriptions(ch); rmErr != nil {
-						w.logger.Error("[Processor] Remove inaccessible channel subscriptions err", "error", rmErr, "channel", ch)
-					} else {
-						w.logger.Warn("[Processor] Removed subscriptions for inaccessible channel", "channel", ch)
-					}
-					w.logger.Warn("[Processor] Missing access for channel (subscriptions removed)", "error", err, "run_id", job.KillID, "channel", ch)
-				} else {
-					w.logger.Error("[Processor] Send mythic report err", "error", err, "run_id", job.KillID, "channel", ch)
-				}
-				continue
-			}
+		if !w.subStore.IsMythicReportsEnabled(ch) {
+			w.markDelivered(job.JobID, ch)
+			w.markProcessed(job.KillID, ch)
+			continue
 		}
-		w.subStore.MarkKillProcessed(job.KillID, ch)
+		if w.isAccessSuppressed(ch) {
+			continue
+		}
+
+		notice, hasNotice := w.takeNotice(job.JobID, ch)
+		w.markDelivered(job.JobID, ch)
+		w.markProcessed(job.KillID, ch)
+		w.scheduleMythicReport(job, ch, notice, hasNotice, job.MythicReport)
 	}
 
+}
+
+func (w *Worker) scheduleMythicReport(job KillJob, ch string, notice queueNotice, hasNotice bool, report *models.MythicReport) {
+	if !hasNotice {
+		w.deliverMythicReport(job, ch, "", false, report)
+		return
+	}
+	go func() {
+		if wait := time.Until(notice.CreatedAt.Add(queueNoticeMinVisible)); wait > 0 {
+			time.Sleep(wait)
+		}
+		w.deliverMythicReport(job, ch, notice.MessageID, true, report)
+	}()
+}
+
+func (w *Worker) deliverMythicReport(job KillJob, ch, messageID string, edit bool, report *models.MythicReport) {
+	var err error
+	if edit {
+		err = w.reporter.EditMythicReport(ch, messageID, report)
+		if err != nil {
+			w.logger.Warn("[Processor] Edit mythic report err, sending a new message",
+				"error", err, "run_id", job.KillID, "channel", ch)
+			_ = w.reporter.DeleteNotice(ch, messageID)
+			err = w.reporter.SendMythicReport(ch, report)
+		}
+	} else {
+		err = w.reporter.SendMythicReport(ch, report)
+	}
+	if err != nil {
+		w.handleReportDeliveryError(job.KillID, ch, err)
+	}
 }
 
 func (w *Worker) enrichMythicCharacters(job KillJob) {

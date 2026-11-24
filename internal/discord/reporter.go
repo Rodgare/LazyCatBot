@@ -47,7 +47,29 @@ var ansiColors = map[string]string{
 }
 
 func SendKillReport(s *discordgo.Session, channelID string, report models.BossKillReport) error {
-	embed := &discordgo.MessageEmbed{
+	embed := killReportEmbed(report)
+	params := &discordgo.MessageSend{
+		Embeds: []*discordgo.MessageEmbed{embed},
+	}
+	if file := renderKillReportFile(report); file != nil {
+		params.Files = []*discordgo.File{file}
+	}
+
+	_, err := s.ChannelMessageSendComplex(channelID, params)
+	if err != nil {
+		slog.Error("Error sending report", "error", err, "channel_id", channelID)
+	}
+	return err
+}
+
+// EditKillReport rewrites an existing message (the queue notice) into the
+// finished report, attaching the rendered image to the same message.
+func EditKillReport(s *discordgo.Session, channelID, messageID string, report models.BossKillReport) error {
+	return editReportMessage(s, channelID, messageID, killReportEmbed(report), renderKillReportFile(report))
+}
+
+func killReportEmbed(report models.BossKillReport) *discordgo.MessageEmbed {
+	return &discordgo.MessageEmbed{
 		Author: &discordgo.MessageEmbedAuthor{
 			Name:    report.GuildName,
 			IconURL: fmt.Sprintf("https://sirus.su/api/base/%s/guild/%d/emblem.webp", report.Realm, report.GuildID),
@@ -65,29 +87,58 @@ func SendKillReport(s *discordgo.Session, channelID string, report models.BossKi
 		},
 		Timestamp: time.Now().Format(time.RFC3339),
 	}
+}
 
-	params := &discordgo.MessageSend{
-		Embeds: []*discordgo.MessageEmbed{embed},
-	}
-
+func renderKillReportFile(report models.BossKillReport) *discordgo.File {
 	imgData, err := RenderReportImage(report)
-	if err == nil {
-		params.Files = []*discordgo.File{
-			{
-				Name:        "report.png",
-				ContentType: "image/png",
-				Reader:      bytes.NewReader(imgData),
-			},
-		}
-	} else {
+	if err != nil {
 		slog.Error("Error rendering image", "error", err)
+		return nil
+	}
+	return &discordgo.File{
+		Name:        "report.png",
+		ContentType: "image/png",
+		Reader:      bytes.NewReader(imgData),
+	}
+}
+
+// editReportMessage edits a message and adds an attachment. Discord requires
+// new attachments to be listed in the attachments array with id equal to the
+// file index, so this uses a raw multipart request instead of MessageEdit.
+func editReportMessage(s *discordgo.Session, channelID, messageID string, embed *discordgo.MessageEmbed, file *discordgo.File) error {
+	emptyContent := ""
+	payload := struct {
+		Content     *string                      `json:"content"`
+		Embeds      []*discordgo.MessageEmbed    `json:"embeds"`
+		Attachments []reportAttachment           `json:"attachments"`
+		Components  []discordgo.MessageComponent `json:"components"`
+	}{
+		Content:     &emptyContent,
+		Embeds:      []*discordgo.MessageEmbed{embed},
+		Components:  []discordgo.MessageComponent{},
+		Attachments: []reportAttachment{},
 	}
 
-	_, err = s.ChannelMessageSendComplex(channelID, params)
-	if err != nil {
-		slog.Error("Error sending report", "error", err, "channel_id", channelID)
+	files := []*discordgo.File{}
+	if file != nil {
+		files = append(files, file)
+		payload.Attachments = []reportAttachment{{ID: 0, Filename: file.Name}}
+	} else {
+		embed.Image = nil
 	}
+
+	contentType, body, err := discordgo.MultipartBodyWithJSON(payload, files)
+	if err != nil {
+		return err
+	}
+	_, err = s.RequestRaw("PATCH", discordgo.EndpointChannelMessage(channelID, messageID),
+		contentType, body, discordgo.EndpointChannelMessage(channelID, ""), 0)
 	return err
+}
+
+type reportAttachment struct {
+	ID       int    `json:"id"`
+	Filename string `json:"filename"`
 }
 
 func buildFields(report models.BossKillReport, lootsBlock []models.LootReport) []*discordgo.MessageEmbedField {
@@ -264,6 +315,10 @@ func (r *DiscordReporter) SendKillReport(channelID string, report models.BossKil
 		}
 	}
 	return SendKillReport(r.session, channelID, report)
+}
+
+func (r *DiscordReporter) EditKillReport(channelID, messageID string, report models.BossKillReport) error {
+	return EditKillReport(r.session, channelID, messageID, report)
 }
 
 func (r *DiscordReporter) GetChannelName(channelID string) string {
