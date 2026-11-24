@@ -52,6 +52,25 @@ func (s *jobScheduler) total() int {
 	return len(s.premium) + len(s.free)
 }
 
+// freeLen returns the number of jobs waiting in the non-premium queue.
+func (s *jobScheduler) freeLen() int {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	return len(s.free)
+}
+
+// freeJobIDs returns job IDs in the order they will be processed. Used to keep
+// the "position in queue" notices up to date.
+func (s *jobScheduler) freeJobIDs() []string {
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	ids := make([]string, 0, len(s.free))
+	for _, qj := range s.free {
+		ids = append(ids, qj.job.JobID)
+	}
+	return ids
+}
+
 // pop blocks until a job is available or ctx is cancelled. The bool is false
 // only when the context is done.
 func (s *jobScheduler) pop(ctx context.Context) (KillJob, bool) {

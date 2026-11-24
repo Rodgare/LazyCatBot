@@ -280,22 +280,39 @@ func (r *DiscordReporter) SendChannelNotice(channelID, text string) error {
 }
 
 // SendQueueNotice posts the "report is queued" placeholder for free channels
-// and returns its message ID so the caller can delete it once the report is out.
-func (r *DiscordReporter) SendQueueNotice(channelID string, position int) (string, error) {
-	text := fmt.Sprintf("⏳ Отчёт готовится к отправке. Позиция в очереди: **%d**.\n"+
-		"Сервер с **премиумом** получает отчёты без очереди во всех каналах. Подробнее — кнопка ниже.", position)
+// and returns its message ID so the same message can be edited and removed.
+func (r *DiscordReporter) SendQueueNotice(channelID, text string) (string, error) {
 	msg, err := r.session.ChannelMessageSendComplex(channelID, &discordgo.MessageSend{
-		Content: text,
-		Components: []discordgo.MessageComponent{
-			discordgo.ActionsRow{Components: []discordgo.MessageComponent{
-				discordgo.Button{Label: "🐾 Премиум", Style: discordgo.SecondaryButton, CustomID: "premium_open"},
-			}},
-		},
+		Content:    text,
+		Components: queueNoticeComponents(),
 	})
 	if err != nil {
 		return "", err
 	}
 	return msg.ID, nil
+}
+
+// EditQueueNotice updates an existing queue notice in place.
+func (r *DiscordReporter) EditQueueNotice(channelID, messageID, text string) error {
+	if messageID == "" {
+		return nil
+	}
+	components := queueNoticeComponents()
+	_, err := r.session.ChannelMessageEditComplex(&discordgo.MessageEdit{
+		ID:         messageID,
+		Channel:    channelID,
+		Content:    &text,
+		Components: &components,
+	})
+	return err
+}
+
+func queueNoticeComponents() []discordgo.MessageComponent {
+	return []discordgo.MessageComponent{
+		discordgo.ActionsRow{Components: []discordgo.MessageComponent{
+			discordgo.Button{Label: "🐾 Премиум", Style: discordgo.SecondaryButton, CustomID: "premium_open"},
+		}},
+	}
 }
 
 func (r *DiscordReporter) DeleteNotice(channelID, messageID string) error {

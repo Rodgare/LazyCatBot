@@ -22,7 +22,8 @@ type Reporter interface {
 	SendMythicTopMock(channelID string) error
 	GetChannelName(channelID string) string
 	SendChannelNotice(channelID, text string) error
-	SendQueueNotice(channelID string, position int) (string, error)
+	SendQueueNotice(channelID, text string) (string, error)
+	EditQueueNotice(channelID, messageID, text string) error
 	DeleteNotice(channelID, messageID string) error
 	SendAnnouncement(channelID, text string) error
 	SendWeeklyDigest(channelID string, digest models.WeeklyDigest) error
@@ -125,9 +126,20 @@ type KillJob struct {
 	Channels     map[string]bool
 	Type         string
 	MythicReport *models.MythicReport
-	// QueueNotices maps channel ID to the placeholder message that was sent to
-	// free channels while the job was waiting. It is empty for premium channels.
-	QueueNotices map[string]string
+	// JobID deduplicates repeated detections of the same kill.
+	JobID string
+	// Title and KillTime are surfaced in the queue notice when known.
+	Title    string
+	KillTime string
+}
+
+type queueNotice struct {
+	ChannelID string
+	MessageID string
+	JobID     string
+	Position  int
+	Title     string
+	KillTime  string
 }
 
 type Worker struct {
@@ -151,6 +163,9 @@ type Worker struct {
 	cfg                     *config.Config
 	missingAccessSuppressed map[string]int
 	resyncMu                sync.Mutex
+	noticeMu                sync.Mutex
+	activeNotices           map[string][]queueNotice
+	pendingJobs             map[string]struct{}
 }
 
 func NewWorker(
@@ -181,6 +196,8 @@ func NewWorker(
 		logger:                  logger,
 		cfg:                     cfg,
 		missingAccessSuppressed: make(map[string]int),
+		activeNotices:           make(map[string][]queueNotice),
+		pendingJobs:             make(map[string]struct{}),
 	}
 }
 
@@ -218,10 +235,24 @@ func (w *Worker) channelPremium(channelID string) bool {
 }
 
 // enqueueJob classifies a job by the channels it targets and pushes it into the
-// priority scheduler. Free channels always receive a short processing/queue
-// notice, which is cleaned up when the job is processed. Premium servers get
-// their report without a placeholder because they never wait in the queue.
+// priority scheduler. Free channels receive one queue notice per report; the
+// same message is edited as the queue advances and removed when the report is
+// generated. Repeated detections of the same kill are ignored while a job for
+// it is still pending. Premium servers get their report without a placeholder
+// because they never wait in the queue.
 func (w *Worker) enqueueJob(job KillJob) {
+	if job.JobID == "" {
+		job.JobID = fmt.Sprintf("%s:%s:%d", job.Type, job.Realm, job.KillID)
+	}
+
+	w.noticeMu.Lock()
+	if _, exists := w.pendingJobs[job.JobID]; exists {
+		w.noticeMu.Unlock()
+		return
+	}
+	w.pendingJobs[job.JobID] = struct{}{}
+	w.noticeMu.Unlock()
+
 	freeChannels := make([]string, 0, len(job.Channels))
 	hasPremium := false
 	for ch := range job.Channels {
@@ -232,31 +263,133 @@ func (w *Worker) enqueueJob(job KillJob) {
 		freeChannels = append(freeChannels, ch)
 	}
 
-	position := w.scheduler.total() + 1
-	for _, ch := range freeChannels {
-		msgID, err := w.reporter.SendQueueNotice(ch, position)
-		if err != nil {
-			w.logger.Warn("[Processor] Send queue notice err", "error", err, "channel", ch)
-			continue
+	position := w.scheduler.freeLen() + 1
+	if !hasPremium {
+		for _, ch := range freeChannels {
+			notice := queueNotice{
+				ChannelID: ch,
+				JobID:     job.JobID,
+				Position:  position,
+				Title:     job.Title,
+				KillTime:  job.KillTime,
+			}
+			msgID, err := w.reporter.SendQueueNotice(ch, notice.queuedText())
+			if err != nil {
+				w.logger.Warn("[Processor] Send queue notice err", "error", err, "channel", ch)
+				continue
+			}
+			notice.MessageID = msgID
+			w.noticeMu.Lock()
+			w.activeNotices[job.JobID] = append(w.activeNotices[job.JobID], notice)
+			w.noticeMu.Unlock()
 		}
-		if job.QueueNotices == nil {
-			job.QueueNotices = make(map[string]string)
-		}
-		job.QueueNotices[ch] = msgID
 	}
 
 	w.scheduler.push(job, hasPremium)
 }
 
-func (w *Worker) clearQueueNotices(job KillJob) {
-	for ch, msgID := range job.QueueNotices {
-		if msgID == "" {
-			continue
-		}
-		if err := w.reporter.DeleteNotice(ch, msgID); err != nil {
-			w.logger.Debug("[Processor] Delete queue notice err", "error", err, "channel", ch)
+func (n queueNotice) queuedText() string {
+	var b strings.Builder
+	b.WriteString("⏳ Отчёт поставлен в очередь на генерацию.")
+	if n.Title != "" {
+		b.WriteString("\n**" + n.Title + "**")
+	}
+	if n.KillTime != "" {
+		b.WriteString("\nКил: " + n.KillTime)
+	}
+	fmt.Fprintf(&b, "\nПозиция в очереди: **%d**.", n.Position)
+	b.WriteString("\nСервер с **премиумом** получает отчёты без очереди. Подробнее — кнопка ниже.")
+	return b.String()
+}
+
+func (n queueNotice) processingText() string {
+	var b strings.Builder
+	b.WriteString("⚙️ Генерируем отчёт…")
+	if n.Title != "" {
+		b.WriteString("\n**" + n.Title + "**")
+	}
+	if n.KillTime != "" {
+		b.WriteString("\nКил: " + n.KillTime)
+	}
+	return b.String()
+}
+
+// markJobProcessing updates the job's notices to the "generating" state.
+func (w *Worker) markJobProcessing(job KillJob) {
+	w.noticeMu.Lock()
+	notices := append([]queueNotice(nil), w.activeNotices[job.JobID]...)
+	w.noticeMu.Unlock()
+
+	for _, n := range notices {
+		if err := w.reporter.EditQueueNotice(n.ChannelID, n.MessageID, n.processingText()); err != nil {
+			w.logger.Debug("[Processor] Edit queue notice err", "error", err, "channel", n.ChannelID)
 		}
 	}
+}
+
+// editJobNotices replaces the text of every active notice for a job.
+func (w *Worker) editJobNotices(jobID, text string) {
+	w.noticeMu.Lock()
+	notices := append([]queueNotice(nil), w.activeNotices[jobID]...)
+	w.noticeMu.Unlock()
+
+	for _, n := range notices {
+		if err := w.reporter.EditQueueNotice(n.ChannelID, n.MessageID, text); err != nil {
+			w.logger.Debug("[Processor] Edit queue notice err", "error", err, "channel", n.ChannelID)
+		}
+	}
+}
+
+// refreshNoticePositions rewrites the queue position on every waiting notice.
+func (w *Worker) refreshNoticePositions() {
+	ids := w.scheduler.freeJobIDs()
+	positions := make(map[string]int, len(ids))
+	for i, id := range ids {
+		positions[id] = i + 1
+	}
+
+	w.noticeMu.Lock()
+	var updates []queueNotice
+	for jobID, notices := range w.activeNotices {
+		position, ok := positions[jobID]
+		if !ok {
+			continue
+		}
+		for i := range notices {
+			if notices[i].Position == position {
+				continue
+			}
+			notices[i].Position = position
+			updates = append(updates, notices[i])
+		}
+	}
+	w.noticeMu.Unlock()
+
+	for _, n := range updates {
+		if err := w.reporter.EditQueueNotice(n.ChannelID, n.MessageID, n.queuedText()); err != nil {
+			w.logger.Debug("[Processor] Edit queue position err", "error", err, "channel", n.ChannelID)
+		}
+	}
+}
+
+// finishJob deletes the job's queue notices and lets a future poll retry the
+// kill if it was not marked as processed.
+func (w *Worker) finishJob(job KillJob) {
+	w.noticeMu.Lock()
+	notices := w.activeNotices[job.JobID]
+	delete(w.activeNotices, job.JobID)
+	delete(w.pendingJobs, job.JobID)
+	w.noticeMu.Unlock()
+
+	for _, n := range notices {
+		if n.MessageID == "" {
+			continue
+		}
+		if err := w.reporter.DeleteNotice(n.ChannelID, n.MessageID); err != nil {
+			w.logger.Debug("[Processor] Delete queue notice err", "error", err, "channel", n.ChannelID)
+		}
+	}
+	w.refreshNoticePositions()
 }
 
 const killPollWindowSeconds = 90
@@ -308,7 +441,7 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 
 		w.prepareGuildPollLimiter(len(guilds))
 
-		kills, killRealms := w.getGuildKills(guilds)
+		kills, killRealms, killTimes := w.getGuildKills(guilds)
 		sortedKillsIDs := w.sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
@@ -322,6 +455,7 @@ func (w *Worker) GuildKillMonitor(ctx context.Context) {
 				Realm:    killRealms[killID],
 				Channels: kills[killID],
 				Type:     "raid",
+				KillTime: killTimes[killID],
 			})
 		}
 
@@ -358,7 +492,7 @@ func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 			continue
 		}
 
-		kills, killRealms := w.getPlayerKills(players)
+		kills, killRealms, killTimes := w.getPlayerKills(players)
 		sortedKillsIDs := w.sortKills(kills)
 
 		for _, killID := range sortedKillsIDs {
@@ -372,6 +506,7 @@ func (w *Worker) PlayerKillMonitor(ctx context.Context) {
 				Realm:    killRealms[killID],
 				Channels: kills[killID],
 				Type:     "raid",
+				KillTime: killTimes[killID],
 			})
 		}
 
@@ -506,12 +641,22 @@ func (w *Worker) MythicRunsMonitor(ctx context.Context) {
 				return
 			default:
 			}
+			title := report.Name
+			if title != "" && report.KeystoneLevel > 0 {
+				title = fmt.Sprintf("%s +%d", title, report.KeystoneLevel)
+			}
+			killTime := ""
+			if report.DateTime > 0 {
+				killTime = time.Unix(int64(report.DateTime), 0).In(time.FixedZone("MSK", 3*3600)).Format("02.01 15:04")
+			}
 			w.enqueueJob(KillJob{
 				KillID:       runID,
 				Realm:        realm,
 				Channels:     channels,
 				MythicReport: &report,
 				Type:         "myth",
+				Title:        title,
+				KillTime:     killTime,
 			})
 		}
 
@@ -534,6 +679,9 @@ func (w *Worker) StartProcessor(ctx context.Context) {
 			w.logger.Info("[KillMonitor] Processor stopped")
 			return
 		}
+
+		w.markJobProcessing(job)
+		w.refreshNoticePositions()
 
 		queued := w.scheduler.total()
 		if queued >= killQueueOverloadThreshold {
@@ -567,7 +715,7 @@ func (w *Worker) StartProcessor(ctx context.Context) {
 }
 
 func (w *Worker) processRaids(job KillJob) {
-	defer w.clearQueueNotices(job)
+	defer w.finishJob(job)
 	var report *models.BossKillReport
 
 	for ch := range job.Channels {
@@ -586,6 +734,18 @@ func (w *Worker) processRaids(job KillJob) {
 			rep := w.createReport(enrichedKill, job.KillID, job.Realm)
 			w.enrichRaidCharacters(&rep, job.Realm)
 			report = &rep
+
+			notice := "⚙️ Генерируем отчёт…"
+			if rep.BossName != "" {
+				notice += "\n**" + rep.BossName + "**"
+			}
+			if rep.MapName != "" {
+				notice += " · " + rep.MapName
+			}
+			if job.KillTime != "" {
+				notice += "\nКил: " + job.KillTime
+			}
+			w.editJobNotices(job.JobID, notice)
 
 			if w.killHistory != nil {
 				if err := w.killHistory.RecordKill(rep); err != nil {
@@ -624,7 +784,7 @@ func (w *Worker) processRaids(job KillJob) {
 }
 
 func (w *Worker) processMythicRuns(job KillJob) {
-	defer w.clearQueueNotices(job)
+	defer w.finishJob(job)
 	if job.MythicReport.HasRunLog {
 		w.apiLimiter.Wait()
 		runDetails, err := w.sirusClient.FetchMythicRunDetails(job.Realm, job.KillID)
@@ -712,9 +872,10 @@ func (w *Worker) enrichRaidCharacters(report *models.BossKillReport, realm strin
 	}
 }
 
-func (w *Worker) getGuildKills(data map[storage.TrackedGuildKey][]string) (map[int]map[string]bool, map[int]string) {
+func (w *Worker) getGuildKills(data map[storage.TrackedGuildKey][]string) (map[int]map[string]bool, map[int]string, map[int]string) {
 	kills := make(map[int]map[string]bool)
 	killRealms := make(map[int]string)
+	killTimes := make(map[int]string)
 
 	var mu sync.Mutex
 	keys := make([]storage.TrackedGuildKey, 0, len(data))
@@ -754,6 +915,7 @@ func (w *Worker) getGuildKills(data map[storage.TrackedGuildKey][]string) (map[i
 					}
 					kills[id][ch] = true
 					killRealms[id] = key.Realm
+					killTimes[id] = kill.TimeEnd
 					mu.Unlock()
 				}
 			}
@@ -761,12 +923,13 @@ func (w *Worker) getGuildKills(data map[storage.TrackedGuildKey][]string) (map[i
 	}
 
 	wg.Wait()
-	return kills, killRealms
+	return kills, killRealms, killTimes
 }
 
-func (w *Worker) getPlayerKills(data map[storage.TrackedPlayerKey][]string) (map[int]map[string]bool, map[int]string) {
+func (w *Worker) getPlayerKills(data map[storage.TrackedPlayerKey][]string) (map[int]map[string]bool, map[int]string, map[int]string) {
 	kills := make(map[int]map[string]bool)
 	killRealms := make(map[int]string)
+	killTimes := make(map[int]string)
 
 	var mu sync.Mutex
 	keys := make([]storage.TrackedPlayerKey, 0, len(data))
@@ -814,6 +977,7 @@ func (w *Worker) getPlayerKills(data map[storage.TrackedPlayerKey][]string) (map
 					}
 					kills[id][ch] = true
 					killRealms[id] = key.Realm
+					killTimes[id] = kill.Date
 					mu.Unlock()
 				}
 			}
@@ -821,7 +985,7 @@ func (w *Worker) getPlayerKills(data map[storage.TrackedPlayerKey][]string) (map
 	}
 
 	wg.Wait()
-	return kills, killRealms
+	return kills, killRealms, killTimes
 }
 
 func (w *Worker) createReport(fight *models.BossFight, killID int, realm string) models.BossKillReport {
